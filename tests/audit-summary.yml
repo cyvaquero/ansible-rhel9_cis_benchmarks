@@ -9,7 +9,8 @@
 #                                       # nothing to report; passes even when failing on findings
 
 # Hosts
-- hosts: "{{ target }}"
+- name: Exercise the finding and summary tasks
+  hosts: "{{ target | default('localhost') }}"
   become: false
   gather_facts: false
 
