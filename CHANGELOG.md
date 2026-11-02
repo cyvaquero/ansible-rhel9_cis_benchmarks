@@ -26,6 +26,23 @@ implements, then the role's own version.
 - The auditd reload handler waives ansible-lint's `command-instead-of-module` rule,
   because auditd refuses the service module (#13).
 
+## [3.0.0_0.0.5]
+
+### Added
+
+- Audit mode (#4): `cis_audit_only` (default `false`) checks and reports without
+  changing the host, and `cis_fail_on_findings` (default `false`) fails each host that
+  ends the run with findings. Preflight rejects values that are not true or false.
+- A shared control pattern: a read-only check, remediation only when not in audit mode,
+  and `tasks/finding.yml` to record a finding. It is documented in `CLAUDE.md` and in the
+  header of `tasks/finding.yml`.
+- An end-of-run summary per host listing the failing CIS IDs. Selected audit-only and
+  manual controls always count as findings; their IDs come from the new
+  `cis_control_dispositions` map in `vars/controls.yml`, which mirrors `docs/controls.md`.
+- `tests/check_controls.py` fails when `vars/controls.yml` and `docs/controls.md`
+  disagree on IDs, levels, dispositions or totals, and `tests/audit-summary.yml`
+  exercises the summary and failure behavior without a RHEL 9 host.
+
 ## [3.0.0_0.0.4]
 
 ### Added
