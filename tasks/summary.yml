@@ -1,0 +1,52 @@
+---
+# End-of-run summary, per host: the failing CIS IDs recorded in cis_findings (see
+# finding.yml) plus every selected control whose disposition is audit-only or manual,
+# which only ever report. IDs are listed in docs/controls.md order. With
+# cis_fail_on_findings the host then fails when there is at least one.
+#
+# Needs cis_selected_controls (preflight) and vars/controls.yml.
+
+- name: "Summary - Compute the findings"
+  ansible.builtin.set_fact:
+    cis_report_only_findings: >-
+      {{ cis_selected_controls
+         | select('in', cis_control_dispositions | dict2items
+                  | selectattr('value', 'in', ['audit-only', 'manual'])
+                  | map(attribute='key') | list)
+         | list }}
+    cis_final_findings: >-
+      {{ cis_selected_controls
+         | select('in', (cis_findings | default([]))
+                  + (cis_control_dispositions | dict2items
+                     | selectattr('value', 'in', ['audit-only', 'manual'])
+                     | map(attribute='key') | list))
+         | list }}
+  tags:
+    - always
+    - summary
+
+- name: "Summary - Report the findings"
+  ansible.builtin.debug:
+    msg:
+      - "CIS findings for {{ inventory_hostname }}: {{ cis_final_findings | length }}
+         ({{ 'audit' if (cis_audit_only | bool) else 'remediate' }} mode)"
+      - "Failing checks: {{ (cis_findings | default([])) | length }}"
+      - "Audit-only and manual controls to review: {{ cis_report_only_findings | length }}"
+      - "All finding IDs: {{ cis_final_findings | join(', ') if cis_final_findings else 'none' }}"
+  tags:
+    - always
+    - summary
+
+- name: "Summary - Fail when there are findings"
+  ansible.builtin.fail:
+    msg: >-
+      {{ cis_final_findings | length }} CIS finding(s) on {{ inventory_hostname }}:
+      {{ cis_final_findings | join(', ') }}. Set cis_fail_on_findings to false to
+      report them without failing.
+  when:
+    - cis_fail_on_findings | bool
+    - cis_final_findings | length > 0
+  tags:
+    - always
+    - summary
+...

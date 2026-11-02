@@ -4,8 +4,8 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.4).** The role skeleton, preflight check and profile
-selection exist; no controls are implemented yet. Do not run this against hosts you care about.
+**Status: pre-alpha (3.0.0_0.0.5).** The role skeleton, preflight check, profile
+selection and audit mode exist; no controls are implemented yet. Do not run this against hosts you care about.
 
 ## Relationship to the RHEL 7 and RHEL 8 projects
 
@@ -41,8 +41,8 @@ for tasks that differ between minor releases. Compare it with the `int` filter, 
 example `cis_rhel_minor_release | int >= 4`.
 
 It then validates the selection variables below and fails with a clear message on an
-invalid `cis_profile`, a `cis_apply_level_2` that is not true or false, or a CIS ID in
-`cis_exclusions` that is not in the benchmark.
+invalid `cis_profile`, a `cis_apply_level_2`, `cis_audit_only` or `cis_fail_on_findings`
+that is not true or false, or a CIS ID in `cis_exclusions` that is not in the benchmark.
 
 ## Usage (planned)
 
@@ -90,18 +90,33 @@ ansible-playbook -i inventory site.yml -e target=webservers
 
 ### Audit vs remediate
 
-- Remediate (default): each control is checked and fixed.
-- Audit: `-e cis_audit_only=true` checks and reports each control without changing the
-  host.
+| Variable | Default | Meaning |
+|---|---|---|
+| `cis_audit_only` | `false` | `false` (remediate) checks and fixes each control. `true` (audit) checks and reports without changing the host. |
+| `cis_fail_on_findings` | `false` | `true` fails each host that ends the run with findings, after the summary is printed. |
 
-Controls marked audit-only or manual in `docs/controls.md` only report, in either mode.
-The audit variable name is provisional until the audit-mode work lands.
+- Remediate (default): each control is checked and fixed.
+- Audit: `-e cis_audit_only=true` checks each control and records a finding for every
+  one that fails; nothing on the host changes, so the run reports `changed=0`.
+- With `--check`, remediate mode shows which controls would change; audit mode never
+  changes anything.
+- Controls marked audit-only or manual in `docs/controls.md` only report, in either
+  mode. Every one that is selected is listed as a finding, whether or not its check
+  passes, so it is not forgotten.
+- At the end of every run a summary lists, per host, the failing CIS IDs (in
+  `docs/controls.md` order) and how many are audit-only or manual controls to review.
+  With `cis_fail_on_findings: true` the host then fails, which suits a CI gate:
+  `-e cis_audit_only=true -e cis_fail_on_findings=true`. The audit-only and manual
+  controls selected for the run always count, so expect that gate to fail until you
+  exclude them in `cis_exclusions`.
+- The summary is tagged `summary` and `always`, and lists every selected audit-only and
+  manual control even on a run limited by tags.
 
 ## Versioning
 
 Versions are `<benchmark>_<major>.<minor>.<iterative>`. The part before the underscore is
 the CIS benchmark version the role implements; the part after is the role's own version.
-`3.0.0_0.0.4` is role version 0.0.4 for benchmark v3.0.0. See
+`3.0.0_0.0.5` is role version 0.0.5 for benchmark v3.0.0. See
 [CHANGELOG.md](CHANGELOG.md).
 
 ## License
