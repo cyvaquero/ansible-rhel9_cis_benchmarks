@@ -4,8 +4,8 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.3).** The role skeleton and preflight check exist; no controls are
-implemented yet. Do not run this against hosts you care about.
+**Status: pre-alpha (3.0.0_0.0.4).** The role skeleton, preflight check and profile
+selection exist; no controls are implemented yet. Do not run this against hosts you care about.
 
 ## Relationship to the RHEL 7 and RHEL 8 projects
 
@@ -40,6 +40,10 @@ message otherwise. It sets `cis_rhel_minor_release`, a string such as `"4"` on R
 for tasks that differ between minor releases. Compare it with the `int` filter, for
 example `cis_rhel_minor_release | int >= 4`.
 
+It then validates the selection variables below and fails with a clear message on an
+invalid `cis_profile`, a `cis_apply_level_2` that is not true or false, or a CIS ID in
+`cis_exclusions` that is not in the benchmark.
+
 ## Usage (planned)
 
 Install the role into a `roles/` directory next to your playbook as
@@ -68,9 +72,19 @@ ansible-playbook -i inventory site.yml -e target=webservers
 
 ### Selecting profiles
 
-- Level: Level 1 runs by default. Set `cis_apply_level_2: true` to add Level 2.
-- Profile: `cis_profile: server` (default) or `cis_profile: workstation`.
-- Exclusions: list CIS IDs in `cis_exclusions` to skip them.
+| Variable | Default | Meaning |
+|---|---|---|
+| `cis_apply_level_2` | `false` | Level 1 always runs. `true` adds Level 2, which includes Level 1. |
+| `cis_profile` | `server` | `server` or `workstation`. |
+| `cis_exclusions` | `[]` | Your list of CIS IDs to skip, for example `["1.1.1.10"]`. |
+| `cis_default_exclusions` | `["2.1.20", "2.1.21", "2.1.22", "5.2.6"]` | Controls skipped by default because they can disrupt or lock out a host (they remove the desktop, or make `sudo` ask for a password, which breaks passwordless `become`). Set it to `[]` or a shorter list to run them; `cis_exclusions` is unaffected. |
+
+- Each control has a level per profile (some are Level 1 for Server but Level 2 for
+  Workstation), so the same control can run at different levels in the two profiles.
+- Controls with no Workstation profile in the benchmark (for example 2.1.11 and 3.1.2)
+  never run with `cis_profile: workstation`.
+- A control runs when it is in the selected level and profile and in neither exclusion
+  list. Preflight records the result in `cis_selected_controls`.
 - Tags: run a section, level or single control, for example `-t section-5` or
   `-t 5.1.21`.
 
@@ -81,13 +95,13 @@ ansible-playbook -i inventory site.yml -e target=webservers
   host.
 
 Controls marked audit-only or manual in `docs/controls.md` only report, in either mode.
-Variable names are provisional until the profile-selection work lands.
+The audit variable name is provisional until the audit-mode work lands.
 
 ## Versioning
 
 Versions are `<benchmark>_<major>.<minor>.<iterative>`. The part before the underscore is
 the CIS benchmark version the role implements; the part after is the role's own version.
-`3.0.0_0.0.3` is role version 0.0.3 for benchmark v3.0.0. See
+`3.0.0_0.0.4` is role version 0.0.4 for benchmark v3.0.0. See
 [CHANGELOG.md](CHANGELOG.md).
 
 ## License
