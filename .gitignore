@@ -1,0 +1,3 @@
+# CIS benchmark documents are CIS-licensed: never commit them
+*.pdf
+.DS_Store
