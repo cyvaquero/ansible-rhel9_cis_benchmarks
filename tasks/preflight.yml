@@ -56,6 +56,23 @@
     - always
     - preflight
 
+- name: "Preflight - Validate cis_audit_only and cis_fail_on_findings"
+  ansible.builtin.assert:
+    that:
+      - item.value is boolean or (item.value | string | lower) in ['true', 'false']
+    fail_msg: "{{ item.key }} must be true or false (got '{{ item.value }}')."
+    quiet: true
+  loop:
+    - key: cis_audit_only
+      value: "{{ cis_audit_only }}"
+    - key: cis_fail_on_findings
+      value: "{{ cis_fail_on_findings }}"
+  loop_control:
+    label: "{{ item.key }}"
+  tags:
+    - always
+    - preflight
+
 - name: "Preflight - Validate the exclusion list types"
   ansible.builtin.assert:
     that:
