@@ -1,0 +1,25 @@
+---
+galaxy_info:
+  author: Guy Heckman
+  description: Idempotent CIS Red Hat Enterprise Linux 9 Benchmark hardening role
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+  galaxy_tags:
+    - cis
+    - rhel
+    - el
+    - hardening
+    - benchmark
+    - compliance
+    - security
+
+dependencies: []
+
+collections:
+  - ansible.posix
+  - community.general
+...

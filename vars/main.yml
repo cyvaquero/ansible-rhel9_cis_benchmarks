@@ -1,0 +1,7 @@
+---
+# Internal constants for rhel9_cis_benchmarks. Not meant to be overridden.
+
+# Preflight: the only platform this role supports.
+cis_supported_distribution: RedHat
+cis_supported_major_version: "9"
+...

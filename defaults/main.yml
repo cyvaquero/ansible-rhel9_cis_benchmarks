@@ -1,0 +1,7 @@
+---
+# Defaults for rhel9_cis_benchmarks. Every variable uses the cis_ prefix and carries a
+# comment naming the CIS ID it serves.
+#
+# Level, profile, exclusion and audit-mode variables (cis_apply_level_2, cis_profile,
+# cis_exclusions, cis_audit_only) are added by their own changes.
+...
