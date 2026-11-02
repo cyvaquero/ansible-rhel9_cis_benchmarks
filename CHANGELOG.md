@@ -14,7 +14,8 @@ versions use `major.minor.iterative`.
 - Role skeleton (#2): `defaults/`, `vars/`, `tasks/`, `handlers/` and `meta/` at the repo
   root, with empty placeholder task files for each section (1 to 7) and level.
 - Preflight check: the role stops with a clear message unless the host is RHEL 9, and
-  records the minor release in `cis_rhel_minor_release` (an integer such as `4`).
+  records the minor release in `cis_rhel_minor_release` (a string such as `"4"`; compare
+  with `| int`).
 - Handlers for sshd, rsyslog, chronyd, auditd (reload and rule load) and sysctl reload.
 - Role metadata: MIT license, Ansible 2.15 minimum, EL 9 platform, and the
   `ansible.posix` and `community.general` collections.
