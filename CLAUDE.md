@@ -104,4 +104,9 @@ section comments, in this order, ending with `...`:
 - Verified output formats: not applicable. The regression gates are
   `ansible-playbook --check` and a second-run idempotency check (`changed=0`) against
   RHEL 9 test hosts, under ansible-core 2.15.
+- Versions are `<benchmark>_<major>.<minor>.<iterative>`, for example `3.0.0_0.0.2`: the
+  CIS benchmark version the role implements, an underscore, then the role's own version,
+  which follows the global versioning rules (hotfixes: `3.0.0_1.4.0.1`). CHANGELOG
+  headings, the README status line, release branches and tags all use the full string.
+  The prefix changes only when the role moves to a new benchmark version.
 - Versions: `CHANGELOG.md` (Keep a Changelog). Release steps: `RELEASING.md`.
