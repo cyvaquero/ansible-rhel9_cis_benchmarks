@@ -1,0 +1,49 @@
+---
+# Preflight first, then each section by level. Level and profile selection is added
+# by its own change; for now every placeholder file is imported.
+
+- name: "Preflight checks"
+  ansible.builtin.import_tasks: preflight.yml
+
+- name: "Section 1 - Level 1"
+  ansible.builtin.import_tasks: section-1/level-1.yml
+
+- name: "Section 1 - Level 2"
+  ansible.builtin.import_tasks: section-1/level-2.yml
+
+- name: "Section 2 - Level 1"
+  ansible.builtin.import_tasks: section-2/level-1.yml
+
+- name: "Section 2 - Level 2"
+  ansible.builtin.import_tasks: section-2/level-2.yml
+
+- name: "Section 3 - Level 1"
+  ansible.builtin.import_tasks: section-3/level-1.yml
+
+- name: "Section 3 - Level 2"
+  ansible.builtin.import_tasks: section-3/level-2.yml
+
+- name: "Section 4 - Level 1"
+  ansible.builtin.import_tasks: section-4/level-1.yml
+
+- name: "Section 4 - Level 2"
+  ansible.builtin.import_tasks: section-4/level-2.yml
+
+- name: "Section 5 - Level 1"
+  ansible.builtin.import_tasks: section-5/level-1.yml
+
+- name: "Section 5 - Level 2"
+  ansible.builtin.import_tasks: section-5/level-2.yml
+
+- name: "Section 6 - Level 1"
+  ansible.builtin.import_tasks: section-6/level-1.yml
+
+- name: "Section 6 - Level 2"
+  ansible.builtin.import_tasks: section-6/level-2.yml
+
+- name: "Section 7 - Level 1"
+  ansible.builtin.import_tasks: section-7/level-1.yml
+
+- name: "Section 7 - Level 2"
+  ansible.builtin.import_tasks: section-7/level-2.yml
+...
