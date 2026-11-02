@@ -15,6 +15,8 @@ implements, then the role's own version.
 - Versions now start with the CIS benchmark version the role implements, for example
   `3.0.0_0.0.3` for role version 0.0.3 on benchmark v3.0.0. Earlier entries are renamed
   to match (#15).
+- The role's own version keeps counting when the benchmark version changes, and older
+  benchmarks are maintained on `support/<benchmark>` branches (#15).
 
 ## [3.0.0_0.0.1]
 
