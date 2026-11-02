@@ -29,6 +29,10 @@ jobs:
           echo "ANSIBLE_ROLES_PATH=$RUNNER_TEMP/roles" >> "$GITHUB_ENV"
       - name: ansible-lint
         run: ansible-lint
+      - name: Check that the controls and the benchmark version agree
+        run: |
+          python tests/check_controls.py
+          python tests/check_benchmark_version.py
       - name: Syntax check
         run: ansible-playbook -i localhost, -e target=localhost --syntax-check tests/syntax.yml
 ...
