@@ -8,6 +8,19 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.7]
+
+### Added
+
+- `cis_benchmark` in `vars/main.yml` records the benchmark document the role implements:
+  title, version (3.0.0) and date (2026-08-28). `docs/controls.md` states the same in its
+  header (#17).
+- Preflight prints the benchmark title and version, and the end-of-run summary includes
+  them (#17).
+- `tests/check_benchmark_version.py`, run by CI, fails unless `cis_benchmark`, the
+  `docs/controls.md` header and the version prefix of the newest CHANGELOG entry agree.
+  CI now also runs `tests/check_controls.py` (#17).
+
 ## [3.0.0_0.0.6]
 
 ### Added

@@ -108,8 +108,12 @@ as ansible-lint needs) and use these section comments, in order, ending with `..
   branches and tags use the full string. The prefix changes only on a new benchmark
   version; the role's own number keeps counting (`3.0.0_0.9.4` → `3.1.0_0.10.0`) and never
   resets. Older benchmarks live on `support/<benchmark>` branches.
+- Benchmark identity: `cis_benchmark` (title, version, date) in `vars/main.yml`, the
+  `docs/controls.md` header and the CHANGELOG version prefix must agree
+  (`python3 tests/check_benchmark_version.py`). Change them together, with the version.
 - `CHANGELOG.md` is Keep a Changelog. Release steps: `RELEASING.md`.
 - Lint: in a Python 3.9 venv, `pip install -r tests/requirements.txt`, then run
   `ansible-lint` from the repo root with `ANSIBLE_ROLES_PATH` set to a folder holding a
   `rhel9_cis_benchmarks` link to this repo. CI (`.github/workflows/lint.yml`) also runs
-  `--syntax-check tests/syntax.yml`. Pin actions to commit SHAs, tools to versions.
+  `--syntax-check tests/syntax.yml` and the `tests/check_*.py` scripts. Pin actions to
+  commit SHAs, tools to versions.

@@ -4,7 +4,7 @@
 # which only ever report. IDs are listed in docs/controls.md order. With
 # cis_fail_on_findings the host then fails when there is at least one.
 #
-# Needs cis_selected_controls (preflight) and vars/controls.yml.
+# Needs cis_selected_controls (preflight), vars/main.yml and vars/controls.yml.
 
 - name: "Summary - Compute the findings"
   ansible.builtin.set_fact:
@@ -28,6 +28,7 @@
 - name: "Summary - Report the findings"
   ansible.builtin.debug:
     msg:
+      - "{{ cis_benchmark.title }} v{{ cis_benchmark.version }}"
       - "CIS findings for {{ inventory_hostname }}: {{ cis_final_findings | length }}
          ({{ 'audit' if (cis_audit_only | bool) else 'remediate' }} mode)"
       - "Failing checks: {{ (cis_findings | default([])) | length }}"
