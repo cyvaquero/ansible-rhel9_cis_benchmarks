@@ -3,11 +3,20 @@
 All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
-versions use `major.minor.iterative`.
+versions use `<benchmark>_<major>.<minor>.<iterative>`: the CIS benchmark version the role
+implements, then the role's own version.
 
 ## [Unreleased]
 
-## [0.0.1]
+## [3.0.0_0.0.3]
+
+### Changed
+
+- Versions now start with the CIS benchmark version the role implements, for example
+  `3.0.0_0.0.3` for role version 0.0.3 on benchmark v3.0.0. Earlier entries are renamed
+  to match (#15).
+
+## [3.0.0_0.0.1]
 
 ### Added
 

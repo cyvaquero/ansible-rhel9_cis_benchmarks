@@ -4,7 +4,7 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (0.0.1).** No controls are implemented yet. Do not run this against
+**Status: pre-alpha (3.0.0_0.0.3).** No controls are implemented yet. Do not run this against
 hosts you care about.
 
 ## Relationship to the RHEL 7 and RHEL 8 projects
@@ -75,6 +75,13 @@ ansible-playbook -i inventory site.yml -e target=webservers
 
 Controls marked audit-only or manual in `docs/controls.md` only report, in either mode.
 Variable names are provisional until the profile-selection work lands.
+
+## Versioning
+
+Versions are `<benchmark>_<major>.<minor>.<iterative>`. The part before the underscore is
+the CIS benchmark version the role implements; the part after is the role's own version.
+`3.0.0_0.0.3` is role version 0.0.3 for benchmark v3.0.0. See
+[CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
