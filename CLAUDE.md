@@ -5,19 +5,18 @@ The global rules in `~/.claude/CLAUDE.md` apply; this file adds what is specific
 
 ## Scope of this repo
 
-- The role only. Test harnesses, playbooks, inventories and test hosts live outside this
-  repo; never reference any particular outside project, path or host from here.
+- The role only. Test harnesses, inventories and hosts live outside this repo; never
+  reference any outside project, path or host. `tests/` needs no managed host.
 
 ## Target platform
 
-- Managed nodes: RHEL 9, all minor releases. Detect the minor release from facts
-  (`ansible_distribution_version`) and branch on it only where a control differs between
-  minor releases; note the reason in a comment. Preflight fails on anything else.
+- Managed nodes: RHEL 9, all minor releases. Branch on `ansible_distribution_version`
+  only where a control differs between minor releases, with a comment giving the reason.
+  Preflight fails on anything else.
 - Control node: ansible-core 2.15 (Ansible 8.7), the newest that runs on RHEL 9's default
   Python 3.9. Use no module, option, keyword or filter added after ansible-core 2.15.
-- Collections: `ansible.builtin`, `ansible.posix` and `community.general`, at the versions
-  bundled with Ansible 8.7 (`ansible.posix` 1.5.4, `community.general` 7.5.2). Ask before
-  adding any other.
+- Collections: `ansible.builtin`, `ansible.posix` 1.5.4 and `community.general` 7.5.2, the
+  versions bundled with Ansible 8.7. Ask before adding any other.
 
 ## Structure
 
@@ -26,18 +25,16 @@ The global rules in `~/.claude/CLAUDE.md` apply; this file adds what is specific
   with the role at the repo root, unless this file says otherwise. Deviations:
   - Control IDs follow the RHEL 9 benchmark numbering, not the RHEL 7 numbering the rhel8
     project kept.
-  - Task files are grouped by section, then level: one file per control at
-    `tasks/section-<N>/level-<L>/<cis-id>.yml`, included from
+  - One file per control at `tasks/section-<N>/level-<L>/<cis-id>.yml`, included from
     `tasks/section-<N>/level-<L>.yml`. `<L>` is the lowest level the control has in any
     profile; the exact level per profile comes from the control metadata in `vars/`.
-  - `import_tasks` / `include_tasks`, never the removed bare `include`.
-  - Fully qualified module names (`ansible.builtin.*`, `ansible.posix.*`,
-    `community.general.*`).
-  - No `# Standards:` headers, no `templates/old/`, no `ansible-review` files.
-  - Server and Workstation profiles and an audit mode, which the rhel8 project lacks.
-- Use the current RHEL 9 mechanism instead of a legacy one unless the benchmark specifies
+  - `import_tasks` / `include_tasks`, never the removed bare `include`; fully qualified
+    module names (`ansible.builtin.*`, `ansible.posix.*`, `community.general.*`).
+  - No `# Standards:` headers, `templates/old/` or `ansible-review` files. Adds Server
+    and Workstation profiles and an audit mode.
+- Use the current RHEL 9 mechanism, not a legacy one, unless the benchmark specifies
   otherwise: `dnf` not `yum`, `ss` not `netstat`, chrony not ntpd, authselect not
-  authconfig, firewalld not iptables, systemd units not xinetd, `sysctl.d` drop-ins,
+  authconfig, firewalld not iptables, systemd units not xinetd, `sysctl.d` and
   `sshd_config.d` drop-ins, crypto-policies subpolicies.
 - Variables use the `cis_` prefix. Every default lives in `defaults/main.yml` with a
   comment naming the CIS ID it serves. No real hostnames: use `example.com` names and
@@ -72,18 +69,18 @@ The global rules in `~/.claude/CLAUDE.md` apply; this file adds what is specific
 
 - The benchmark is CIS-licensed. Never copy its descriptions, rationale, audit or
   remediation text into code, comments, docs, commits or issues. CIS IDs and short
-  titles only; write our own task names and comments.
-- Never commit the benchmark PDF (`*.pdf` is gitignored).
+  titles only; write our own task names and comments. Never commit the PDF (gitignored).
 
 ## Playbook format
 
-Example playbooks in the docs target hosts with the `target` extra var and use these
-section comments, in this order, ending with `...`:
+Example and test playbooks target `target` (tests: `{{ target | default('localhost') }}`,
+as ansible-lint needs) and use these section comments, in order, ending with `...`:
 
 ```yaml
 ---
 # Hosts
-- hosts: "{{ target }}"
+- name: Apply the CIS RHEL 9 benchmark
+  hosts: "{{ target }}"
   become: true
   gather_facts: true
 
@@ -106,9 +103,8 @@ section comments, in this order, ending with `...`:
 ## Conventions
 
 - American English.
-- Verified output formats: not applicable. The regression gates are
-  `ansible-playbook --check` and a second-run idempotency check (`changed=0`) against
-  RHEL 9 test hosts, under ansible-core 2.15.
+- Verified output formats: not applicable. Regression gates: `ansible-playbook --check`
+  and a second-run `changed=0` against RHEL 9 test hosts, under ansible-core 2.15.
 - Versions are `<benchmark>_<major>.<minor>.<iterative>`, for example `3.0.0_0.0.2`: the
   CIS benchmark version the role implements, an underscore, then the role's own version,
   which follows the global versioning rules (hotfixes: `3.0.0_1.4.0.1`). CHANGELOG
@@ -116,4 +112,8 @@ section comments, in this order, ending with `...`:
   The prefix changes only when the role moves to a new benchmark version, and the role's
   own number keeps counting across that change (`3.0.0_0.9.4` → `3.1.0_0.10.0`); it never
   resets. Older benchmarks are maintained on `support/<benchmark>` branches.
-- Versions: `CHANGELOG.md` (Keep a Changelog). Release steps: `RELEASING.md`.
+- `CHANGELOG.md` is Keep a Changelog. Release steps: `RELEASING.md`.
+- Lint: in a Python 3.9 venv, `pip install -r tests/requirements.txt`, then run
+  `ansible-lint` from the repo root with `ANSIBLE_ROLES_PATH` pointing at a folder that
+  holds a `rhel9_cis_benchmarks` link to this repo. CI (`.github/workflows/lint.yml`)
+  adds `--syntax-check tests/syntax.yml`. Pin actions to commit SHAs, tools to versions.
