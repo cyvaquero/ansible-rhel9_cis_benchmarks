@@ -11,7 +11,7 @@
 #     register: cis_check_1_1_1_1
 #     changed_when: false        # read-only
 #     check_mode: false          # runs under --check, so --check shows what would change
-#     failed_when: false
+#     failed_when: false         # so "is failed" is always false: test the result instead
 #     when: "'1.1.1.1' in cis_selected_controls"
 #     tags: [...]
 #
@@ -20,7 +20,7 @@
 #     when:
 #       - "'1.1.1.1' in cis_selected_controls"
 #       - not (cis_audit_only | bool)
-#       - cis_check_1_1_1_1 is failed
+#       - cis_check_1_1_1_1.rc != 0   # the check's own non-compliance test
 #     tags: [...]
 #
 #   - name: "1.1.1.1 - Record the finding"
@@ -30,7 +30,7 @@
 #     when:
 #       - "'1.1.1.1' in cis_selected_controls"
 #       - cis_audit_only | bool
-#       - cis_check_1_1_1_1 is failed
+#       - cis_check_1_1_1_1.rc != 0   # the check's own non-compliance test
 #     tags: [...]
 #
 # In remediate mode a control that was fixed is not a finding; a control that could not
