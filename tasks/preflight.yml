@@ -19,8 +19,9 @@
 
 - name: "Preflight - Record the RHEL 9 minor release"
   ansible.builtin.set_fact:
-    # Integer, for example 4 on RHEL 9.4.
-    cis_rhel_minor_release: "{{ (ansible_distribution_version.split('.')[1] | default('0')) | int }}"
+    # A string, for example "4" on RHEL 9.4 ("0" when the version has no minor part).
+    # Compare with the int filter, for example: cis_rhel_minor_release | int >= 4
+    cis_rhel_minor_release: "{{ (ansible_distribution_version.split('.') + ['0'])[1] }}"
   tags:
     - always
     - preflight

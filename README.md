@@ -36,8 +36,9 @@ review. The benchmark text itself is not reproduced here; get the benchmark from
 ## Preflight
 
 The role first checks that the host is Red Hat Enterprise Linux 9 and fails with a clear
-message otherwise. It sets `cis_rhel_minor_release` (for example `4` on RHEL 9.4) for
-tasks that differ between minor releases.
+message otherwise. It sets `cis_rhel_minor_release`, a string such as `"4"` on RHEL 9.4,
+for tasks that differ between minor releases. Compare it with the `int` filter, for
+example `cis_rhel_minor_release | int >= 4`.
 
 ## Usage (planned)
 
