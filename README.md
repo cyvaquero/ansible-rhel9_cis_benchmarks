@@ -4,7 +4,7 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.6).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.7).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist; no controls are implemented yet. Do not run this against hosts you care about.
 
 ## Relationship to the RHEL 7 and RHEL 8 projects
@@ -35,8 +35,10 @@ review. The benchmark text itself is not reproduced here; get the benchmark from
 
 ## Preflight
 
-The role first checks that the host is Red Hat Enterprise Linux 9 and fails with a clear
-message otherwise. It sets `cis_rhel_minor_release`, a string such as `"4"` on RHEL 9.4,
+The role first prints the benchmark it implements (title, version and date, from
+`cis_benchmark` in `vars/main.yml`; the end-of-run summary repeats the title and version),
+then checks that the host is Red Hat Enterprise Linux 9 and fails with a clear message
+otherwise. It sets `cis_rhel_minor_release`, a string such as `"4"` on RHEL 9.4,
 for tasks that differ between minor releases. Compare it with the `int` filter, for
 example `cis_rhel_minor_release | int >= 4`.
 
@@ -116,7 +118,8 @@ ansible-playbook -i inventory site.yml -e target=webservers
 
 Every push and pull request runs [ansible-lint](https://ansible.readthedocs.io/projects/lint/)
 (`production` profile, configured in `.ansible-lint`) and an
-`ansible-playbook --syntax-check` of `tests/syntax.yml`, on Python 3.9 with Ansible 8.7
+`ansible-playbook --syntax-check` of `tests/syntax.yml`, plus the consistency checks
+`tests/check_controls.py` and `tests/check_benchmark_version.py`, on Python 3.9 with Ansible 8.7
 (ansible-core 2.15), the supported control node. To run the same locally:
 
 ```sh
@@ -126,6 +129,8 @@ mkdir -p /tmp/roles && ln -sfn "$PWD" /tmp/roles/rhel9_cis_benchmarks
 export ANSIBLE_ROLES_PATH=/tmp/roles
 ansible-lint
 ansible-playbook -i localhost, -e target=localhost --syntax-check tests/syntax.yml
+python3 tests/check_controls.py
+python3 tests/check_benchmark_version.py
 ```
 
 `tests/requirements.txt` pins ansible-lint 6.22.2, the newest release that installs with
@@ -135,8 +140,13 @@ ansible-core 2.15 on Python 3.9. Later releases need Python 3.10 or newer.
 
 Versions are `<benchmark>_<major>.<minor>.<iterative>`. The part before the underscore is
 the CIS benchmark version the role implements; the part after is the role's own version.
-`3.0.0_0.0.6` is role version 0.0.6 for benchmark v3.0.0. See
+`3.0.0_0.0.7` is role version 0.0.7 for benchmark v3.0.0. See
 [CHANGELOG.md](CHANGELOG.md).
+
+The benchmark identity lives in three places that must agree: `cis_benchmark` (title,
+version, date) in `vars/main.yml`, the header of `docs/controls.md`, and the version
+prefix of the newest released CHANGELOG entry. `python3 tests/check_benchmark_version.py`
+checks them and CI runs it, so changing one without the others fails the build.
 
 ## License
 

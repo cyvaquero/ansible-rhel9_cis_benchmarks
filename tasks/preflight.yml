@@ -17,6 +17,13 @@
     - always
     - preflight
 
+- name: "Preflight - Report the benchmark version"
+  ansible.builtin.debug:
+    msg: "{{ cis_benchmark.title }} v{{ cis_benchmark.version }} ({{ cis_benchmark.date }})"
+  tags:
+    - always
+    - preflight
+
 - name: "Preflight - Record the RHEL 9 minor release"
   ansible.builtin.set_fact:
     # A string, for example "4" on RHEL 9.4 ("0" when the version has no minor part).
