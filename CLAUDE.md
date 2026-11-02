@@ -5,9 +5,8 @@ The global rules in `~/.claude/CLAUDE.md` apply; this file adds what is specific
 
 ## Scope of this repo
 
-- The role only: tasks, defaults, vars, handlers, templates, files, meta and role docs.
-- Test harnesses, playbooks, inventories and test-host setup live outside this repo.
-  Never reference any particular outside project, path or host from here.
+- The role only. Test harnesses, playbooks, inventories and test hosts live outside this
+  repo; never reference any particular outside project, path or host from here.
 
 ## Target platform
 
