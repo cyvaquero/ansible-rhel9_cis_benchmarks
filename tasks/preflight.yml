@@ -1,0 +1,27 @@
+---
+# Stop early on anything that is not RHEL 9, and record the minor release so later tasks
+# can branch on it where a control differs between minor releases.
+
+- name: "Preflight - Verify the host is RHEL 9"
+  ansible.builtin.assert:
+    that:
+      - ansible_distribution == cis_supported_distribution
+      - ansible_distribution_major_version | string == cis_supported_major_version
+    fail_msg: >-
+      rhel9_cis_benchmarks supports Red Hat Enterprise Linux {{ cis_supported_major_version }}
+      only. This host reports distribution
+      '{{ ansible_distribution | default("unknown") }}' version
+      '{{ ansible_distribution_version | default("unknown") }}'.
+    quiet: true
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Record the RHEL 9 minor release"
+  ansible.builtin.set_fact:
+    # Integer, for example 4 on RHEL 9.4.
+    cis_rhel_minor_release: "{{ (ansible_distribution_version.split('.')[1] | default('0')) | int }}"
+  tags:
+    - always
+    - preflight
+...

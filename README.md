@@ -4,8 +4,8 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (0.0.1).** No controls are implemented yet. Do not run this against
-hosts you care about.
+**Status: pre-alpha (0.0.2).** The role skeleton and preflight check exist; no controls are
+implemented yet. Do not run this against hosts you care about.
 
 ## Relationship to the RHEL 7 and RHEL 8 projects
 
@@ -32,6 +32,12 @@ an audit mode.
 its profile and whether this role implements it, only audits it, or leaves it for manual
 review. The benchmark text itself is not reproduced here; get the benchmark from
 [CIS](https://www.cisecurity.org/cis-benchmarks).
+
+## Preflight
+
+The role first checks that the host is Red Hat Enterprise Linux 9 and fails with a clear
+message otherwise. It sets `cis_rhel_minor_release` (for example `4` on RHEL 9.4) for
+tasks that differ between minor releases.
 
 ## Usage (planned)
 
