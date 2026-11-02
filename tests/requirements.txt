@@ -1,0 +1,5 @@
+# Pinned lint toolchain, matching the supported control node (Python 3.9, ansible-core
+# 2.15). ansible-lint 6.22.2 is the newest release that installs with ansible-core 2.15
+# on Python 3.9; later releases require Python 3.10 or newer.
+ansible==8.7.0
+ansible-lint==6.22.2

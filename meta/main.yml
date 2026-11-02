@@ -1,5 +1,7 @@
 ---
 galaxy_info:
+  role_name: rhel9_cis_benchmarks
+  namespace: cyvaquero
   author: Guy Heckman
   description: Idempotent CIS Red Hat Enterprise Linux 9 Benchmark hardening role
   license: MIT

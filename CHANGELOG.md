@@ -8,6 +8,24 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.6]
+
+### Added
+
+- ansible-lint configuration (`.ansible-lint`, `production` profile) and a GitHub
+  Actions workflow that runs it, plus `ansible-playbook --syntax-check` of
+  `tests/syntax.yml`, on pushes and pull requests to `develop`, `main`, `release/**`,
+  `feature/**`, `bugfix/**` and `hotfix/**` (#13). The toolchain is pinned in
+  `tests/requirements.txt`: Ansible 8.7.0 and ansible-lint 6.22.2, on Python 3.9.
+- The README and `CLAUDE.md` describe running the lint locally.
+
+### Changed
+
+- `meta/main.yml` sets `role_name` and `namespace`, so the role name is valid whatever
+  the checkout folder is called (#13).
+- The auditd reload handler waives ansible-lint's `command-instead-of-module` rule,
+  because auditd refuses the service module (#13).
+
 ## [3.0.0_0.0.5]
 
 ### Added

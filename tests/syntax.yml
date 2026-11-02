@@ -1,0 +1,26 @@
+---
+# Minimal playbook for `ansible-playbook --syntax-check`. It only needs to parse; the role
+# resolves from the roles path, so the checkout folder name does not matter.
+#
+#   ansible-playbook -i localhost, -e target=localhost --syntax-check tests/syntax.yml
+
+# Hosts
+- name: Syntax check the role
+  hosts: "{{ target | default('localhost') }}"
+  become: true
+  gather_facts: true
+
+# Vars
+  vars:
+    cis_apply_level_2: false
+
+# Tasks
+  tasks: []
+
+# Handlers
+  handlers: []
+
+# Roles
+  roles:
+    - rhel9_cis_benchmarks
+...

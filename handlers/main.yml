@@ -17,9 +17,10 @@
     state: restarted
 
 # auditd.service sets RefuseManualStop, so systemd rejects a restart or stop through the
-# service module. Its own service wrapper is the supported way to signal the daemon.
+# service module. Its own service wrapper is the supported way to signal the daemon, so
+# the command-instead-of-module rule is waived for this one task.
 - name: Reload auditd
-  ansible.builtin.command: /usr/sbin/service auditd reload
+  ansible.builtin.command: /usr/sbin/service auditd reload  # noqa: command-instead-of-module
   changed_when: true
 
 # Loads the rules assembled in /etc/audit/rules.d into the running kernel.
