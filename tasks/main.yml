@@ -1,6 +1,12 @@
 ---
-# Preflight first, then each section by level. Level and profile selection is added
-# by its own change; for now every placeholder file is imported.
+# Preflight first (it validates the selection variables and computes
+# cis_selected_controls), then each section by level. Level 2 files are imported only
+# when cis_apply_level_2 is true. Every control task or include inside the level files
+# additionally carries the shared condition:
+#
+#   when: "'1.1.1.1' in cis_selected_controls"
+#
+# which applies the profile, the level and the exclusions (see tasks/preflight.yml).
 
 - name: "Preflight checks"
   ansible.builtin.import_tasks: preflight.yml
@@ -10,40 +16,47 @@
 
 - name: "Section 1 - Level 2"
   ansible.builtin.import_tasks: section-1/level-2.yml
+  when: cis_apply_level_2 | bool
 
 - name: "Section 2 - Level 1"
   ansible.builtin.import_tasks: section-2/level-1.yml
 
 - name: "Section 2 - Level 2"
   ansible.builtin.import_tasks: section-2/level-2.yml
+  when: cis_apply_level_2 | bool
 
 - name: "Section 3 - Level 1"
   ansible.builtin.import_tasks: section-3/level-1.yml
 
 - name: "Section 3 - Level 2"
   ansible.builtin.import_tasks: section-3/level-2.yml
+  when: cis_apply_level_2 | bool
 
 - name: "Section 4 - Level 1"
   ansible.builtin.import_tasks: section-4/level-1.yml
 
 - name: "Section 4 - Level 2"
   ansible.builtin.import_tasks: section-4/level-2.yml
+  when: cis_apply_level_2 | bool
 
 - name: "Section 5 - Level 1"
   ansible.builtin.import_tasks: section-5/level-1.yml
 
 - name: "Section 5 - Level 2"
   ansible.builtin.import_tasks: section-5/level-2.yml
+  when: cis_apply_level_2 | bool
 
 - name: "Section 6 - Level 1"
   ansible.builtin.import_tasks: section-6/level-1.yml
 
 - name: "Section 6 - Level 2"
   ansible.builtin.import_tasks: section-6/level-2.yml
+  when: cis_apply_level_2 | bool
 
 - name: "Section 7 - Level 1"
   ansible.builtin.import_tasks: section-7/level-1.yml
 
 - name: "Section 7 - Level 2"
   ansible.builtin.import_tasks: section-7/level-2.yml
+  when: cis_apply_level_2 | bool
 ...

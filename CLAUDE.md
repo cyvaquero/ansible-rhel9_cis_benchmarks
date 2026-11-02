@@ -5,9 +5,8 @@ The global rules in `~/.claude/CLAUDE.md` apply; this file adds what is specific
 
 ## Scope of this repo
 
-- The role only: tasks, defaults, vars, handlers, templates, files, meta and role docs.
-- Test harnesses, playbooks, inventories and test-host setup live outside this repo.
-  Never reference any particular outside project, path or host from here.
+- The role only. Test harnesses, playbooks, inventories and test hosts live outside this
+  repo; never reference any particular outside project, path or host from here.
 
 ## Target platform
 
@@ -50,7 +49,13 @@ The global rules in `~/.claude/CLAUDE.md` apply; this file adds what is specific
 
 - Level 1 runs by default; Level 2 only when `cis_apply_level_2: true` (Level 2 includes
   Level 1). `cis_profile` is `server` (default) or `workstation`. `cis_exclusions` lists
-  CIS IDs to skip.
+  CIS IDs to skip; `cis_default_exclusions` (2.1.20 to 2.1.22, 5.2.6) holds the controls
+  skipped by default because they can lock out or disrupt a host.
+- `vars/controls.yml` maps every CIS ID to its level per profile (null: no such profile).
+  It must match the Profile column of `docs/controls.md`; change both in the same branch.
+- Preflight computes `cis_selected_controls` once. Every control task or include carries
+  `when: "'<cis-id>' in cis_selected_controls"`; never repeat level, profile or exclusion
+  logic in tasks. Level 2 task files are imported only when `cis_apply_level_2` is true.
 - Two modes: remediate (default) checks and fixes; audit (`cis_audit_only: true`) checks
   and reports without changing the host. Controls with disposition audit-only or manual
   only ever report.
