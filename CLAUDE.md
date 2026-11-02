@@ -65,10 +65,10 @@ The global rules in `~/.claude/CLAUDE.md` apply; this file adds what is specific
   level (`level-1` / `level-2`) and profiles (`server` / `workstation`).
 - Idempotency is required: a second run must report `changed=0`. Read-only checks use
   `changed_when: false` and `check_mode: false`.
-- Control pattern (annotated example in `tasks/finding.yml`): a read-only check; fixes
-  gated on `not (cis_audit_only | bool)`; in audit mode a failed check includes
-  `tasks/finding.yml` with `cis_finding_id`. Audit-only and manual controls need no
-  finding task: `tasks/summary.yml` lists them from `cis_control_dispositions`.
+- Control pattern (example in `tasks/finding.yml`): a read-only check; fixes gated on
+  `not (cis_audit_only | bool)`; in audit mode a non-compliant check includes `finding.yml`
+  with `cis_finding_id`. Test the result (`.rc != 0`), never `is failed` (always false with
+  `failed_when: false`). Audit-only and manual controls are listed by `summary.yml`.
 
 ## Benchmark text
 
