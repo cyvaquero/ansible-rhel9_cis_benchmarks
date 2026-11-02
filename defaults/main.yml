@@ -1,8 +1,16 @@
 ---
 # Defaults for rhel9_cis_benchmarks. Every variable uses the cis_ prefix and carries a
 # comment naming the CIS ID it serves.
-#
-# The audit-mode variable (cis_audit_only) is added by its own change.
+
+# Mode (all CIS IDs): false (remediate) checks and fixes each control; true (audit)
+# checks and reports without changing the host. Audit-only and manual controls only
+# report, in either mode.
+cis_audit_only: false
+
+# Mode (all CIS IDs): true fails each host that ends the run with findings (failing
+# checks in audit mode, plus every selected audit-only or manual control), after the
+# summary is printed. false only reports them.
+cis_fail_on_findings: false
 
 # Selection (all CIS IDs): Level 1 controls always run; set true to add Level 2, which
 # includes Level 1.

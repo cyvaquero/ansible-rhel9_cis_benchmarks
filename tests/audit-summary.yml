@@ -1,0 +1,55 @@
+---
+# Exercises the finding and summary logic in isolation (no role run, no host changes),
+# because preflight rejects anything but RHEL 9 and no control tasks exist yet. It
+# includes tasks/finding.yml and tasks/summary.yml directly against a fixed selection.
+#
+#   ansible-playbook -i localhost, -c local -e target=localhost tests/audit-summary.yml
+#   ... -e cis_fail_on_findings=true    # the host must fail
+#   ... -e '{"test_fake_findings": []}' -e '{"test_selected_controls": ["1.1.1.1"]}'
+#                                       # nothing to report; passes even when failing on findings
+
+# Hosts
+- name: Exercise the finding and summary tasks
+  hosts: "{{ target | default('localhost') }}"
+  become: false
+  gather_facts: false
+
+# Vars
+  vars:
+    test_selected_controls:
+      - "1.1.1.1"
+      - "1.1.1.11"
+      - "1.1.2.2.1"
+      - "5.1.1"
+    test_fake_findings:
+      - "5.1.1"
+      - "1.1.1.1"
+      - "5.1.1"
+
+# Tasks
+  tasks:
+    - name: "Load the role defaults and the control maps"
+      ansible.builtin.include_vars: "{{ item }}"
+      loop:
+        - "{{ playbook_dir }}/../defaults/main.yml"
+        - "{{ playbook_dir }}/../vars/controls.yml"
+
+    - name: "Stand in for preflight's selection"
+      ansible.builtin.set_fact:
+        cis_selected_controls: "{{ test_selected_controls }}"
+
+    - name: "Inject the fake findings"
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../tasks/finding.yml"
+      vars:
+        cis_finding_id: "{{ item }}"
+      loop: "{{ test_fake_findings }}"
+
+    - name: "Run the summary"
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../tasks/summary.yml"
+
+# Handlers
+  handlers: []
+
+# Roles
+  roles: []
+...

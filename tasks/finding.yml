@@ -1,0 +1,44 @@
+---
+# Records one finding: appends the CIS ID in cis_finding_id to cis_findings (no
+# duplicates). The end-of-run summary (summary.yml) lists cis_findings per host.
+#
+# Every control task file follows the same pattern (see CLAUDE.md, Task rules). Controls
+# whose disposition is audit-only or manual need no finding task: they are listed from
+# cis_control_dispositions in vars/controls.yml whether or not a check runs.
+#
+#   - name: "1.1.1.1 - Check the cramfs module is disabled"
+#     ansible.builtin.command: ...
+#     register: cis_check_1_1_1_1
+#     changed_when: false        # read-only
+#     check_mode: false          # runs under --check, so --check shows what would change
+#     failed_when: false         # so "is failed" is always false: test the result instead
+#     when: "'1.1.1.1' in cis_selected_controls"
+#     tags: [...]
+#
+#   - name: "1.1.1.1 - Disable the cramfs module"
+#     ansible.builtin.copy: ...  # changes the host only in remediate mode
+#     when:
+#       - "'1.1.1.1' in cis_selected_controls"
+#       - not (cis_audit_only | bool)
+#       - cis_check_1_1_1_1.rc != 0   # the check's own non-compliance test
+#     tags: [...]
+#
+#   - name: "1.1.1.1 - Record the finding"
+#     ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+#     vars:
+#       cis_finding_id: "1.1.1.1"
+#     when:
+#       - "'1.1.1.1' in cis_selected_controls"
+#       - cis_audit_only | bool
+#       - cis_check_1_1_1_1.rc != 0   # the check's own non-compliance test
+#     tags: [...]
+#
+# In remediate mode a control that was fixed is not a finding; a control that could not
+# be fixed should be recorded the same way.
+
+- name: "Record finding {{ cis_finding_id }}"
+  ansible.builtin.set_fact:
+    cis_findings: "{{ cis_findings | default([]) | union([cis_finding_id]) }}"
+  tags:
+    - always
+...
