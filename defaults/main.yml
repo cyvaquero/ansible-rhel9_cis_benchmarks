@@ -2,6 +2,28 @@
 # Defaults for rhel9_cis_benchmarks. Every variable uses the cis_ prefix and carries a
 # comment naming the CIS ID it serves.
 #
-# Level, profile, exclusion and audit-mode variables (cis_apply_level_2, cis_profile,
-# cis_exclusions, cis_audit_only) are added by their own changes.
+# The audit-mode variable (cis_audit_only) is added by its own change.
+
+# Selection (all CIS IDs): Level 1 controls always run; set true to add Level 2, which
+# includes Level 1.
+cis_apply_level_2: false
+
+# Selection (all CIS IDs): which benchmark profile to apply, "server" or "workstation".
+# Controls that have no Workstation profile (for example 2.1.20 to 2.1.22, 3.1.2) are
+# never selected for "workstation".
+cis_profile: server
+
+# Selection (all CIS IDs): your own list of CIS IDs to skip, for example
+# ["1.1.1.10", "5.1.21"]. It adds to cis_default_exclusions.
+cis_exclusions: []
+
+# Selection (2.1.20, 2.1.21, 2.1.22, 5.2.6): controls skipped by default because they
+# can disrupt or lock out a host (they remove the desktop, or require a password for
+# sudo, which breaks passwordless become). Override with [] or a shorter list to run
+# them; cis_exclusions is unaffected.
+cis_default_exclusions:
+  - "2.1.20"
+  - "2.1.21"
+  - "2.1.22"
+  - "5.2.6"
 ...
