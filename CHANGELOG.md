@@ -7,7 +7,7 @@ versions use `major.minor.iterative`.
 
 ## [Unreleased]
 
-## [0.0.2]
+## [3.0.0_0.0.2]
 
 ### Added
 
