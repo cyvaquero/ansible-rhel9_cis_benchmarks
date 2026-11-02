@@ -1,0 +1,6 @@
+---
+# Section 6, Level 1 controls. Placeholder: controls are added per section.
+
+- name: "Section 6 Level 1 - No controls yet"
+  ansible.builtin.meta: noop
+...
