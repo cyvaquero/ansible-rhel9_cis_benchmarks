@@ -4,4 +4,10 @@
 # Preflight: the only platform this role supports.
 cis_supported_distribution: RedHat
 cis_supported_major_version: "9"
+
+# Selection: the profiles cis_profile accepts. The per-control levels are in
+# vars/controls.yml, which preflight loads.
+cis_valid_profiles:
+  - server
+  - workstation
 ...

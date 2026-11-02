@@ -50,7 +50,15 @@ The global rules in `~/.claude/CLAUDE.md` apply; this file adds what is specific
 
 - Level 1 runs by default; Level 2 only when `cis_apply_level_2: true` (Level 2 includes
   Level 1). `cis_profile` is `server` (default) or `workstation`. `cis_exclusions` lists
-  CIS IDs to skip.
+  CIS IDs to skip; `cis_default_exclusions` (2.1.20 to 2.1.22, 5.2.6) holds the controls
+  skipped by default because they can lock out or disrupt a host.
+- `vars/controls.yml` maps every CIS ID to its level per profile (null where the benchmark
+  has no such profile). It must match the Profile column of `docs/controls.md`: change
+  both in the same branch, with the same 352 IDs.
+- Preflight validates the variables and computes `cis_selected_controls` once. Every
+  control task or include carries `when: "'<cis-id>' in cis_selected_controls"`; do not
+  repeat level, profile or exclusion logic in tasks. Level 2 task files are imported only
+  when `cis_apply_level_2` is true.
 - Two modes: remediate (default) checks and fixes; audit (`cis_audit_only: true`) checks
   and reports without changing the host. Controls with disposition audit-only or manual
   only ever report.

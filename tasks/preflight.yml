@@ -25,4 +25,93 @@
   tags:
     - always
     - preflight
+
+- name: "Preflight - Load the control level map"
+  ansible.builtin.include_vars:
+    file: controls.yml
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Validate cis_profile"
+  ansible.builtin.assert:
+    that:
+      - cis_profile in cis_valid_profiles
+    fail_msg: >-
+      cis_profile must be one of {{ cis_valid_profiles | join(', ') }}
+      (got '{{ cis_profile }}').
+    quiet: true
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Validate cis_apply_level_2"
+  ansible.builtin.assert:
+    that:
+      # Accepts a real boolean, or the strings true/false that -e key=value produces.
+      - cis_apply_level_2 is boolean or (cis_apply_level_2 | string | lower) in ['true', 'false']
+    fail_msg: "cis_apply_level_2 must be true or false (got '{{ cis_apply_level_2 }}')."
+    quiet: true
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Validate the exclusion list types"
+  ansible.builtin.assert:
+    that:
+      - cis_exclusions is sequence and cis_exclusions is not string
+      - cis_default_exclusions is sequence and cis_default_exclusions is not string
+    fail_msg: "cis_exclusions and cis_default_exclusions must be lists of CIS IDs."
+    quiet: true
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Validate the exclusion lists"
+  ansible.builtin.assert:
+    that:
+      - cis_unknown_exclusions | length == 0
+    fail_msg: >-
+      Unknown CIS IDs in cis_exclusions or cis_default_exclusions:
+      {{ cis_unknown_exclusions | join(', ') }}. Use IDs listed in docs/controls.md,
+      for example '1.1.1.1'.
+    quiet: true
+  vars:
+    cis_unknown_exclusions: >-
+      {{ (cis_default_exclusions + cis_exclusions) | map('string')
+         | reject('in', cis_control_levels) | list }}
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Compute the selected controls"
+  ansible.builtin.set_fact:
+    # The single list every control task or include tests with
+    #   when: "'<cis-id>' in cis_selected_controls"
+    # It is computed once here, from the level map, the profile, the level switch and the
+    # exclusions, so no task repeats that logic and 352 controls cost one template
+    # evaluation instead of 352. The Jinja loop is used because ansible-core 2.15's
+    # stock filters cannot compare a nested level against a threshold; to_json plus
+    # from_json guarantees a real list on every version.
+    cis_selected_controls: >-
+      {%- set ns = namespace(ids=[]) -%}
+      {%- set max_level = 2 if (cis_apply_level_2 | bool) else 1 -%}
+      {%- set excluded = (cis_default_exclusions + cis_exclusions) | map('string') | list -%}
+      {%- for id, levels in cis_control_levels.items() -%}
+      {%- set lvl = levels[cis_profile] -%}
+      {%- if lvl is not none and lvl <= max_level and id not in excluded -%}
+      {%- set ns.ids = ns.ids + [id] -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {{ ns.ids | to_json }}
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Normalize the selected controls to a list"
+  ansible.builtin.set_fact:
+    cis_selected_controls: "{{ cis_selected_controls | from_json if cis_selected_controls is string else cis_selected_controls }}"
+  tags:
+    - always
+    - preflight
 ...

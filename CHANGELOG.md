@@ -8,6 +8,20 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.4]
+
+### Added
+
+- Level and profile selection (#3): `cis_apply_level_2` (Level 1 by default, Level 2
+  includes Level 1), `cis_profile` (`server` or `workstation`) and `cis_exclusions`.
+- `cis_default_exclusions` skips 2.1.20, 2.1.21, 2.1.22 and 5.2.6 by default because
+  they can lock out or disrupt a host; override it to run them.
+- `vars/controls.yml` records the level of each of the 352 controls per profile, and
+  preflight computes `cis_selected_controls`, the list every control task tests.
+- Preflight fails with a clear message on an invalid `cis_profile`, a
+  `cis_apply_level_2` that is not true or false, a non-list exclusion variable, or an
+  unknown CIS ID in the exclusions.
+
 ## [3.0.0_0.0.3]
 
 ### Changed
