@@ -48,7 +48,7 @@ implements, then the role's own version.
   ends the run with findings. Preflight rejects values that are not true or false.
 - A shared control pattern: a read-only check, remediation only when not in audit mode,
   and `tasks/finding.yml` to record a finding. It is documented in `CLAUDE.md` and in the
-  header of `tasks/finding.yml`.
+  header of `tasks/finding.yml` (#23).
 - An end-of-run summary per host listing the failing CIS IDs. Selected audit-only and
   manual controls always count as findings; their IDs come from the new
   `cis_control_dispositions` map in `vars/controls.yml`, which mirrors `docs/controls.md`.

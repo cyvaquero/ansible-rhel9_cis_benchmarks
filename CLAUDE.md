@@ -57,11 +57,11 @@ never reference any outside project, path or host. `tests/` needs no managed hos
 - Every task name starts with the CIS ID: `"1.1.1.1 - Disable the cramfs module"`.
 - Every task carries tags: the CIS ID (`"1.1.1.1"`), its section (`section-1`), its
   level (`level-1` / `level-2`) and profiles (`server` / `workstation`).
-- A second run must report `changed=0`. Control pattern (annotated example in
-  `tasks/finding.yml`): a read-only check (`changed_when: false`, `check_mode: false`);
-  fixes gated on `not (cis_audit_only | bool)`; in audit mode a failed check includes
-  `tasks/finding.yml` with `cis_finding_id`. Audit-only and manual controls need no
-  finding task: `tasks/summary.yml` lists them from `cis_control_dispositions`.
+- A second run must report `changed=0`. Control pattern (example in `tasks/finding.yml`):
+  a read-only check (`changed_when: false`, `check_mode: false`); fixes gated on
+  `not (cis_audit_only | bool)`; in audit mode a non-compliant check includes `finding.yml`
+  with `cis_finding_id`. Test the result (`.rc != 0`), never `is failed` (always false with
+  `failed_when: false`). Audit-only and manual controls are listed by `summary.yml`.
 
 ## Benchmark text
 
