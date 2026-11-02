@@ -1,6 +1,15 @@
 ---
 # Internal constants for rhel9_cis_benchmarks. Not meant to be overridden.
 
+# The benchmark document this role implements, from its cover page. Preflight and the
+# end-of-run summary print the title and version. The version must match the header of
+# docs/controls.md and the version prefix of the newest CHANGELOG entry
+# (tests/check_benchmark_version.py checks all three).
+cis_benchmark:
+  title: "CIS Red Hat Enterprise Linux 9 Benchmark"
+  version: "3.0.0"
+  date: "2026-08-28"
+
 # Preflight: the only platform this role supports.
 cis_supported_distribution: RedHat
 cis_supported_major_version: "9"

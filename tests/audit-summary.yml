@@ -32,6 +32,7 @@
       ansible.builtin.include_vars: "{{ item }}"
       loop:
         - "{{ playbook_dir }}/../defaults/main.yml"
+        - "{{ playbook_dir }}/../vars/main.yml"
         - "{{ playbook_dir }}/../vars/controls.yml"
 
     - name: "Stand in for preflight's selection"

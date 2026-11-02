@@ -1,6 +1,10 @@
 # Control inventory
 
-Every recommendation in the CIS Red Hat Enterprise Linux 9 Benchmark v3.0.0, with the planned disposition in this project.
+- Benchmark: CIS Red Hat Enterprise Linux 9 Benchmark
+- Version: 3.0.0
+- Date: 2026-08-28
+
+Every recommendation in that benchmark, with the planned disposition in this project.
 Only CIS IDs and short titles appear here. Read the benchmark itself for descriptions, audit and remediation steps.
 
 ## Dispositions
