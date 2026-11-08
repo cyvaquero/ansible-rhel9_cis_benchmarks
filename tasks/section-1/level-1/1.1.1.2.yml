@@ -1,0 +1,15 @@
+---
+# 1.1.1.2 - freevxfs kernel module. The logic is shared in tasks/lib/kernel_module.yml.
+
+- name: "1.1.1.2 - Ensure the freevxfs kernel module is not available"
+  ansible.builtin.import_tasks: ../../lib/kernel_module.yml
+  vars:
+    cis_km_id: "1.1.1.2"
+    cis_km_module: "freevxfs"
+  tags:
+    - "1.1.1.2"
+    - section-1
+    - level-1
+    - server
+    - workstation
+...

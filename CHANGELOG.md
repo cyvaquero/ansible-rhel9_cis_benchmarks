@@ -8,6 +8,27 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.8]
+
+### Added
+
+- Controls 1.1.1.1 to 1.1.1.10 (cramfs, freevxfs, hfs, hfsplus, jffs2, overlay,
+  squashfs, udf, firewire-core and usb-storage kernel modules), part of #5. A module that
+  is not shipped for the running kernel passes; otherwise it must be blocked from loading
+  (`install ... /bin/false`), blacklisted and not loaded. Remediate mode writes
+  `/etc/modprobe.d/<module>.conf` (root:root, 0644) and unloads the module; a module that
+  is in use is recorded as a finding and does not fail the run. Audit mode only reports.
+  The shared logic is `tasks/lib/kernel_module.yml`.
+- Control 1.1.1.11 (manual) lists the loaded filesystem kernel modules for review.
+- A Status column (`planned` or `implemented`) in every control table of
+  `docs/controls.md`. `tests/check_controls.py` accepts only those values and fails when
+  an implemented control has no task file, or a planned control has one.
+
+### Changed
+
+- `tasks/section-1/level-1.yml` and `level-2.yml` import the section 1.1.1 control
+  files instead of the placeholder task (#5).
+
 ## [3.0.0_0.0.7]
 
 ### Added
