@@ -32,7 +32,8 @@ an audit mode.
 
 [docs/controls.md](docs/controls.md) lists every benchmark recommendation by CIS ID with
 its profile, whether this role implements it, only audits it, or leaves it for manual
-review, and its status: `implemented` (the task file exists) or `planned`. The benchmark text itself is not reproduced here; get the benchmark from
+review, and its status: `implemented` (the task file exists) or `planned`. The
+benchmark text itself is not reproduced here; get the benchmark from
 [CIS](https://www.cisecurity.org/cis-benchmarks).
 
 ## Preflight
