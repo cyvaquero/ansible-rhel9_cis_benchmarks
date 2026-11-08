@@ -1,0 +1,16 @@
+---
+# 1.1.1.10 - usb-storage kernel module. The logic is shared in tasks/lib/kernel_module.yml.
+
+- name: "1.1.1.10 - Ensure the usb-storage kernel module is not available"
+  ansible.builtin.import_tasks: ../../lib/kernel_module.yml
+  vars:
+    cis_km_id: "1.1.1.10"
+    cis_km_module: "usb-storage"
+  tags:
+    - "1.1.1.10"
+    - section-1
+    - level-1
+    - level-2
+    - server
+    - workstation
+...

@@ -23,8 +23,8 @@ never reference any outside project, path or host. `tests/` needs no managed hos
   - One file per control at `tasks/section-<N>/level-<L>/<cis-id>.yml`, included from
     `tasks/section-<N>/level-<L>.yml`; `<L>` is its lowest level in any profile (the
     exact level per profile is in `vars/controls.yml`).
-  - `import_tasks` / `include_tasks`, never the removed bare `include`; fully qualified
-    module names (`ansible.builtin.*`, `ansible.posix.*`, `community.general.*`).
+  - `import_tasks` / `include_tasks` (shared logic in `tasks/lib/`), never the removed
+    bare `include`; fully qualified module names (`ansible.builtin.*`, `ansible.posix.*`, `community.general.*`).
   - No `# Standards:` headers, `templates/old/` or `ansible-review` files. Adds Server
     and Workstation profiles and an audit mode.
 - Use the current RHEL 9 mechanism unless the benchmark specifies otherwise: `dnf` not
@@ -34,7 +34,7 @@ never reference any outside project, path or host. `tests/` needs no managed hos
 - Variables use the `cis_` prefix; every default lives in `defaults/main.yml` with a
   comment naming its CIS ID. No real hostnames: use `example.com` names and RFC 5737
   addresses (`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`).
-- `docs/controls.md` is the control inventory; change a disposition there with the code.
+- `docs/controls.md` is the inventory; change dispositions and Status (`implemented` with the task file) there.
 
 ## Selection and modes
 

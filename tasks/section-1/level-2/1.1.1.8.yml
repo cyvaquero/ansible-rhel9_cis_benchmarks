@@ -1,0 +1,15 @@
+---
+# 1.1.1.8 - udf kernel module. The logic is shared in tasks/lib/kernel_module.yml.
+
+- name: "1.1.1.8 - Ensure the udf kernel module is not available"
+  ansible.builtin.import_tasks: ../../lib/kernel_module.yml
+  vars:
+    cis_km_id: "1.1.1.8"
+    cis_km_module: "udf"
+  tags:
+    - "1.1.1.8"
+    - section-1
+    - level-2
+    - server
+    - workstation
+...
