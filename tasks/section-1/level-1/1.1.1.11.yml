@@ -1,0 +1,35 @@
+---
+# 1.1.1.11 (manual) - lists the loaded filesystem kernel modules for review. It only
+# reads, in both modes, and records no finding: summary.yml lists manual controls.
+
+- name: "1.1.1.11 - Find the loaded filesystem kernel modules"
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        dir="/lib/modules/$(uname -r)/kernel/fs"
+        [ -d "$dir" ] || exit 0
+        find "$dir" -type f -name '*.ko*' | while read -r f; do
+          m=$(basename "$f" | sed 's/\.ko.*$//' | tr - _)
+          awk -v m="$m" '$1 == m { print m }' /proc/modules
+        done | sort -u
+  register: cis_check_1_1_1_11
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: &cis_tags_1_1_1_11
+    - "1.1.1.11"
+    - section-1
+    - level-1
+    - server
+    - workstation
+
+- name: "1.1.1.11 - Report the loaded filesystem kernel modules for review"
+  ansible.builtin.debug:
+    msg: >-
+      Loaded filesystem kernel modules to review:
+      {{ cis_check_1_1_1_11.stdout_lines | join(', ') if cis_check_1_1_1_11.stdout_lines | default([]) else 'none' }}
+  tags: *cis_tags_1_1_1_11
+...

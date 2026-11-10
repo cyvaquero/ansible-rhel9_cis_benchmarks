@@ -1,6 +1,20 @@
 ---
-# Section 1, Level 2 controls. Placeholder: controls are added per section.
+# Section 1, Level 2 controls, one file per control in level-2/.
+#
+# import_tasks, not include_tasks: imports are resolved when the playbook is parsed, so
+# --list-tasks shows these tasks and --tags / --skip-tags match the tags set inside each
+# control file (an include would need its own tags and could not be skipped by an inner
+# tag). The when below is copied onto every imported task.
 
-- name: "Section 1 Level 2 - No controls yet"
-  ansible.builtin.meta: noop
+- name: "1.1.1.6 - Ensure the overlay kernel module is not available"
+  ansible.builtin.import_tasks: level-2/1.1.1.6.yml
+  when: "'1.1.1.6' in cis_selected_controls"
+
+- name: "1.1.1.7 - Ensure the squashfs kernel module is not available"
+  ansible.builtin.import_tasks: level-2/1.1.1.7.yml
+  when: "'1.1.1.7' in cis_selected_controls"
+
+- name: "1.1.1.8 - Ensure the udf kernel module is not available"
+  ansible.builtin.import_tasks: level-2/1.1.1.8.yml
+  when: "'1.1.1.8' in cis_selected_controls"
 ...
