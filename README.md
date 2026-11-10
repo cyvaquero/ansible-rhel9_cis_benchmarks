@@ -4,8 +4,10 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.7).** The role skeleton, preflight check, profile
-selection, audit mode and lint CI exist; no controls are implemented yet. Do not run this against hosts you care about.
+**Status: pre-alpha (3.0.0_0.0.8).** The role skeleton, preflight check, profile
+selection, audit mode and lint CI exist, and the kernel module controls 1.1.1.1 to
+1.1.1.11 are implemented; every other control is still planned. Do not run this against
+hosts you care about.
 
 ## Relationship to the RHEL 7 and RHEL 8 projects
 
@@ -29,8 +31,9 @@ an audit mode.
 ## Controls
 
 [docs/controls.md](docs/controls.md) lists every benchmark recommendation by CIS ID with
-its profile and whether this role implements it, only audits it, or leaves it for manual
-review. The benchmark text itself is not reproduced here; get the benchmark from
+its profile, whether this role implements it, only audits it, or leaves it for manual
+review, and its status: `implemented` (the task file exists) or `planned`. The
+benchmark text itself is not reproduced here; get the benchmark from
 [CIS](https://www.cisecurity.org/cis-benchmarks).
 
 ## Preflight
@@ -140,7 +143,7 @@ ansible-core 2.15 on Python 3.9. Later releases need Python 3.10 or newer.
 
 Versions are `<benchmark>_<major>.<minor>.<iterative>`. The part before the underscore is
 the CIS benchmark version the role implements; the part after is the role's own version.
-`3.0.0_0.0.7` is role version 0.0.7 for benchmark v3.0.0. See
+`3.0.0_0.0.8` is role version 0.0.8 for benchmark v3.0.0. See
 [CHANGELOG.md](CHANGELOG.md).
 
 The benchmark identity lives in three places that must agree: `cis_benchmark` (title,

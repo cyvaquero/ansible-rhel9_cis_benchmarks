@@ -1,0 +1,15 @@
+---
+# 1.1.1.6 - overlay kernel module. The logic is shared in tasks/lib/kernel_module.yml.
+
+- name: "1.1.1.6 - Ensure the overlay kernel module is not available"
+  ansible.builtin.import_tasks: ../../lib/kernel_module.yml
+  vars:
+    cis_km_id: "1.1.1.6"
+    cis_km_module: "overlay"
+  tags:
+    - "1.1.1.6"
+    - section-1
+    - level-2
+    - server
+    - workstation
+...

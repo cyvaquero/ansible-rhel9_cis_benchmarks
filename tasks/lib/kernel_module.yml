@@ -1,0 +1,98 @@
+---
+# Shared logic for the kernel module controls (1.1.1.1 to 1.1.1.10). A control file
+# imports this with:
+#   cis_km_id      the CIS ID, for the task names and the finding
+#   cis_km_module  the module name as the benchmark writes it, dash or underscore
+# and puts the tags, which every task here inherits, on the import.
+#
+# Compliant: the module is not shipped for the running kernel, or it is blocked from
+# loading (an install line pointing at /bin/false), blacklisted and not loaded.
+# Remediate: write one modprobe.d drop-in, then unload the module. A module that is in
+# use cannot be unloaded. After the fix the check runs again, and a control that still
+# fails (a module in use, or a conflicting install line elsewhere) is recorded as a
+# finding without failing the run.
+# Task names are one template expression because ansible-lint allows a template only at
+# the end of a name, and the CIS ID must come first.
+# Needs cis_selected_controls (preflight) and finding.yml.
+
+- name: "{{ cis_km_id ~ ' - Check the ' ~ cis_km_module ~ ' module is not available' }}"
+  ansible.builtin.command:
+    argv: &cis_km_argv
+      - /bin/sh
+      - -c
+      - |
+        # $1 is the module name. /proc/modules and modprobe -c use underscores in
+        # names; configuration may spell the name with dashes, so match both.
+        us=$(printf '%s' "$1" | tr - _)
+        pat=$(printf '%s' "$1" | sed 's/[-_]/[-_]/g')
+        loaded=no
+        awk -v m="$us" '$1 == m { found = 1 } END { exit !found }' /proc/modules && loaded=yes
+        [ "$loaded" = yes ] && echo loaded
+        if [ "$loaded" = no ] && ! modinfo -k "$(uname -r)" "$us" >/dev/null 2>&1; then
+          echo not-shipped
+          exit 0
+        fi
+        conf=$(modprobe -c 2>/dev/null)
+        printf '%s\n' "$conf" | grep -Eq "^install[[:space:]]+$pat[[:space:]]+/bin/false[[:space:]]*$" || { echo not-blocked; exit 1; }
+        printf '%s\n' "$conf" | grep -Eq "^blacklist[[:space:]]+$pat[[:space:]]*$" || { echo not-blacklisted; exit 1; }
+        [ "$loaded" = no ]
+      - sh
+      - "{{ cis_km_module }}"
+  register: cis_km_check
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: "{{ cis_km_id ~ ' - Block and blacklist the ' ~ cis_km_module ~ ' module' }}"
+  ansible.builtin.copy:
+    dest: "/etc/modprobe.d/{{ cis_km_module | replace('-', '_') }}.conf"
+    content: |
+      # Managed by rhel9_cis_benchmarks ({{ cis_km_id }}).
+      install {{ cis_km_module | replace('-', '_') }} /bin/false
+      blacklist {{ cis_km_module | replace('-', '_') }}
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - not (cis_audit_only | bool)
+    - cis_km_check.rc != 0
+
+- name: "{{ cis_km_id ~ ' - Unload the ' ~ cis_km_module ~ ' module' }}"
+  community.general.modprobe:
+    name: "{{ cis_km_module | replace('-', '_') }}"
+    state: absent
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - cis_km_check.rc != 0
+    - "'loaded' in cis_km_check.stdout_lines"
+
+- name: "{{ cis_km_id ~ ' - Check again after the fix' }}"
+  ansible.builtin.command:
+    argv: *cis_km_argv
+  register: cis_km_recheck
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - cis_km_check.rc != 0
+
+- name: "{{ cis_km_id ~ ' - Record the finding when the check fails in audit mode' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "{{ cis_km_id }}"
+  when:
+    - cis_audit_only | bool
+    - cis_km_check.rc != 0
+
+# Under --check the fix does not happen, so the second check says nothing new.
+- name: "{{ cis_km_id ~ ' - Record the finding when the fix did not take effect' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "{{ cis_km_id }}"
+  when:
+    - cis_km_recheck is not skipped
+    - not ansible_check_mode
+    - cis_km_recheck.rc != 0
+...
