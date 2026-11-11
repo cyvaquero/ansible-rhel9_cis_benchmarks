@@ -1,0 +1,98 @@
+---
+# 1.1.2.1.1 - /tmp is a mount point. When it is not, enable systemd's tmp.mount unit
+# WITHOUT starting it: mounting tmpfs over a live /tmp would hide the files running
+# services keep there. The mount appears at the next boot, so the control sets
+# cis_reboot_required and reports that a reboot is pending until then. The role never
+# reboots. A /tmp that is already a mount (an fstab entry or a started unit) passes.
+# Not compliant and not pending is a finding: audit mode when the unit is not enabled,
+# remediate mode when enabling it failed (for example a masked unit).
+
+- name: "1.1.2.1.1 - Check whether /tmp is a mount point"
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - -n
+      - --mountpoint
+      - /tmp
+  register: cis_check_1_1_2_1_1_mount
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: &cis_tags_1_1_2_1_1
+    - "1.1.2.1.1"
+    - section-1
+    - level-1
+    - server
+    - workstation
+
+- name: "1.1.2.1.1 - Check whether the tmp.mount unit is enabled"
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-enabled
+      - tmp.mount
+  register: cis_check_1_1_2_1_1_unit
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: *cis_tags_1_1_2_1_1
+
+# No state: the unit is enabled for the next boot and not started.
+- name: "1.1.2.1.1 - Enable the tmp.mount unit without starting it"
+  ansible.builtin.systemd:
+    name: tmp.mount
+    enabled: true
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - cis_check_1_1_2_1_1_mount.rc != 0
+    - cis_check_1_1_2_1_1_unit.stdout != 'enabled'
+  tags: *cis_tags_1_1_2_1_1
+
+- name: "1.1.2.1.1 - Check the tmp.mount unit again after the fix"
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-enabled
+      - tmp.mount
+  register: cis_recheck_1_1_2_1_1_unit
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+    - cis_check_1_1_2_1_1_mount.rc != 0
+    - cis_check_1_1_2_1_1_unit.stdout != 'enabled'
+  tags: *cis_tags_1_1_2_1_1
+
+- name: "1.1.2.1.1 - Work out whether /tmp waits for a reboot"
+  ansible.builtin.set_fact:
+    cis_state_1_1_2_1_1_pending: >-
+      {{ cis_check_1_1_2_1_1_mount.rc != 0
+         and (cis_recheck_1_1_2_1_1_unit.stdout | default(cis_check_1_1_2_1_1_unit.stdout)) == 'enabled' }}
+  tags: *cis_tags_1_1_2_1_1
+
+- name: "1.1.2.1.1 - Flag that a reboot is required"
+  ansible.builtin.set_fact:
+    cis_reboot_required: true
+  when: cis_state_1_1_2_1_1_pending | bool
+  tags: *cis_tags_1_1_2_1_1
+
+- name: "1.1.2.1.1 - Report that /tmp becomes a mount point at the next reboot"
+  ansible.builtin.debug:
+    msg: "A reboot is pending: tmp.mount is enabled and /tmp becomes a tmpfs mount at the next boot."
+  when: cis_state_1_1_2_1_1_pending | bool
+  tags: *cis_tags_1_1_2_1_1
+
+# Under --check the fix does not happen, so remediate mode records nothing then.
+- name: "1.1.2.1.1 - Record the finding when /tmp is not a mount and no reboot is pending"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "1.1.2.1.1"
+  when:
+    - cis_check_1_1_2_1_1_mount.rc != 0
+    - not (cis_state_1_1_2_1_1_pending | bool)
+    - (cis_audit_only | bool) or not ansible_check_mode
+  tags: *cis_tags_1_1_2_1_1
+...

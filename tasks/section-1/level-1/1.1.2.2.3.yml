@@ -1,0 +1,19 @@
+---
+# 1.1.2.2.3 - nosuid on /dev/shm. The logic is shared in tasks/lib/mount_option.yml.
+
+- name: "1.1.2.2.3 - Ensure the nosuid option is set on /dev/shm"
+  ansible.builtin.import_tasks: ../../lib/mount_option.yml
+  vars:
+    cis_mo_id: "1.1.2.2.3"
+    cis_mo_path: "/dev/shm"
+    cis_mo_option: "nosuid"
+    cis_mo_fstab_create:
+      src: "tmpfs"
+      fstype: "tmpfs"
+  tags:
+    - "1.1.2.2.3"
+    - section-1
+    - level-1
+    - server
+    - workstation
+...

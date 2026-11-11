@@ -1,0 +1,29 @@
+---
+# Shared logic for the audit-only "separate mount" controls (1.1.2.2.1 and the 1.1.2.x.1
+# controls). Partitioning is decided at install time, so these only read the host and
+# report, in both modes. They record no finding: summary.yml lists audit-only controls.
+# A control file imports this with:
+#   cis_ms_id    the CIS ID, for the task names
+#   cis_ms_path  the mount point to look for
+# and puts the tags, which every task here inherits, on the import.
+# Task names are one template expression because ansible-lint allows a template only at
+# the end of a name, and the CIS ID must come first.
+
+- name: "{{ cis_ms_id ~ ' - Check whether ' ~ cis_ms_path ~ ' is a mount point' }}"
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - -n
+      - --mountpoint
+      - "{{ cis_ms_path }}"
+  register: cis_ms_check
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: "{{ cis_ms_id ~ ' - Report the mount state of ' ~ cis_ms_path }}"
+  ansible.builtin.debug:
+    msg: >-
+      {{ cis_ms_path }} is
+      {{ 'a mount point' if cis_ms_check.rc == 0 else 'not a mount point (review only: partitioning is fixed at install time)' }}
+...

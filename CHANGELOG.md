@@ -8,6 +8,28 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.11]
+
+### Added
+
+- Controls 1.1.2.1.1 to 1.1.2.7.4 (26 mount controls). 1.1.2.1.1 enables systemd's
+  `tmp.mount` when `/tmp` is not already a mount, without starting it, because mounting
+  tmpfs over a live `/tmp` would hide files running services hold there; the mount
+  appears at the next boot, and until then the control reports that a reboot is pending.
+  The `nodev`, `nosuid` and `noexec` controls for `/tmp`, `/dev/shm`, `/home`, `/var`,
+  `/var/tmp`, `/var/log` and `/var/log/audit` act only when the mount exists (for `/tmp`,
+  when `tmp.mount` is enabled): they add the option to the `/etc/fstab` entry (a new entry
+  for `/dev/shm`) or to a `tmp.mount` drop-in, and remount the live mount. A control that
+  cannot be fixed is recorded as a finding and does not fail the run. The audit compares
+  the live options. The separate-partition controls (1.1.2.2.1 and 1.1.2.x.1) only report.
+  Shared logic is `tasks/lib/mount_option.yml` and `tasks/lib/mount_separate.yml` (#5).
+- `cis_reboot_required` (default `false`), set by any control whose fix only takes effect
+  after a reboot, and printed in the end-of-run summary. The role never reboots (#5).
+
+### Changed
+
+- `docs/controls.md` marks the 26 mount controls implemented (#5).
+
 ## [3.0.0_0.0.10]
 
 ### Fixed

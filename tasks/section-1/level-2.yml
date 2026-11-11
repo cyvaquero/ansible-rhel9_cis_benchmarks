@@ -17,4 +17,24 @@
 - name: "1.1.1.8 - Ensure the udf kernel module is not available"
   ansible.builtin.import_tasks: level-2/1.1.1.8.yml
   when: "'1.1.1.8' in cis_selected_controls"
+
+- name: "1.1.2.3.1 - Ensure /home is a separate mount"
+  ansible.builtin.import_tasks: level-2/1.1.2.3.1.yml
+  when: "'1.1.2.3.1' in cis_selected_controls"
+
+- name: "1.1.2.4.1 - Ensure /var is a separate mount"
+  ansible.builtin.import_tasks: level-2/1.1.2.4.1.yml
+  when: "'1.1.2.4.1' in cis_selected_controls"
+
+- name: "1.1.2.5.1 - Ensure /var/tmp is a separate mount"
+  ansible.builtin.import_tasks: level-2/1.1.2.5.1.yml
+  when: "'1.1.2.5.1' in cis_selected_controls"
+
+- name: "1.1.2.6.1 - Ensure /var/log is a separate mount"
+  ansible.builtin.import_tasks: level-2/1.1.2.6.1.yml
+  when: "'1.1.2.6.1' in cis_selected_controls"
+
+- name: "1.1.2.7.1 - Ensure /var/log/audit is a separate mount"
+  ansible.builtin.import_tasks: level-2/1.1.2.7.1.yml
+  when: "'1.1.2.7.1' in cis_selected_controls"
 ...

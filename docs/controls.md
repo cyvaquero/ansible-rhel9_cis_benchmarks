@@ -46,32 +46,32 @@ yet. `implemented`: the control has its task file at
 | 1.1.1.9 | Ensure firewire-core kernel module is not available | L1 Server, L2 Workstation | Automated | implement | implemented | Profile differs: L1 Server, L2 Workstation |
 | 1.1.1.10 | Ensure usb-storage kernel module is not available | L1 Server, L2 Workstation | Automated | implement | implemented | Profile differs: L1 Server, L2 Workstation |
 | 1.1.1.11 | Ensure unused filesystems kernel modules are not available | L1 Server, L1 Workstation | Manual | manual | implemented | Report loaded filesystem modules for review |
-| 1.1.2.1.1 | Ensure /tmp is tmpfs or a separate partition | L1 Server, L1 Workstation | Automated | implement | planned | Enable the systemd tmp.mount unit when /tmp is not already separate |
-| 1.1.2.1.2 | Ensure nodev option set on /tmp partition | L1 Server, L1 Workstation | Automated | implement | planned | Only when the mount exists |
-| 1.1.2.1.3 | Ensure nosuid option set on /tmp partition | L1 Server, L1 Workstation | Automated | implement | planned | Only when the mount exists |
-| 1.1.2.1.4 | Ensure noexec option set on /tmp partition | L1 Server, L1 Workstation | Automated | implement | planned | Only when the mount exists |
-| 1.1.2.2.1 | Ensure /dev/shm is tmpfs or a separate partition | L1 Server, L1 Workstation | Automated | audit-only | planned | RHEL 9 mounts /dev/shm as tmpfs by default; report only |
-| 1.1.2.2.2 | Ensure nodev option set on /dev/shm partition | L1 Server, L1 Workstation | Automated | implement | planned | Only when the mount exists |
-| 1.1.2.2.3 | Ensure nosuid option set on /dev/shm partition | L1 Server, L1 Workstation | Automated | implement | planned | Only when the mount exists |
-| 1.1.2.2.4 | Ensure noexec option set on /dev/shm partition | L1 Server, L1 Workstation | Automated | implement | planned | Only when the mount exists |
-| 1.1.2.3.1 | Ensure separate partition exists for /home | L2 Server, L2 Workstation | Automated | audit-only | planned | Partitioning is decided at install time; report only |
-| 1.1.2.3.2 | Ensure nodev option set on /home partition | L1 Server, L1 Workstation | Automated | implement | planned | Only when the mount exists |
-| 1.1.2.3.3 | Ensure nosuid option set on /home partition | L1 Server, L1 Workstation | Automated | implement | planned | Only when the mount exists |
-| 1.1.2.4.1 | Ensure separate partition exists for /var | L2 Server, L2 Workstation | Automated | audit-only | planned | Partitioning is decided at install time; report only |
-| 1.1.2.4.2 | Ensure nodev option set on /var partition | L1 Server, L1 Workstation | Automated | implement | planned | Only when the mount exists |
-| 1.1.2.4.3 | Ensure nosuid option set on /var partition | L1 Server, L1 Workstation | Automated | implement | planned | Only when the mount exists |
-| 1.1.2.5.1 | Ensure separate partition exists for /var/tmp | L2 Server, L2 Workstation | Automated | audit-only | planned | Partitioning is decided at install time; report only |
-| 1.1.2.5.2 | Ensure nodev option set on /var/tmp partition | L1 Server, L1 Workstation | Automated | implement | planned | Only when the mount exists |
-| 1.1.2.5.3 | Ensure nosuid option set on /var/tmp partition | L1 Server, L1 Workstation | Automated | implement | planned | Only when the mount exists |
-| 1.1.2.5.4 | Ensure noexec option set on /var/tmp partition | L1 Server, L1 Workstation | Automated | implement | planned | Only when the mount exists |
-| 1.1.2.6.1 | Ensure separate partition exists for /var/log | L2 Server, L2 Workstation | Automated | audit-only | planned | Partitioning is decided at install time; report only |
-| 1.1.2.6.2 | Ensure nodev option set on /var/log partition | L1 Server, L1 Workstation | Automated | implement | planned | Only when the mount exists |
-| 1.1.2.6.3 | Ensure nosuid option set on /var/log partition | L1 Server, L1 Workstation | Automated | implement | planned | Only when the mount exists |
-| 1.1.2.6.4 | Ensure noexec option set on /var/log partition | L1 Server, L1 Workstation | Automated | implement | planned | Only when the mount exists |
-| 1.1.2.7.1 | Ensure separate partition exists for /var/log/audit | L2 Server, L2 Workstation | Automated | audit-only | planned | Partitioning is decided at install time; report only |
-| 1.1.2.7.2 | Ensure nodev option set on /var/log/audit partition | L1 Server, L1 Workstation | Automated | implement | planned | Only when the mount exists |
-| 1.1.2.7.3 | Ensure nosuid option set on /var/log/audit partition | L1 Server, L1 Workstation | Automated | implement | planned | Only when the mount exists |
-| 1.1.2.7.4 | Ensure noexec option set on /var/log/audit partition | L1 Server, L1 Workstation | Automated | implement | planned | Only when the mount exists |
+| 1.1.2.1.1 | Ensure /tmp is tmpfs or a separate partition | L1 Server, L1 Workstation | Automated | implement | implemented | Enable the systemd tmp.mount unit when /tmp is not already separate |
+| 1.1.2.1.2 | Ensure nodev option set on /tmp partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
+| 1.1.2.1.3 | Ensure nosuid option set on /tmp partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
+| 1.1.2.1.4 | Ensure noexec option set on /tmp partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
+| 1.1.2.2.1 | Ensure /dev/shm is tmpfs or a separate partition | L1 Server, L1 Workstation | Automated | audit-only | implemented | RHEL 9 mounts /dev/shm as tmpfs by default; report only |
+| 1.1.2.2.2 | Ensure nodev option set on /dev/shm partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
+| 1.1.2.2.3 | Ensure nosuid option set on /dev/shm partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
+| 1.1.2.2.4 | Ensure noexec option set on /dev/shm partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
+| 1.1.2.3.1 | Ensure separate partition exists for /home | L2 Server, L2 Workstation | Automated | audit-only | implemented | Partitioning is decided at install time; report only |
+| 1.1.2.3.2 | Ensure nodev option set on /home partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
+| 1.1.2.3.3 | Ensure nosuid option set on /home partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
+| 1.1.2.4.1 | Ensure separate partition exists for /var | L2 Server, L2 Workstation | Automated | audit-only | implemented | Partitioning is decided at install time; report only |
+| 1.1.2.4.2 | Ensure nodev option set on /var partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
+| 1.1.2.4.3 | Ensure nosuid option set on /var partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
+| 1.1.2.5.1 | Ensure separate partition exists for /var/tmp | L2 Server, L2 Workstation | Automated | audit-only | implemented | Partitioning is decided at install time; report only |
+| 1.1.2.5.2 | Ensure nodev option set on /var/tmp partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
+| 1.1.2.5.3 | Ensure nosuid option set on /var/tmp partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
+| 1.1.2.5.4 | Ensure noexec option set on /var/tmp partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
+| 1.1.2.6.1 | Ensure separate partition exists for /var/log | L2 Server, L2 Workstation | Automated | audit-only | implemented | Partitioning is decided at install time; report only |
+| 1.1.2.6.2 | Ensure nodev option set on /var/log partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
+| 1.1.2.6.3 | Ensure nosuid option set on /var/log partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
+| 1.1.2.6.4 | Ensure noexec option set on /var/log partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
+| 1.1.2.7.1 | Ensure separate partition exists for /var/log/audit | L2 Server, L2 Workstation | Automated | audit-only | implemented | Partitioning is decided at install time; report only |
+| 1.1.2.7.2 | Ensure nodev option set on /var/log/audit partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
+| 1.1.2.7.3 | Ensure nosuid option set on /var/log/audit partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
+| 1.1.2.7.4 | Ensure noexec option set on /var/log/audit partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
 | 1.2.1.1 | Ensure GPG keys are configured | L1 Server, L1 Workstation | Manual | manual | planned |  |
 | 1.2.1.2 | Ensure gpgcheck is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 1.2.1.3 | Ensure repo_gpgcheck is configured | L2 Server, L2 Workstation | Automated | audit-only | planned | Red Hat CDN repositories do not sign repository metadata; enabling breaks dnf |
