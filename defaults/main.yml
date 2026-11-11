@@ -34,4 +34,10 @@ cis_default_exclusions:
   - "2.1.21"
   - "2.1.22"
   - "5.2.6"
+
+# Output (1.1.2.1.1, mount options on /tmp): set to true by any control whose fix only takes
+# effect after a reboot. The role never reboots; it sets this flag, the control reports that
+# a reboot is pending, and the end-of-run summary prints it. Leave it false: the role sets
+# it, and a value you pass in is overwritten when a control needs a reboot.
+cis_reboot_required: false
 ...

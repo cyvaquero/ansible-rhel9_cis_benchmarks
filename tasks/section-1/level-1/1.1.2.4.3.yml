@@ -1,0 +1,16 @@
+---
+# 1.1.2.4.3 - nosuid on /var. The logic is shared in tasks/lib/mount_option.yml.
+
+- name: "1.1.2.4.3 - Ensure the nosuid option is set on /var"
+  ansible.builtin.import_tasks: ../../lib/mount_option.yml
+  vars:
+    cis_mo_id: "1.1.2.4.3"
+    cis_mo_path: "/var"
+    cis_mo_option: "nosuid"
+  tags:
+    - "1.1.2.4.3"
+    - section-1
+    - level-1
+    - server
+    - workstation
+...

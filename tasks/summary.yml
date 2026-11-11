@@ -34,6 +34,7 @@
       - "Failing checks: {{ (cis_findings | default([])) | length }}"
       - "Audit-only and manual controls to review: {{ cis_report_only_findings | length }}"
       - "All finding IDs: {{ cis_final_findings | join(', ') if cis_final_findings else 'none' }}"
+      - "Reboot required: {{ 'yes, a control needs a reboot to take effect' if cis_reboot_required | bool else 'no' }}"
   tags:
     - always
     - summary

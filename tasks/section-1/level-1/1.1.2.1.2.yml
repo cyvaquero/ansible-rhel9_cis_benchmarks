@@ -1,0 +1,17 @@
+---
+# 1.1.2.1.2 - nodev on /tmp. The logic is shared in tasks/lib/mount_option.yml.
+
+- name: "1.1.2.1.2 - Ensure the nodev option is set on /tmp"
+  ansible.builtin.import_tasks: ../../lib/mount_option.yml
+  vars:
+    cis_mo_id: "1.1.2.1.2"
+    cis_mo_path: "/tmp"
+    cis_mo_option: "nodev"
+    cis_mo_unit: "tmp.mount"
+  tags:
+    - "1.1.2.1.2"
+    - section-1
+    - level-1
+    - server
+    - workstation
+...
