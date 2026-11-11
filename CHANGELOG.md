@@ -8,6 +8,14 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.9]
+
+### Fixed
+
+- The placeholder task files for sections 2 to 7 no longer warn that a noop task does
+  not support a `when` conditional. They now use a `debug` task that prints only at
+  `-v` and above (#22).
+
 ## [3.0.0_0.0.8]
 
 ### Added
