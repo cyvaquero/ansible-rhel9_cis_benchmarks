@@ -2,5 +2,7 @@
 # Section 7, Level 2 controls. Placeholder: controls are added per section.
 
 - name: "Section 7 Level 2 - No controls yet"
-  ansible.builtin.meta: noop
+  ansible.builtin.debug:
+    msg: "No controls in this file yet"
+    verbosity: 1
 ...
