@@ -396,13 +396,13 @@ yet. `implemented`: the control has its task file at
 | CIS ID | Title | Profile | Type | Disposition | Status | Notes |
 |---|---|---|---|---|---|---|
 | 7.1.1 | Ensure access to /etc/passwd is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 7.1.2 | Ensure access to /etc/passwd-is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
+| 7.1.2 | Ensure access to /etc/passwd- is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 7.1.3 | Ensure access to /etc/group is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 7.1.4 | Ensure access to /etc/group-is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
+| 7.1.4 | Ensure access to /etc/group- is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 7.1.5 | Ensure access to /etc/shadow is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 7.1.6 | Ensure access to /etc/shadow-is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
+| 7.1.6 | Ensure access to /etc/shadow- is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 7.1.7 | Ensure access to /etc/gshadow is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 7.1.8 | Ensure access to /etc/gshadow-is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
+| 7.1.8 | Ensure access to /etc/gshadow- is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 7.1.9 | Ensure access to /etc/shells is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 7.1.10 | Ensure access to /etc/security/opasswd is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 7.1.11 | Ensure world writable files and directories are secured | L1 Server, L1 Workstation | Automated | audit-only | planned | Changing arbitrary files is unsafe; report only |
