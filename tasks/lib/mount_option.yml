@@ -13,8 +13,9 @@
 # The control acts only when the mount exists, or for a unit, will exist after a reboot.
 # Where the option is persisted depends on the route:
 #   fstab   the path has an fstab entry: add the option to its option field.
-#   unit    no fstab entry and the unit provides the mount: add a drop-in whose Options=
-#           is the unit's effective options plus this option. If the unit is enabled but
+#   unit    no fstab entry and the unit provides the mount: write one shared drop-in
+#           (cis-options.conf) whose Options= is the unit's effective options plus this
+#           option. systemctl show prints the options unescaped, so % is written as %%. If the unit is enabled but
 #           the path is not mounted yet, nothing can be remounted: cis_reboot_required is
 #           set instead and the drop-in takes effect at boot.
 #   create  mounted with no fstab entry and cis_mo_fstab_create given: add the entry.
@@ -156,11 +157,11 @@
 
 - name: "{{ cis_mo_id ~ ' - Add ' ~ cis_mo_option ~ ' to the options of the systemd mount unit' }}"
   ansible.builtin.copy:
-    dest: "/etc/systemd/system/{{ cis_mo_unit }}.d/cis-{{ cis_mo_option }}.conf"
+    dest: "/etc/systemd/system/{{ cis_mo_unit }}.d/cis-options.conf"
     content: |
-      # Managed by rhel9_cis_benchmarks ({{ cis_mo_id }}).
+      # Managed by rhel9_cis_benchmarks (mount option controls).
       [Mount]
-      Options={{ cis_mo_new_words | join(',') }}
+      Options={{ cis_mo_new_words | join(',') | replace('%', '%%') }}
     owner: root
     group: root
     mode: "0644"
