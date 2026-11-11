@@ -15,6 +15,14 @@ implements, then the role's own version.
 - The titles of controls 7.1.2, 7.1.4, 7.1.6 and 7.1.8 in `docs/controls.md` had lost the
   space after the backup file name (`/etc/passwd- is configured`) (#25).
 
+## [3.0.0_0.0.9]
+
+### Fixed
+
+- The placeholder task files for sections 2 to 7 no longer warn that a noop task does
+  not support a `when` conditional. They now use a `debug` task that prints only at
+  `-v` and above (#22).
+
 ## [3.0.0_0.0.8]
 
 ### Added
