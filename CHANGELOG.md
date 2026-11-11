@@ -8,6 +8,13 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.10]
+
+### Fixed
+
+- The titles of controls 7.1.2, 7.1.4, 7.1.6 and 7.1.8 in `docs/controls.md` had lost the
+  space after the backup file name (`/etc/passwd- is configured`) (#25).
+
 ## [3.0.0_0.0.8]
 
 ### Added
