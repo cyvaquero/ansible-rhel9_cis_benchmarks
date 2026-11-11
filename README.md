@@ -4,7 +4,7 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.8).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.9).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and the kernel module controls 1.1.1.1 to
 1.1.1.11 are implemented; every other control is still planned. Do not run this against
 hosts you care about.
