@@ -1,0 +1,16 @@
+---
+# 1.1.2.7.3 - nosuid on /var/log/audit. The logic is shared in tasks/lib/mount_option.yml.
+
+- name: "1.1.2.7.3 - Ensure the nosuid option is set on /var/log/audit"
+  ansible.builtin.import_tasks: ../../lib/mount_option.yml
+  vars:
+    cis_mo_id: "1.1.2.7.3"
+    cis_mo_path: "/var/log/audit"
+    cis_mo_option: "nosuid"
+  tags:
+    - "1.1.2.7.3"
+    - section-1
+    - level-1
+    - server
+    - workstation
+...

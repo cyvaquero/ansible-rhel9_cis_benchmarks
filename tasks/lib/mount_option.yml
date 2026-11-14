@@ -1,0 +1,242 @@
+---
+# Shared logic for the mount option controls (nodev, nosuid and noexec on /tmp, /dev/shm,
+# /home, /var, /var/tmp, /var/log and /var/log/audit). A control file imports this with:
+#   cis_mo_id           the CIS ID, for the task names and the finding
+#   cis_mo_path         the mount point
+#   cis_mo_option       nodev, nosuid or noexec
+#   cis_mo_unit         optional: the systemd mount unit that provides the mount when
+#                       there is no fstab entry (tmp.mount for /tmp)
+#   cis_mo_fstab_create optional: {src, fstype} of an fstab entry to add when the path is
+#                       mounted without one (tmpfs for /dev/shm)
+# and puts the tags, which every task here inherits, on the import.
+#
+# The control acts only when the mount exists, or for a unit, will exist after a reboot.
+# Where the option is persisted depends on the route:
+#   fstab   the path has an fstab entry: add the option to its option field.
+#   unit    no fstab entry and the unit provides the mount: write one shared drop-in
+#           (cis-options.conf) whose Options= is the unit's effective options plus this
+#           option. systemctl show prints the options unescaped, so % is written as %%. If the unit is enabled but
+#           the path is not mounted yet, nothing can be remounted: cis_reboot_required is
+#           set instead and the drop-in takes effect at boot.
+#   create  mounted with no fstab entry and cis_mo_fstab_create given: add the entry.
+#   none    mounted, but no way to persist the option: remediate mode records a finding.
+# The three option controls for one path each add their own option to what the earlier
+# ones left, so they compose in any order and a second run changes nothing.
+# Live mounts are remounted with the option added. The audit compares the live options,
+# after the fix in remediate mode. Under --check nothing is changed and no finding is
+# recorded from a fix that did not happen.
+# Needs cis_selected_controls (preflight) and finding.yml.
+# Task names are one template expression because ansible-lint allows a template only at
+# the end of a name, and the CIS ID must come first.
+
+- name: "{{ cis_mo_id ~ ' - Read the live mount options of ' ~ cis_mo_path }}"
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - -n
+      - -o
+      - OPTIONS
+      - --mountpoint
+      - "{{ cis_mo_path }}"
+  register: cis_mo_live
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+# Field 4 of the first matching /etc/fstab line.
+- name: "{{ cis_mo_id ~ ' - Read the fstab options of ' ~ cis_mo_path }}"
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - |
+        awk -v p="$1" '$0 !~ /^[ \t]*#/ && $2 == p { print $4; found = 1; exit } END { exit !found }' /etc/fstab
+      - sh
+      - "{{ cis_mo_path }}"
+  register: cis_mo_fstab
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+# Three lines: is-enabled, is-active and the effective Options= of the unit.
+- name: "{{ cis_mo_id ~ ' - Read the state of the systemd mount unit' }}"
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - |
+        printf '%s\n' "$(systemctl is-enabled "$1" 2>/dev/null)" \
+          "$(systemctl is-active "$1" 2>/dev/null)" \
+          "$(systemctl show -p Options --value "$1" 2>/dev/null)"
+      - sh
+      - "{{ cis_mo_unit }}"
+  register: cis_mo_unit_state
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when: cis_mo_unit | default('') != ''
+
+- name: "{{ cis_mo_id ~ ' - Work out where the ' ~ cis_mo_option ~ ' option for ' ~ cis_mo_path ~ ' is kept' }}"
+  ansible.builtin.set_fact:
+    cis_mo_mounted: "{{ cis_mo_live.rc == 0 }}"
+    cis_mo_live_words: "{{ (cis_mo_live.stdout_lines | last).split(',') if cis_mo_live.rc == 0 else [] }}"
+    cis_mo_fstab_present: "{{ cis_mo_fstab.rc == 0 }}"
+    cis_mo_fstab_words: "{{ cis_mo_fstab.stdout.strip().split(',') if cis_mo_fstab.rc == 0 else [] }}"
+    cis_mo_unit_info: "{{ ((cis_mo_unit_state.stdout | default('')).split('\n') + ['', '', ''])[0:3] }}"
+    cis_mo_opposite: "{{ {'nodev': 'dev', 'nosuid': 'suid', 'noexec': 'exec'}[cis_mo_option] }}"
+
+- name: "{{ cis_mo_id ~ ' - Choose how to keep the ' ~ cis_mo_option ~ ' option for ' ~ cis_mo_path }}"
+  ansible.builtin.set_fact:
+    cis_mo_unit_words: "{{ cis_mo_unit_info[2].split(',') if cis_mo_unit_info[2] != '' else [] }}"
+    cis_mo_route: >-
+      {{ 'fstab' if cis_mo_mounted and cis_mo_fstab_present
+         else 'unit' if (cis_mo_unit | default('')) != '' and not cis_mo_fstab_present
+              and ((cis_mo_mounted and cis_mo_unit_info[1] == 'active')
+                   or (not cis_mo_mounted and cis_mo_unit_info[0] == 'enabled'))
+         else 'create' if cis_mo_mounted and not cis_mo_fstab_present
+              and (cis_mo_fstab_create | default({})) | length > 0
+         else 'none' }}
+
+- name: "{{ cis_mo_id ~ ' - Work out the option list to persist for ' ~ cis_mo_path }}"
+  ansible.builtin.set_fact:
+    cis_mo_base: >-
+      {{ cis_mo_fstab_words if cis_mo_route == 'fstab'
+         else cis_mo_unit_words if cis_mo_route == 'unit'
+         else ['defaults'] if cis_mo_route == 'create'
+         else [] }}
+
+- name: "{{ cis_mo_id ~ ' - Compose the option list for ' ~ cis_mo_path }}"
+  ansible.builtin.set_fact:
+    cis_mo_new_words: >-
+      {{ (cis_mo_base | reject('equalto', cis_mo_opposite) | list)
+         + ([] if cis_mo_option in cis_mo_base else [cis_mo_option]) }}
+    cis_mo_persist_needed: >-
+      {{ cis_mo_route != 'none' and (cis_mo_option not in cis_mo_base or cis_mo_opposite in cis_mo_base) }}
+
+# The mount does not exist yet; the drop-in below takes effect at boot.
+- name: "{{ cis_mo_id ~ ' - Flag the reboot that brings up ' ~ cis_mo_path }}"
+  ansible.builtin.set_fact:
+    cis_reboot_required: true
+  when:
+    - cis_mo_route == 'unit'
+    - not cis_mo_mounted
+
+- name: "{{ cis_mo_id ~ ' - Add ' ~ cis_mo_option ~ ' to the fstab entry of ' ~ cis_mo_path }}"
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^([^#\s]\S*\s+{{ cis_mo_path | regex_escape }}\s+\S+\s+)\S+(.*)$'
+    line: '\1{{ cis_mo_new_words | join(",") }}\2'
+    backrefs: true
+  register: cis_mo_fstab_edit
+  when:
+    - not (cis_audit_only | bool)
+    - cis_mo_route == 'fstab'
+    - cis_mo_persist_needed | bool
+
+- name: "{{ cis_mo_id ~ ' - Add an fstab entry with ' ~ cis_mo_option ~ ' for ' ~ cis_mo_path }}"
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^[^#\s]\S*\s+{{ cis_mo_path | regex_escape }}\s'
+    line: "{{ cis_mo_fstab_create.src }} {{ cis_mo_path }} {{ cis_mo_fstab_create.fstype }} {{ cis_mo_new_words | join(',') }} 0 0"
+  register: cis_mo_fstab_add
+  when:
+    - not (cis_audit_only | bool)
+    - cis_mo_route == 'create'
+
+- name: "{{ cis_mo_id ~ ' - Create the drop-in folder of the systemd mount unit' }}"
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ cis_mo_unit }}.d"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - not (cis_audit_only | bool)
+    - cis_mo_route == 'unit'
+    - cis_mo_persist_needed | bool
+
+- name: "{{ cis_mo_id ~ ' - Add ' ~ cis_mo_option ~ ' to the options of the systemd mount unit' }}"
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/{{ cis_mo_unit }}.d/cis-options.conf"
+    content: |
+      # Managed by rhel9_cis_benchmarks (mount option controls).
+      [Mount]
+      Options={{ cis_mo_new_words | join(',') | replace('%', '%%') }}
+    owner: root
+    group: root
+    mode: "0644"
+  register: cis_mo_dropin
+  when:
+    - not (cis_audit_only | bool)
+    - cis_mo_route == 'unit'
+    - cis_mo_persist_needed | bool
+
+- name: "{{ cis_mo_id ~ ' - Reload systemd after changing mount configuration' }}"
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when:
+    - not ansible_check_mode
+    - cis_mo_fstab_edit is changed or cis_mo_fstab_add is changed or cis_mo_dropin is changed
+
+# Skipped under --check by the command module itself.
+- name: "{{ cis_mo_id ~ ' - Remount ' ~ cis_mo_path ~ ' with ' ~ cis_mo_option }}"
+  ansible.builtin.command:
+    argv:
+      - mount
+      - -o
+      - "remount,{{ cis_mo_option }}"
+      - "{{ cis_mo_path }}"
+  changed_when: true
+  when:
+    - not (cis_audit_only | bool)
+    - cis_mo_mounted | bool
+    - cis_mo_route != 'none'
+    - cis_mo_option not in cis_mo_live_words
+
+- name: "{{ cis_mo_id ~ ' - Check the live options of ' ~ cis_mo_path ~ ' again after the fix' }}"
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - -n
+      - -o
+      - OPTIONS
+      - --mountpoint
+      - "{{ cis_mo_path }}"
+  register: cis_mo_recheck
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+    - cis_mo_mounted | bool
+    - cis_mo_option not in cis_mo_live_words
+
+- name: "{{ cis_mo_id ~ ' - Record the finding when the live options fail in audit mode' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "{{ cis_mo_id }}"
+  when:
+    - cis_audit_only | bool
+    - cis_mo_mounted | bool
+    - cis_mo_option not in cis_mo_live_words
+
+- name: "{{ cis_mo_id ~ ' - Record the finding when the fix did not take effect' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "{{ cis_mo_id }}"
+  when:
+    - cis_mo_recheck is not skipped
+    - cis_mo_option not in ((cis_mo_recheck.stdout_lines | default(['']) | last).split(','))
+
+# Mounted, not compliant, and nowhere to persist the option: nothing was attempted.
+- name: "{{ cis_mo_id ~ ' - Record the finding when there is no way to persist the option' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "{{ cis_mo_id }}"
+  when:
+    - not (cis_audit_only | bool)
+    - cis_mo_mounted | bool
+    - cis_mo_route == 'none'
+    - cis_mo_option not in cis_mo_live_words
+...

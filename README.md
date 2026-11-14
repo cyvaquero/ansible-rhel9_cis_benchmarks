@@ -4,10 +4,10 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.10).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.11).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and the kernel module controls 1.1.1.1 to
-1.1.1.11 are implemented; every other control is still planned. Do not run this against
-hosts you care about.
+1.1.1.11 and the mount controls 1.1.2.1.1 to 1.1.2.7.4 are implemented; every other
+control is still planned. Do not run this against hosts you care about.
 
 ## Relationship to the RHEL 7 and RHEL 8 projects
 
@@ -114,6 +114,18 @@ ansible-playbook -i inventory site.yml -e target=webservers
   `-e cis_audit_only=true -e cis_fail_on_findings=true`. The audit-only and manual
   controls selected for the run always count, so expect that gate to fail until you
   exclude them in `cis_exclusions`.
+- The role never reboots a host. A control whose fix only takes effect after a reboot
+  (1.1.2.1.1 enables `tmp.mount` for the next boot rather than mounting tmpfs over a live
+  `/tmp`) sets `cis_reboot_required` to `true`, reports that a reboot is pending, and the
+  summary prints `Reboot required`. The variable defaults to `false` and is an output:
+  read it after the role runs (for example to schedule a reboot) rather than setting it.
+  Audit mode sets it too, from the state it finds.
+- Mount controls (1.1.2): the `nodev`, `nosuid` and `noexec` controls act only when the
+  mount exists, or for `/tmp`, will exist once `tmp.mount` is enabled. They add the option
+  to `/etc/fstab` (adding a `/dev/shm` entry if there is none) or, for `/tmp` provided by
+  `tmp.mount`, to a drop-in under `/etc/systemd/system/tmp.mount.d/`, and remount the live
+  mount. The audit compares the live options. The separate-partition controls (1.1.2.x.1)
+  only report.
 - The summary is tagged `summary` and `always`, and lists every selected audit-only and
   manual control even on a run limited by tags.
 

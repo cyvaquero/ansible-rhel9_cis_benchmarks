@@ -37,4 +37,89 @@
 - name: "1.1.1.11 - Review the loaded filesystem kernel modules"
   ansible.builtin.import_tasks: level-1/1.1.1.11.yml
   when: "'1.1.1.11' in cis_selected_controls"
+
+- name: "1.1.2.1.1 - Ensure /tmp is a mount point"
+  ansible.builtin.import_tasks: level-1/1.1.2.1.1.yml
+  when: "'1.1.2.1.1' in cis_selected_controls"
+
+- name: "1.1.2.1.2 - Ensure the nodev option is set on /tmp"
+  ansible.builtin.import_tasks: level-1/1.1.2.1.2.yml
+  when: "'1.1.2.1.2' in cis_selected_controls"
+
+- name: "1.1.2.1.3 - Ensure the nosuid option is set on /tmp"
+  ansible.builtin.import_tasks: level-1/1.1.2.1.3.yml
+  when: "'1.1.2.1.3' in cis_selected_controls"
+
+- name: "1.1.2.1.4 - Ensure the noexec option is set on /tmp"
+  ansible.builtin.import_tasks: level-1/1.1.2.1.4.yml
+  when: "'1.1.2.1.4' in cis_selected_controls"
+
+- name: "1.1.2.2.1 - Report whether /dev/shm is a mount point"
+  ansible.builtin.import_tasks: level-1/1.1.2.2.1.yml
+  when: "'1.1.2.2.1' in cis_selected_controls"
+
+- name: "1.1.2.2.2 - Ensure the nodev option is set on /dev/shm"
+  ansible.builtin.import_tasks: level-1/1.1.2.2.2.yml
+  when: "'1.1.2.2.2' in cis_selected_controls"
+
+- name: "1.1.2.2.3 - Ensure the nosuid option is set on /dev/shm"
+  ansible.builtin.import_tasks: level-1/1.1.2.2.3.yml
+  when: "'1.1.2.2.3' in cis_selected_controls"
+
+- name: "1.1.2.2.4 - Ensure the noexec option is set on /dev/shm"
+  ansible.builtin.import_tasks: level-1/1.1.2.2.4.yml
+  when: "'1.1.2.2.4' in cis_selected_controls"
+
+- name: "1.1.2.3.2 - Ensure the nodev option is set on /home"
+  ansible.builtin.import_tasks: level-1/1.1.2.3.2.yml
+  when: "'1.1.2.3.2' in cis_selected_controls"
+
+- name: "1.1.2.3.3 - Ensure the nosuid option is set on /home"
+  ansible.builtin.import_tasks: level-1/1.1.2.3.3.yml
+  when: "'1.1.2.3.3' in cis_selected_controls"
+
+- name: "1.1.2.4.2 - Ensure the nodev option is set on /var"
+  ansible.builtin.import_tasks: level-1/1.1.2.4.2.yml
+  when: "'1.1.2.4.2' in cis_selected_controls"
+
+- name: "1.1.2.4.3 - Ensure the nosuid option is set on /var"
+  ansible.builtin.import_tasks: level-1/1.1.2.4.3.yml
+  when: "'1.1.2.4.3' in cis_selected_controls"
+
+
+- name: "1.1.2.5.2 - Ensure the nodev option is set on /var/tmp"
+  ansible.builtin.import_tasks: level-1/1.1.2.5.2.yml
+  when: "'1.1.2.5.2' in cis_selected_controls"
+
+- name: "1.1.2.5.3 - Ensure the nosuid option is set on /var/tmp"
+  ansible.builtin.import_tasks: level-1/1.1.2.5.3.yml
+  when: "'1.1.2.5.3' in cis_selected_controls"
+
+- name: "1.1.2.5.4 - Ensure the noexec option is set on /var/tmp"
+  ansible.builtin.import_tasks: level-1/1.1.2.5.4.yml
+  when: "'1.1.2.5.4' in cis_selected_controls"
+
+- name: "1.1.2.6.2 - Ensure the nodev option is set on /var/log"
+  ansible.builtin.import_tasks: level-1/1.1.2.6.2.yml
+  when: "'1.1.2.6.2' in cis_selected_controls"
+
+- name: "1.1.2.6.3 - Ensure the nosuid option is set on /var/log"
+  ansible.builtin.import_tasks: level-1/1.1.2.6.3.yml
+  when: "'1.1.2.6.3' in cis_selected_controls"
+
+- name: "1.1.2.6.4 - Ensure the noexec option is set on /var/log"
+  ansible.builtin.import_tasks: level-1/1.1.2.6.4.yml
+  when: "'1.1.2.6.4' in cis_selected_controls"
+
+- name: "1.1.2.7.2 - Ensure the nodev option is set on /var/log/audit"
+  ansible.builtin.import_tasks: level-1/1.1.2.7.2.yml
+  when: "'1.1.2.7.2' in cis_selected_controls"
+
+- name: "1.1.2.7.3 - Ensure the nosuid option is set on /var/log/audit"
+  ansible.builtin.import_tasks: level-1/1.1.2.7.3.yml
+  when: "'1.1.2.7.3' in cis_selected_controls"
+
+- name: "1.1.2.7.4 - Ensure the noexec option is set on /var/log/audit"
+  ansible.builtin.import_tasks: level-1/1.1.2.7.4.yml
+  when: "'1.1.2.7.4' in cis_selected_controls"
 ...

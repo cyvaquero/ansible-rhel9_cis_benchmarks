@@ -1,0 +1,16 @@
+---
+# 1.1.2.3.1 (audit-only) - reports whether /home is a mount point. The logic is shared in
+# tasks/lib/mount_separate.yml. It never changes the host.
+
+- name: "1.1.2.3.1 - Ensure /home is a separate mount"
+  ansible.builtin.import_tasks: ../../lib/mount_separate.yml
+  vars:
+    cis_ms_id: "1.1.2.3.1"
+    cis_ms_path: "/home"
+  tags:
+    - "1.1.2.3.1"
+    - section-1
+    - level-2
+    - server
+    - workstation
+...
