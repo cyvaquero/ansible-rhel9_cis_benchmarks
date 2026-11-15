@@ -1,0 +1,72 @@
+---
+# 1.2.1.5 - dnf does not pull in weak dependencies. [main] in /etc/dnf/dnf.conf must set
+# install_weak_deps to a false value (0, false or no); a missing setting counts as off
+# because dnf's own default is on. The fix writes install_weak_deps=False. Remediate mode
+# records a finding when it is still not off after the fix; under --check nothing is
+# fixed, so nothing is recorded then.
+
+- name: "1.2.1.5 - Check install_weak_deps in dnf.conf"
+  ansible.builtin.command:
+    argv: &cis_argv_1_2_1_5
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        awk '
+        function trim(s) { gsub(/^[ \t]+|[ \t\r]+$/, "", s); return s }
+        /^[ \t]*[#;]/ { next }
+        /^[ \t]*\[/ { sec = trim($0); sub(/^\[/, "", sec); sub(/\].*$/, "", sec); next }
+        sec == "main" && index($0, "=") {
+          i = index($0, "=")
+          k = trim(substr($0, 1, i - 1)); v = tolower(trim(substr($0, i + 1)))
+          if (k == "install_weak_deps") ok = (v == "0" || v == "false" || v == "no")
+        }
+        END { if (!ok) print "on" }' /etc/dnf/dnf.conf 2>/dev/null || echo on
+  register: cis_check_1_2_1_5
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: &cis_tags_1_2_1_5
+    - "1.2.1.5"
+    - section-1
+    - level-2
+    - server
+    - workstation
+
+- name: "1.2.1.5 - Turn off weak dependencies in dnf.conf"
+  community.general.ini_file:
+    path: /etc/dnf/dnf.conf
+    section: main
+    option: install_weak_deps
+    value: "False"
+    no_extra_spaces: true
+    mode: "0644"
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - cis_check_1_2_1_5.stdout | trim == 'on'
+  tags: *cis_tags_1_2_1_5
+
+- name: "1.2.1.5 - Check install_weak_deps again after the fix"
+  ansible.builtin.command:
+    argv: *cis_argv_1_2_1_5
+  register: cis_recheck_1_2_1_5
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+    - cis_check_1_2_1_5.stdout | trim == 'on'
+  tags: *cis_tags_1_2_1_5
+
+# Under --check the fix does not happen, so remediate mode records nothing then.
+- name: "1.2.1.5 - Record the finding"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "1.2.1.5"
+  when:
+    - (cis_recheck_1_2_1_5.stdout | default(cis_check_1_2_1_5.stdout)) | trim == 'on'
+    - (cis_audit_only | bool) or not ansible_check_mode
+  tags: *cis_tags_1_2_1_5
+...

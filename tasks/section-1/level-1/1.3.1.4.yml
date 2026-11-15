@@ -1,0 +1,98 @@
+---
+# 1.3.1.4 - SELinux is not disabled in /etc/selinux/config. The state comes from the shared
+# read in tasks/section-1/level-1.yml (cis_selinux_*). A disabled configuration is changed
+# with ansible.posix.selinux to the mode SELinux is running in now, so the L1 fix never
+# lowers an enforcing host; a host that is not running SELinux at all gets permissive.
+# Leaving the disabled state takes a reboot, and files created while it was off carry no
+# labels, so the control then creates /.autorelabel (the next boot relabels the file
+# system and removes it) and sets cis_reboot_required. A host that is already configured
+# but not yet rebooted keeps that pending state on later runs. The role never reboots.
+# Not enforcing is not a finding here; 1.3.1.5 (Level 2) asks for enforcing. Remediate mode
+# records a finding when the configuration is still disabled after the fix; under --check
+# nothing is fixed, so nothing is recorded then.
+
+- name: "1.3.1.4 - Move the SELinux configuration out of disabled"
+  ansible.posix.selinux:
+    state: "{{ cis_selinux_runtime if cis_selinux_runtime in ['enforcing', 'permissive'] else 'permissive' }}"
+    policy: "{{ cis_selinux_type if cis_selinux_type != '' else 'targeted' }}"
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - cis_selinux_mode == 'disabled'
+  tags: &cis_tags_1_3_1_4
+    - "1.3.1.4"
+    - section-1
+    - level-1
+    - server
+    - workstation
+
+- name: "1.3.1.4 - Read the SELinux configuration mode again after the fix"
+  ansible.builtin.command:
+    argv: &cis_argv_1_3_1_4
+      - /bin/sh
+      - -c
+      - |
+        awk -F= '
+        $0 !~ /^[ \t]*#/ {
+          k = $1; gsub(/[ \t]/, "", k)
+          if (k == "SELINUX") { v = $2; gsub(/[ \t\r]/, "", v); m = v }
+        }
+        END { print tolower(m) }' /etc/selinux/config
+  register: cis_recheck_1_3_1_4
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+    - cis_selinux_mode == 'disabled'
+  tags: *cis_tags_1_3_1_4
+
+- name: "1.3.1.4 - Keep the SELinux state facts current"
+  ansible.builtin.set_fact:
+    cis_selinux_mode: "{{ cis_recheck_1_3_1_4.stdout | trim }}"
+  when: cis_recheck_1_3_1_4.stdout is defined
+  tags: *cis_tags_1_3_1_4
+
+# Configured to be on but not running: the next boot leaves the disabled state.
+- name: "1.3.1.4 - Work out whether SELinux waits for a relabeling reboot"
+  ansible.builtin.set_fact:
+    cis_state_1_3_1_4_pending: "{{ cis_selinux_runtime == 'disabled' and cis_selinux_mode in ['enforcing', 'permissive'] }}"
+  tags: *cis_tags_1_3_1_4
+
+# An empty file: its existence is the request, and force: false keeps a second run at changed=0.
+- name: "1.3.1.4 - Request a relabeling of the file system at the next boot"
+  ansible.builtin.copy:
+    dest: /.autorelabel
+    content: ""
+    force: false
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - not (cis_audit_only | bool)
+    - cis_state_1_3_1_4_pending | bool
+  tags: *cis_tags_1_3_1_4
+
+- name: "1.3.1.4 - Flag that a reboot is required"
+  ansible.builtin.set_fact:
+    cis_reboot_required: true
+  when: cis_state_1_3_1_4_pending | bool
+  tags: *cis_tags_1_3_1_4
+
+- name: "1.3.1.4 - Report that SELinux starts at the next reboot"
+  ansible.builtin.debug:
+    msg: "A reboot is pending: SELinux is configured as {{ cis_selinux_mode }} and starts, after a full relabeling, at the next boot."
+  when: cis_state_1_3_1_4_pending | bool
+  tags: *cis_tags_1_3_1_4
+
+# Under --check the fix does not happen, so remediate mode records nothing then.
+- name: "1.3.1.4 - Record the finding"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "1.3.1.4"
+  when:
+    - cis_selinux_mode == 'disabled'
+    - (cis_audit_only | bool) or not ansible_check_mode
+  tags: *cis_tags_1_3_1_4
+...

@@ -1,0 +1,38 @@
+---
+# 1.2.2.1 (manual) - reports how many package updates are pending. It only reads, in both
+# modes, and records no finding: summary.yml lists manual controls. dnf check-update exits
+# 100 when updates are available and 0 when there are none; any other exit (no repository
+# access, a locked rpm database) reports "unknown" and never fails the run. The script
+# passes dnf's exit status on and prints the number of listed updates.
+
+- name: "1.2.2.1 - Count the pending package updates"
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - |
+        set +e
+        out=$(dnf -q check-update 2>/dev/null)
+        rc=$?
+        printf '%s\n' "$out" | awk '/^$/ { exit } NF >= 3 { n++ } END { print n + 0 }'
+        exit "$rc"
+  register: cis_check_1_2_2_1
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: &cis_tags_1_2_2_1
+    - "1.2.2.1"
+    - section-1
+    - level-1
+    - server
+    - workstation
+
+- name: "1.2.2.1 - Report the pending package updates for review"
+  ansible.builtin.debug:
+    msg: >-
+      Pending package updates:
+      {{ (cis_check_1_2_2_1.stdout_lines | first | default('0')) ~ ' (updates are available)' if cis_check_1_2_2_1.rc == 100
+         else 'none' if cis_check_1_2_2_1.rc == 0
+         else 'unknown (dnf check-update failed)' }}
+  tags: *cis_tags_1_2_2_1
+...

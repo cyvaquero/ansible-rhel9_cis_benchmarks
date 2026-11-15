@@ -138,4 +138,14 @@
   tags:
     - always
     - preflight
+
+# Once for every section: package controls read ansible_facts.packages. A control that
+# installs or removes a package reads the facts again to confirm the result. The module
+# supports --check, so --check sees the same packages.
+- name: "Preflight - Gather the installed packages"
+  ansible.builtin.package_facts:
+    manager: rpm
+  tags:
+    - always
+    - preflight
 ...

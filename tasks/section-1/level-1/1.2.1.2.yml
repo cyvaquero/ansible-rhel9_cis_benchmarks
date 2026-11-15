@@ -1,0 +1,124 @@
+---
+# 1.2.1.2 - package signature checking is on. [main] in /etc/dnf/dnf.conf must set
+# gpgcheck to a true value, and no repository file in /etc/yum.repos.d may turn it off for
+# a repository. The check prints "main" when dnf.conf does not, and one
+# "repo|<file>|<section>" line for each repository section with gpgcheck off. The fix sets
+# gpgcheck=1 in each of those places, except in redhat.repo: subscription-manager owns
+# that file and rewrites it, so an edit would not hold. A repository in redhat.repo with
+# gpgcheck off is therefore a finding in both modes and is never edited.
+# Remediate mode records a finding when anything else is still off after the fix; under
+# --check nothing is fixed, so nothing is recorded then.
+
+- name: "1.2.1.2 - Check gpgcheck in dnf.conf and the repository files"
+  ansible.builtin.command:
+    argv: &cis_argv_1_2_1_2
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        awk '
+        function trim(s) { gsub(/^[ \t]+|[ \t\r]+$/, "", s); return s }
+        /^[ \t]*[#;]/ { next }
+        /^[ \t]*\[/ { sec = trim($0); sub(/^\[/, "", sec); sub(/\].*$/, "", sec); next }
+        sec == "main" && index($0, "=") {
+          i = index($0, "=")
+          k = trim(substr($0, 1, i - 1)); v = tolower(trim(substr($0, i + 1)))
+          if (k == "gpgcheck") ok = (v == "1" || v == "true" || v == "yes")
+        }
+        END { if (!ok) print "main" }' /etc/dnf/dnf.conf 2>/dev/null || echo main
+        for f in /etc/yum.repos.d/*.repo; do
+          [ -f "$f" ] || continue
+          awk -v f="$f" '
+          function trim(s) { gsub(/^[ \t]+|[ \t\r]+$/, "", s); return s }
+          /^[ \t]*[#;]/ { next }
+          /^[ \t]*\[/ { sec = trim($0); sub(/^\[/, "", sec); sub(/\].*$/, "", sec); next }
+          index($0, "=") {
+            i = index($0, "=")
+            k = trim(substr($0, 1, i - 1)); v = tolower(trim(substr($0, i + 1)))
+            if (k == "gpgcheck" && (v == "0" || v == "false" || v == "no")) print "repo|" f "|" sec
+          }' "$f"
+        done
+  register: cis_check_1_2_1_2
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: &cis_tags_1_2_1_2
+    - "1.2.1.2"
+    - section-1
+    - level-1
+    - server
+    - workstation
+
+# repo_off holds [repo, file, section] lists for the repositories this role may edit;
+# redhat_off the ones in redhat.repo, which it only reports.
+- name: "1.2.1.2 - Work out what has gpgcheck off"
+  ansible.builtin.set_fact:
+    cis_state_1_2_1_2_main_off: "{{ 'main' in cis_check_1_2_1_2.stdout_lines }}"
+    cis_state_1_2_1_2_repo_off: >-
+      {{ cis_check_1_2_1_2.stdout_lines | select('match', '^repo[|]') | map('split', '|') | list
+         | rejectattr('1', 'equalto', '/etc/yum.repos.d/redhat.repo') | list }}
+    cis_state_1_2_1_2_redhat_off: >-
+      {{ cis_check_1_2_1_2.stdout_lines | select('match', '^repo[|]') | map('split', '|') | list
+         | selectattr('1', 'equalto', '/etc/yum.repos.d/redhat.repo') | list }}
+  tags: *cis_tags_1_2_1_2
+
+- name: "1.2.1.2 - Turn on gpgcheck in dnf.conf"
+  community.general.ini_file:
+    path: /etc/dnf/dnf.conf
+    section: main
+    option: gpgcheck
+    value: "1"
+    no_extra_spaces: true
+    mode: "0644"
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - cis_state_1_2_1_2_main_off | bool
+  tags: *cis_tags_1_2_1_2
+
+- name: "1.2.1.2 - Turn on gpgcheck in the repository files"
+  community.general.ini_file:
+    path: "{{ item[1] }}"
+    section: "{{ item[2] }}"
+    option: gpgcheck
+    value: "1"
+    no_extra_spaces: true
+    mode: "0644"
+  failed_when: false
+  loop: "{{ cis_state_1_2_1_2_repo_off }}"
+  loop_control:
+    label: "{{ item[1] }} [{{ item[2] }}]"
+  when: not (cis_audit_only | bool)
+  tags: *cis_tags_1_2_1_2
+
+- name: "1.2.1.2 - Check gpgcheck again after the fix"
+  ansible.builtin.command:
+    argv: *cis_argv_1_2_1_2
+  register: cis_recheck_1_2_1_2
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+    - cis_state_1_2_1_2_main_off | bool or cis_state_1_2_1_2_repo_off | length > 0
+  tags: *cis_tags_1_2_1_2
+
+- name: "1.2.1.2 - Work out whether gpgcheck is still off"
+  ansible.builtin.set_fact:
+    cis_state_1_2_1_2_left: >-
+      {{ (cis_recheck_1_2_1_2.stdout_lines | default(cis_check_1_2_1_2.stdout_lines))
+         | reject('equalto', '')
+         | reject('match', '^repo[|]/etc/yum[.]repos[.]d/redhat[.]repo[|]') | list | length > 0 }}
+  tags: *cis_tags_1_2_1_2
+
+# The redhat.repo case is a finding even though the role never edits that file.
+- name: "1.2.1.2 - Record the finding"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "1.2.1.2"
+  when:
+    - cis_state_1_2_1_2_redhat_off | length > 0 or cis_state_1_2_1_2_left | bool
+    - (cis_audit_only | bool) or not ansible_check_mode or cis_state_1_2_1_2_redhat_off | length > 0
+  tags: *cis_tags_1_2_1_2
+...
