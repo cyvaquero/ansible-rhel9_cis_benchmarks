@@ -72,20 +72,20 @@ yet. `implemented`: the control has its task file at
 | 1.1.2.7.2 | Ensure nodev option set on /var/log/audit partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
 | 1.1.2.7.3 | Ensure nosuid option set on /var/log/audit partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
 | 1.1.2.7.4 | Ensure noexec option set on /var/log/audit partition | L1 Server, L1 Workstation | Automated | implement | implemented | Only when the mount exists |
-| 1.2.1.1 | Ensure GPG keys are configured | L1 Server, L1 Workstation | Manual | manual | planned |  |
-| 1.2.1.2 | Ensure gpgcheck is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.2.1.3 | Ensure repo_gpgcheck is configured | L2 Server, L2 Workstation | Automated | audit-only | planned | Red Hat CDN repositories do not sign repository metadata; enabling breaks dnf |
-| 1.2.1.4 | Ensure package manager repositories are configured | L1 Server, L1 Workstation | Manual | manual | planned |  |
-| 1.2.1.5 | Ensure weak dependencies are configured | L2 Server, L2 Workstation | Automated | implement | planned |  |
-| 1.2.2.1 | Ensure updates, patches, and additional security software are installed | L1 Server, L1 Workstation | Manual | manual | planned |  |
-| 1.3.1.1 | Ensure SELinux is installed | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.3.1.2 | Ensure SELinux is not disabled in bootloader configuration | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.3.1.3 | Ensure SELinux policy is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.3.1.4 | Ensure the SELinux mode is not disabled | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.3.1.5 | Ensure the SELinux mode is enforcing | L2 Server, L2 Workstation | Automated | implement | planned |  |
-| 1.3.1.6 | Ensure no unconfined services exist | L2 Server, L2 Workstation | Manual | manual | planned |  |
-| 1.3.1.7 | Ensure the MCS Translation Service (mcstrans) is not installed | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.3.1.8 | Ensure SETroubleshoot is not installed | L1 Server | Automated | implement | planned |  |
+| 1.2.1.1 | Ensure GPG keys are configured | L1 Server, L1 Workstation | Manual | manual | implemented |  |
+| 1.2.1.2 | Ensure gpgcheck is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 1.2.1.3 | Ensure repo_gpgcheck is configured | L2 Server, L2 Workstation | Automated | audit-only | implemented | Red Hat CDN repositories do not sign repository metadata; enabling breaks dnf |
+| 1.2.1.4 | Ensure package manager repositories are configured | L1 Server, L1 Workstation | Manual | manual | implemented |  |
+| 1.2.1.5 | Ensure weak dependencies are configured | L2 Server, L2 Workstation | Automated | implement | implemented |  |
+| 1.2.2.1 | Ensure updates, patches, and additional security software are installed | L1 Server, L1 Workstation | Manual | manual | implemented |  |
+| 1.3.1.1 | Ensure SELinux is installed | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 1.3.1.2 | Ensure SELinux is not disabled in bootloader configuration | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 1.3.1.3 | Ensure SELinux policy is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 1.3.1.4 | Ensure the SELinux mode is not disabled | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 1.3.1.5 | Ensure the SELinux mode is enforcing | L2 Server, L2 Workstation | Automated | implement | implemented |  |
+| 1.3.1.6 | Ensure no unconfined services exist | L2 Server, L2 Workstation | Manual | manual | implemented |  |
+| 1.3.1.7 | Ensure the MCS Translation Service (mcstrans) is not installed | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 1.3.1.8 | Ensure SETroubleshoot is not installed | L1 Server | Automated | implement | implemented |  |
 | 1.4.1 | Ensure bootloader password is set | L1 Server, L1 Workstation | Automated | implement | planned | Needs a site-supplied password hash; report only when unset |
 | 1.4.2 | Ensure access to bootloader config is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 1.4.3 | Ensure authentication is required when booting into rescue mode | L2 Server, L2 Workstation | Automated | implement | planned |  |

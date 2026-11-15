@@ -1,0 +1,31 @@
+---
+# 1.2.1.4 (manual) - lists the enabled package repositories for review. It only reads, in
+# both modes, and records no finding: summary.yml lists manual controls.
+
+- name: "1.2.1.4 - List the enabled package repositories"
+  ansible.builtin.command:
+    argv:
+      - dnf
+      - -q
+      - repolist
+      - --enabled
+  register: cis_check_1_2_1_4
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: &cis_tags_1_2_1_4
+    - "1.2.1.4"
+    - section-1
+    - level-1
+    - server
+    - workstation
+
+- name: "1.2.1.4 - Report the enabled package repositories for review"
+  ansible.builtin.debug:
+    msg: >-
+      Enabled package repositories to review:
+      {{ cis_check_1_2_1_4.stdout_lines | join('; ')
+         if cis_check_1_2_1_4.rc == 0 and cis_check_1_2_1_4.stdout_lines | default([])
+         else 'none, or the list could not be read' }}
+  tags: *cis_tags_1_2_1_4
+...

@@ -8,6 +8,32 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.12]
+
+### Added
+
+- Controls 1.2.1.1 to 1.2.2.1 (package manager) and 1.3.1.1 to 1.3.1.8 (SELinux), 14
+  controls. 1.2.1.2 sets `gpgcheck=1` in `/etc/dnf/dnf.conf` and in every repository file
+  section that turns it off, except `redhat.repo`, which subscription-manager owns: a
+  repository there with `gpgcheck=0` is a finding and is never edited. 1.2.1.5 (Level 2)
+  sets `install_weak_deps=False`. 1.2.1.3 (repo_gpgcheck, Level 2), 1.2.1.1, 1.2.1.4,
+  1.2.2.1 (pending updates; an unreadable `dnf check-update` reports unknown and never
+  fails the run) and 1.3.1.6 (processes in `unconfined_service_t`) only report. 1.3.1.1,
+  1.3.1.7 and 1.3.1.8 install `libselinux` and remove `mcstrans` and `setroubleshoot`
+  (1.3.1.8 is Server only). 1.3.1.2 removes `selinux=0` and `enforcing=0` from every boot
+  entry with `grubby`. 1.3.1.3 sets `SELINUXTYPE=targeted`. 1.3.1.4 moves a disabled
+  configuration to the mode SELinux is running in (permissive when it is not running), so
+  it never lowers an enforcing host. 1.3.1.5 (Level 2) sets enforcing in the configuration
+  and at runtime. The SELinux controls read the state once and share it, so the Level 1
+  and Level 2 controls do not undo each other (#5).
+- Leaving the disabled SELinux state creates `/.autorelabel` and sets
+  `cis_reboot_required`, as do a boot entry fix while the running kernel still has
+  `selinux=0` or `enforcing=0`, and a policy type change while another policy is loaded.
+  A host that is not running SELinux is switched to enforcing by 1.3.1.5 only on a run
+  after that reboot (#5).
+- Package facts are gathered once in preflight for the controls that read installed
+  packages (#5).
+
 ## [3.0.0_0.0.11]
 
 ### Added

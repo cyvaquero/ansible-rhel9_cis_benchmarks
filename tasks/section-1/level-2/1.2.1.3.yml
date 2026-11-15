@@ -1,0 +1,43 @@
+---
+# 1.2.1.3 (audit-only) - reports the repo_gpgcheck settings in dnf.conf and the repository
+# files for review. It only reads, in both modes, and never changes them: the Red Hat CDN
+# does not sign repository metadata, so turning repo_gpgcheck on would break dnf there. It
+# records no finding: summary.yml lists audit-only controls.
+
+- name: "1.2.1.3 - Read the repo_gpgcheck settings"
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        for f in /etc/dnf/dnf.conf /etc/yum.repos.d/*.repo; do
+          [ -f "$f" ] || continue
+          awk -v f="$f" '
+          function trim(s) { gsub(/^[ \t]+|[ \t\r]+$/, "", s); return s }
+          /^[ \t]*[#;]/ { next }
+          /^[ \t]*\[/ { sec = trim($0); sub(/^\[/, "", sec); sub(/\].*$/, "", sec); next }
+          index($0, "=") {
+            i = index($0, "=")
+            k = trim(substr($0, 1, i - 1)); v = trim(substr($0, i + 1))
+            if (k == "repo_gpgcheck") print f " [" sec "] repo_gpgcheck=" v
+          }' "$f"
+        done
+  register: cis_check_1_2_1_3
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: &cis_tags_1_2_1_3
+    - "1.2.1.3"
+    - section-1
+    - level-2
+    - server
+    - workstation
+
+- name: "1.2.1.3 - Report the repo_gpgcheck settings for review"
+  ansible.builtin.debug:
+    msg: >-
+      repo_gpgcheck settings to review:
+      {{ cis_check_1_2_1_3.stdout_lines | join('; ') if cis_check_1_2_1_3.stdout_lines | default([]) else 'none set (dnf default applies)' }}
+  tags: *cis_tags_1_2_1_3
+...
