@@ -4,9 +4,10 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.11).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.12).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and the kernel module controls 1.1.1.1 to
-1.1.1.11 and the mount controls 1.1.2.1.1 to 1.1.2.7.4 are implemented; every other
+1.1.1.11, the mount controls 1.1.2.1.1 to 1.1.2.7.4, the package manager controls 1.2.1.1
+to 1.2.2.1 and the SELinux controls 1.3.1.1 to 1.3.1.8 are implemented; every other
 control is still planned. Do not run this against hosts you care about.
 
 ## Relationship to the RHEL 7 and RHEL 8 projects
@@ -116,7 +117,10 @@ ansible-playbook -i inventory site.yml -e target=webservers
   exclude them in `cis_exclusions`.
 - The role never reboots a host. A control whose fix only takes effect after a reboot
   (1.1.2.1.1 enables `tmp.mount` for the next boot rather than mounting tmpfs over a live
-  `/tmp`) sets `cis_reboot_required` to `true`, reports that a reboot is pending, and the
+  `/tmp`; 1.3.1.2 removes `selinux=0` or `enforcing=0` from the boot entries while the
+  running kernel still has it; 1.3.1.4 and 1.3.1.5 configure SELinux on a host that is not
+  running it; 1.3.1.3 changes the policy type while another policy is loaded) sets
+  `cis_reboot_required` to `true`, reports that a reboot is pending, and the
   summary prints `Reboot required`. The variable defaults to `false` and is an output:
   read it after the role runs (for example to schedule a reboot) rather than setting it.
   Audit mode sets it too, from the state it finds.
@@ -126,6 +130,13 @@ ansible-playbook -i inventory site.yml -e target=webservers
   `tmp.mount`, to a drop-in under `/etc/systemd/system/tmp.mount.d/`, and remount the live
   mount. The audit compares the live options. The separate-partition controls (1.1.2.x.1)
   only report.
+- Package manager and SELinux controls (1.2, 1.3): 1.2.1.2 never edits `redhat.repo`
+  (subscription-manager owns it); a repository there with `gpgcheck=0` is a finding.
+  1.3.1.4 moves a disabled SELinux configuration to the running mode (permissive when it is
+  not running), creates `/.autorelabel` when SELinux starts at the next boot, and never
+  lowers an enforcing host. 1.3.1.5 (Level 2) enforces only a host that is running
+  SELinux: on a host that is not, run the role again after the relabeling reboot. The
+  SELinux changes need `python3-libselinux` on the managed node.
 - The summary is tagged `summary` and `always`, and lists every selected audit-only and
   manual control even on a run limited by tags.
 

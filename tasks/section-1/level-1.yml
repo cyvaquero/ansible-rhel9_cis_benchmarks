@@ -122,4 +122,94 @@
 - name: "1.1.2.7.4 - Ensure the noexec option is set on /var/log/audit"
   ansible.builtin.import_tasks: level-1/1.1.2.7.4.yml
   when: "'1.1.2.7.4' in cis_selected_controls"
+
+- name: "1.2.1.1 - Review the imported GPG keys"
+  ansible.builtin.import_tasks: level-1/1.2.1.1.yml
+  when: "'1.2.1.1' in cis_selected_controls"
+
+- name: "1.2.1.2 - Ensure gpgcheck is configured"
+  ansible.builtin.import_tasks: level-1/1.2.1.2.yml
+  when: "'1.2.1.2' in cis_selected_controls"
+
+- name: "1.2.1.4 - Review the enabled package repositories"
+  ansible.builtin.import_tasks: level-1/1.2.1.4.yml
+  when: "'1.2.1.4' in cis_selected_controls"
+
+- name: "1.2.2.1 - Review the pending package updates"
+  ansible.builtin.import_tasks: level-1/1.2.2.1.yml
+  when: "'1.2.2.1' in cis_selected_controls"
+
+- name: "1.3.1.1 - Ensure SELinux is installed"
+  ansible.builtin.import_tasks: level-1/1.3.1.1.yml
+  when: "'1.3.1.1' in cis_selected_controls"
+
+- name: "1.3.1.2 - Ensure SELinux is not disabled in the bootloader configuration"
+  ansible.builtin.import_tasks: level-1/1.3.1.2.yml
+  when: "'1.3.1.2' in cis_selected_controls"
+
+# Read once for 1.3.1.3 to 1.3.1.5, which share it so the Level 1 and Level 2 SELinux
+# controls never undo each other. Four lines: the running mode, the mode in
+# /etc/selinux/config, the policy type in that file and the policy the kernel loaded, all
+# lowercase and empty when unknown (no getenforce means SELinux is not running). The
+# SELinux controls update cis_selinux_mode and cis_selinux_type after a fix, so a later
+# control starts from the current values. Read-only, so it also runs under --check.
+- name: "Section 1 - Read the SELinux state"
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        r=disabled
+        if command -v getenforce >/dev/null 2>&1; then r=$(getenforce | tr 'A-Z' 'a-z'); fi
+        cfg=/etc/selinux/config
+        [ -r "$cfg" ] || cfg=/dev/null
+        val() {
+          awk -F= -v want="$1" '
+          $0 !~ /^[ \t]*#/ {
+            k = $1; gsub(/[ \t]/, "", k)
+            if (k == want) { v = $2; gsub(/[ \t\r]/, "", v); out = v }
+          }
+          END { print tolower(out) }' "$cfg"
+        }
+        loaded=
+        if command -v sestatus >/dev/null 2>&1; then
+          loaded=$(sestatus | awk -F: '/^Loaded policy name/ { gsub(/[ \t]/, "", $2); print tolower($2) }')
+        fi
+        printf '%s\n%s\n%s\n%s\n' "$r" "$(val SELINUX)" "$(val SELINUXTYPE)" "$loaded"
+  register: cis_check_selinux_state
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when: "['1.3.1.3', '1.3.1.4', '1.3.1.5'] | intersect(cis_selected_controls) | length > 0"
+  tags:
+    - always
+    - section-1
+
+- name: "Section 1 - Record the SELinux state"
+  ansible.builtin.set_fact:
+    cis_selinux_runtime: "{{ (cis_check_selinux_state.stdout_lines + ['', '', '', ''])[0] }}"
+    cis_selinux_mode: "{{ (cis_check_selinux_state.stdout_lines + ['', '', '', ''])[1] }}"
+    cis_selinux_type: "{{ (cis_check_selinux_state.stdout_lines + ['', '', '', ''])[2] }}"
+    cis_selinux_loaded_policy: "{{ (cis_check_selinux_state.stdout_lines + ['', '', '', ''])[3] }}"
+  when: "['1.3.1.3', '1.3.1.4', '1.3.1.5'] | intersect(cis_selected_controls) | length > 0"
+  tags:
+    - always
+    - section-1
+
+- name: "1.3.1.3 - Ensure the SELinux policy is configured"
+  ansible.builtin.import_tasks: level-1/1.3.1.3.yml
+  when: "'1.3.1.3' in cis_selected_controls"
+
+- name: "1.3.1.4 - Ensure the SELinux mode is not disabled"
+  ansible.builtin.import_tasks: level-1/1.3.1.4.yml
+  when: "'1.3.1.4' in cis_selected_controls"
+
+- name: "1.3.1.7 - Ensure the mcstrans package is not installed"
+  ansible.builtin.import_tasks: level-1/1.3.1.7.yml
+  when: "'1.3.1.7' in cis_selected_controls"
+
+- name: "1.3.1.8 - Ensure the setroubleshoot packages are not installed"
+  ansible.builtin.import_tasks: level-1/1.3.1.8.yml
+  when: "'1.3.1.8' in cis_selected_controls"
 ...

@@ -1,0 +1,30 @@
+---
+# 1.2.1.1 (manual) - lists the GPG public keys imported into the rpm database for review.
+# It only reads, in both modes, and records no finding: summary.yml lists manual controls.
+
+- name: "1.2.1.1 - List the imported GPG public keys"
+  ansible.builtin.command:
+    argv:
+      - rpm
+      - -q
+      - gpg-pubkey
+      - --qf
+      - '%{NAME}-%{VERSION}-%{RELEASE} %{SUMMARY}\n'
+  register: cis_check_1_2_1_1
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: &cis_tags_1_2_1_1
+    - "1.2.1.1"
+    - section-1
+    - level-1
+    - server
+    - workstation
+
+- name: "1.2.1.1 - Report the imported GPG public keys for review"
+  ansible.builtin.debug:
+    msg: >-
+      Imported GPG public keys to review:
+      {{ cis_check_1_2_1_1.stdout_lines | join('; ') if cis_check_1_2_1_1.rc == 0 and cis_check_1_2_1_1.stdout_lines | default([]) else 'none' }}
+  tags: *cis_tags_1_2_1_1
+...
