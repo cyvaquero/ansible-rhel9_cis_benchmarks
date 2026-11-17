@@ -1,0 +1,35 @@
+---
+# 1.6.5 (manual) - reports whether the generated OpenSSH server back-end offers the
+# chacha20-poly1305 cipher, for review. It only reads, in both modes, and records no
+# finding: summary.yml lists manual controls. Whether the cipher is acceptable is the
+# administrator's decision, so the role never changes the policy for it.
+
+- name: "1.6.5 - Check whether the SSH server crypto policy offers chacha20-poly1305"
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - |
+        f=/etc/crypto-policies/back-ends/opensshserver.config
+        [ -r "$f" ] || { echo unknown; exit 0; }
+        if grep -Ei '^[[:space:]]*Ciphers[[:space:]=]' "$f" | grep -qi 'chacha20-poly1305'; then
+          echo offered
+        else
+          echo not offered
+        fi
+  register: cis_check_1_6_5
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: &cis_tags_1_6_5
+    - "1.6.5"
+    - section-1
+    - level-1
+    - server
+    - workstation
+
+- name: "1.6.5 - Report whether chacha20-poly1305 is offered for SSH for review"
+  ansible.builtin.debug:
+    msg: "chacha20-poly1305 in the SSH server crypto policy: {{ cis_check_1_6_5.stdout | default('unknown') | trim }}"
+  tags: *cis_tags_1_6_5
+...
