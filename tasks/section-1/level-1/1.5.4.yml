@@ -1,0 +1,18 @@
+---
+# 1.5.4 - kernel.dmesg_restrict is set to an accepted value, both running and in the configuration.
+# Accepted: 1. The logic is shared in tasks/lib/sysctl.yml.
+
+- name: "1.5.4 - Ensure kernel.dmesg_restrict is configured"
+  ansible.builtin.import_tasks: ../../lib/sysctl.yml
+  vars:
+    cis_sc_id: "1.5.4"
+    cis_sc_key: "kernel.dmesg_restrict"
+    cis_sc_ok: ["1"]
+    cis_sc_set: "1"
+  tags:
+    - "1.5.4"
+    - section-1
+    - level-1
+    - server
+    - workstation
+...
