@@ -1,0 +1,18 @@
+---
+# 1.5.2 - fs.protected_symlinks is set to an accepted value, both running and in the configuration.
+# Accepted: 1. The logic is shared in tasks/lib/sysctl.yml.
+
+- name: "1.5.2 - Ensure fs.protected_symlinks is configured"
+  ansible.builtin.import_tasks: ../../lib/sysctl.yml
+  vars:
+    cis_sc_id: "1.5.2"
+    cis_sc_key: "fs.protected_symlinks"
+    cis_sc_ok: ["1"]
+    cis_sc_set: "1"
+  tags:
+    - "1.5.2"
+    - section-1
+    - level-2
+    - server
+    - workstation
+...

@@ -86,21 +86,21 @@ yet. `implemented`: the control has its task file at
 | 1.3.1.6 | Ensure no unconfined services exist | L2 Server, L2 Workstation | Manual | manual | implemented |  |
 | 1.3.1.7 | Ensure the MCS Translation Service (mcstrans) is not installed | L1 Server, L1 Workstation | Automated | implement | implemented |  |
 | 1.3.1.8 | Ensure SETroubleshoot is not installed | L1 Server | Automated | implement | implemented |  |
-| 1.4.1 | Ensure bootloader password is set | L1 Server, L1 Workstation | Automated | implement | planned | Needs a site-supplied password hash; report only when unset |
-| 1.4.2 | Ensure access to bootloader config is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.4.3 | Ensure authentication is required when booting into rescue mode | L2 Server, L2 Workstation | Automated | implement | planned |  |
-| 1.4.4 | Ensure authentication is required when booting into emergency mode | L2 Server, L2 Workstation | Automated | implement | planned |  |
-| 1.4.5 | Ensure systemd ability to spawn an interactive boot process is disabled | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.5.1 | Ensure fs.protected_hardlinks is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.5.2 | Ensure fs.protected_symlinks is configured | L2 Server, L2 Workstation | Automated | implement | planned |  |
-| 1.5.3 | Ensure fs.suid_dumpable is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.5.4 | Ensure kernel.dmesg_restrict is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.5.5 | Ensure kernel.kptr_restrict is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.5.6 | Ensure kernel.randomize_va_space is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.5.7 | Ensure kernel.yama.ptrace_scope is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.5.8 | Ensure core file size is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.5.9 | Ensure systemd-coredump ProcessSizeMax is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.5.10 | Ensure systemd-coredump Storage is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
+| 1.4.1 | Ensure bootloader password is set | L1 Server, L1 Workstation | Automated | implement | implemented | Needs a site-supplied password hash; report only when unset |
+| 1.4.2 | Ensure access to bootloader config is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 1.4.3 | Ensure authentication is required when booting into rescue mode | L2 Server, L2 Workstation | Automated | implement | implemented |  |
+| 1.4.4 | Ensure authentication is required when booting into emergency mode | L2 Server, L2 Workstation | Automated | implement | implemented |  |
+| 1.4.5 | Ensure systemd ability to spawn an interactive boot process is disabled | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 1.5.1 | Ensure fs.protected_hardlinks is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 1.5.2 | Ensure fs.protected_symlinks is configured | L2 Server, L2 Workstation | Automated | implement | implemented |  |
+| 1.5.3 | Ensure fs.suid_dumpable is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 1.5.4 | Ensure kernel.dmesg_restrict is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 1.5.5 | Ensure kernel.kptr_restrict is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 1.5.6 | Ensure kernel.randomize_va_space is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 1.5.7 | Ensure kernel.yama.ptrace_scope is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 1.5.8 | Ensure core file size is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 1.5.9 | Ensure systemd-coredump ProcessSizeMax is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 1.5.10 | Ensure systemd-coredump Storage is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
 | 1.6.1 | Ensure system wide crypto policy is not legacy | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 1.6.2 | Ensure system wide crypto policy disables sha1 hash and signature support | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 1.6.3 | Ensure system wide crypto policy macs are configured | L1 Server, L1 Workstation | Automated | implement | planned |  |

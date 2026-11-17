@@ -212,4 +212,52 @@
 - name: "1.3.1.8 - Ensure the setroubleshoot packages are not installed"
   ansible.builtin.import_tasks: level-1/1.3.1.8.yml
   when: "'1.3.1.8' in cis_selected_controls"
+
+- name: "1.4.1 - Ensure the bootloader password is set"
+  ansible.builtin.import_tasks: level-1/1.4.1.yml
+  when: "'1.4.1' in cis_selected_controls"
+
+- name: "1.4.2 - Ensure access to the bootloader configuration is restricted"
+  ansible.builtin.import_tasks: level-1/1.4.2.yml
+  when: "'1.4.2' in cis_selected_controls"
+
+- name: "1.4.5 - Ensure systemd cannot spawn an interactive boot process"
+  ansible.builtin.import_tasks: level-1/1.4.5.yml
+  when: "'1.4.5' in cis_selected_controls"
+
+- name: "1.5.1 - Ensure fs.protected_hardlinks is configured"
+  ansible.builtin.import_tasks: level-1/1.5.1.yml
+  when: "'1.5.1' in cis_selected_controls"
+
+- name: "1.5.3 - Ensure fs.suid_dumpable is configured"
+  ansible.builtin.import_tasks: level-1/1.5.3.yml
+  when: "'1.5.3' in cis_selected_controls"
+
+- name: "1.5.4 - Ensure kernel.dmesg_restrict is configured"
+  ansible.builtin.import_tasks: level-1/1.5.4.yml
+  when: "'1.5.4' in cis_selected_controls"
+
+- name: "1.5.5 - Ensure kernel.kptr_restrict is configured"
+  ansible.builtin.import_tasks: level-1/1.5.5.yml
+  when: "'1.5.5' in cis_selected_controls"
+
+- name: "1.5.6 - Ensure kernel.randomize_va_space is configured"
+  ansible.builtin.import_tasks: level-1/1.5.6.yml
+  when: "'1.5.6' in cis_selected_controls"
+
+- name: "1.5.7 - Ensure kernel.yama.ptrace_scope is configured"
+  ansible.builtin.import_tasks: level-1/1.5.7.yml
+  when: "'1.5.7' in cis_selected_controls"
+
+- name: "1.5.8 - Ensure the core file size limit is configured"
+  ansible.builtin.import_tasks: level-1/1.5.8.yml
+  when: "'1.5.8' in cis_selected_controls"
+
+- name: "1.5.9 - Ensure systemd-coredump ProcessSizeMax is configured"
+  ansible.builtin.import_tasks: level-1/1.5.9.yml
+  when: "'1.5.9' in cis_selected_controls"
+
+- name: "1.5.10 - Ensure systemd-coredump Storage is configured"
+  ansible.builtin.import_tasks: level-1/1.5.10.yml
+  when: "'1.5.10' in cis_selected_controls"
 ...

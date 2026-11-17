@@ -8,6 +8,28 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.13]
+
+### Added
+
+- Controls 1.4.1 to 1.4.5 (boot loader) and 1.5.1 to 1.5.10 (kernel and process
+  hardening), 15 controls. 1.4.1 writes the boot loader password hash from the new
+  `cis_grub_password_hash` variable (default empty) to `/boot/grub2/user.cfg`; with the
+  variable empty it only reports. 1.4.2 sets 0600 root:root on the grub2 files and
+  `uid=0,gid=0,umask=0077` on the `/boot/efi` fstab entry. 1.4.3 and 1.4.4 (Level 2) keep
+  the root password prompt in rescue and emergency mode. 1.4.5 removes
+  `systemd.confirm_spawn` from the boot entries and `ConfirmSpawn=yes` from the systemd
+  configuration. 1.5.1 to 1.5.7 (1.5.2 is Level 2) set the sysctl values in a role-owned
+  file that overrides vendor files, and set the running value. 1.5.8 sets a hard core
+  limit of 0, and 1.5.9 and 1.5.10 set `ProcessSizeMax=0` and `Storage=none` for
+  systemd-coredump. A setting that another file overrides is a finding. 1.4.2 and 1.4.5
+  set `cis_reboot_required` when the live state still differs. Shared logic is
+  `tasks/lib/sysctl.yml`, `sulogin_unit.yml` and `coredump.yml` (#5).
+
+### Changed
+
+- `docs/controls.md` marks the 15 controls implemented (#5).
+
 ## [3.0.0_0.0.12]
 
 ### Added

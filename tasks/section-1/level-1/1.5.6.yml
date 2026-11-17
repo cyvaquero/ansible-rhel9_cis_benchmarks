@@ -1,0 +1,18 @@
+---
+# 1.5.6 - kernel.randomize_va_space is set to an accepted value, both running and in the configuration.
+# Accepted: 2. The logic is shared in tasks/lib/sysctl.yml.
+
+- name: "1.5.6 - Ensure kernel.randomize_va_space is configured"
+  ansible.builtin.import_tasks: ../../lib/sysctl.yml
+  vars:
+    cis_sc_id: "1.5.6"
+    cis_sc_key: "kernel.randomize_va_space"
+    cis_sc_ok: ["2"]
+    cis_sc_set: "2"
+  tags:
+    - "1.5.6"
+    - section-1
+    - level-1
+    - server
+    - workstation
+...

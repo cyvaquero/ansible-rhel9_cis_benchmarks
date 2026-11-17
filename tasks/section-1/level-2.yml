@@ -53,4 +53,16 @@
 - name: "1.3.1.6 - Review the unconfined service processes"
   ansible.builtin.import_tasks: level-2/1.3.1.6.yml
   when: "'1.3.1.6' in cis_selected_controls"
+
+- name: "1.4.3 - Ensure authentication is required in rescue mode"
+  ansible.builtin.import_tasks: level-2/1.4.3.yml
+  when: "'1.4.3' in cis_selected_controls"
+
+- name: "1.4.4 - Ensure authentication is required in emergency mode"
+  ansible.builtin.import_tasks: level-2/1.4.4.yml
+  when: "'1.4.4' in cis_selected_controls"
+
+- name: "1.5.2 - Ensure fs.protected_symlinks is configured"
+  ansible.builtin.import_tasks: level-2/1.5.2.yml
+  when: "'1.5.2' in cis_selected_controls"
 ...
