@@ -6,12 +6,12 @@
 #  - /boot/efi, when /etc/fstab mounts it as vfat (UEFI), must carry uid=0, gid=0 and a
 #    umask of 0077 (or fmask and dmask, each covering 077), because vfat has no file
 #    permissions. A host with no such entry (BIOS) skips this part. The fix rewrites the
-#    fstab options, reloads systemd and tries a remount; if the live mount still does not
-#    match, cis_reboot_required is set. The live check accepts a missing uid or gid (the
-#    kernel hides root).
-# Remediate mode records a finding when anything is still not compliant after the fix
-# (a reboot-pending mount is not a finding); under --check nothing is fixed, so nothing
-# is recorded then.
+#    fstab options and reloads systemd. A vfat remount does not change these options, so a
+#    live mount that differs from a compliant fstab entry waits for the next boot: the
+#    control sets cis_reboot_required, in audit mode too, and that is not a finding. The
+#    live check accepts a missing uid or gid (the kernel hides root).
+# Remediate mode records a finding when anything is still not compliant after the fix;
+# under --check nothing is fixed, so nothing is recorded then.
 
 - name: "1.4.2 - Find boot loader files with the wrong owner or mode"
   ansible.builtin.command:
@@ -147,21 +147,6 @@
     - cis_fix_1_4_2_fstab is changed
   tags: *cis_tags_1_4_2
 
-# Skipped under --check by the command module itself. A failed remount is checked below.
-- name: "1.4.2 - Remount /boot/efi with the fstab options"
-  ansible.builtin.command:
-    argv:
-      - mount
-      - -o
-      - remount
-      - /boot/efi
-  changed_when: true
-  failed_when: false
-  when:
-    - not (cis_audit_only | bool)
-    - cis_state_1_4_2_live == 'bad'
-  tags: *cis_tags_1_4_2
-
 - name: "1.4.2 - Check the boot loader files and /boot/efi again after the fix"
   ansible.builtin.command:
     argv: "{{ item }}"
@@ -199,8 +184,6 @@
     cis_reboot_required: true
     cis_state_1_4_2_reboot: true
   when:
-    - not (cis_audit_only | bool)
-    - not ansible_check_mode
     - "'fstab=ok' in cis_state_1_4_2_efi_out"
     - "'live=bad' in cis_state_1_4_2_efi_out"
   tags: *cis_tags_1_4_2
@@ -220,7 +203,6 @@
     - >-
       cis_state_1_4_2_files_bad | bool
       or 'fstab=bad' in cis_state_1_4_2_efi_out
-      or ((cis_audit_only | bool) and 'live=bad' in cis_state_1_4_2_efi_out)
     - (cis_audit_only | bool) or not ansible_check_mode
   tags: *cis_tags_1_4_2
 ...
