@@ -284,4 +284,55 @@
 - name: "1.6.6 - Review how the crypto policy treats EtM for SSH"
   ansible.builtin.import_tasks: level-1/1.6.6.yml
   when: "'1.6.6' in cis_selected_controls"
+- name: "1.7.1 - Ensure /etc/motd is configured"
+  ansible.builtin.import_tasks: level-1/1.7.1.yml
+  when: "'1.7.1' in cis_selected_controls"
+
+- name: "1.7.2 - Ensure /etc/issue is configured"
+  ansible.builtin.import_tasks: level-1/1.7.2.yml
+  when: "'1.7.2' in cis_selected_controls"
+
+- name: "1.7.3 - Ensure /etc/issue.net is configured"
+  ansible.builtin.import_tasks: level-1/1.7.3.yml
+  when: "'1.7.3' in cis_selected_controls"
+
+- name: "1.7.4 - Ensure access to /etc/motd is configured"
+  ansible.builtin.import_tasks: level-1/1.7.4.yml
+  when: "'1.7.4' in cis_selected_controls"
+
+- name: "1.7.5 - Ensure access to /etc/issue is configured"
+  ansible.builtin.import_tasks: level-1/1.7.5.yml
+  when: "'1.7.5' in cis_selected_controls"
+
+- name: "1.7.6 - Ensure access to /etc/issue.net is configured"
+  ansible.builtin.import_tasks: level-1/1.7.6.yml
+  when: "'1.7.6' in cis_selected_controls"
+
+- name: "1.8.1 - Ensure the GDM login banner is configured"
+  ansible.builtin.import_tasks: level-1/1.8.1.yml
+  when: "'1.8.1' in cis_selected_controls"
+
+- name: "1.8.2 - Ensure GDM disable-user-list is configured"
+  ansible.builtin.import_tasks: level-1/1.8.2.yml
+  when: "'1.8.2' in cis_selected_controls"
+
+- name: "1.8.3 - Ensure GDM screen lock is configured"
+  ansible.builtin.import_tasks: level-1/1.8.3.yml
+  when: "'1.8.3' in cis_selected_controls"
+
+- name: "1.8.4 - Ensure GDM automount is configured"
+  ansible.builtin.import_tasks: level-1/1.8.4.yml
+  when: "'1.8.4' in cis_selected_controls"
+
+- name: "1.8.5 - Ensure GDM autorun-never is configured"
+  ansible.builtin.import_tasks: level-1/1.8.5.yml
+  when: "'1.8.5' in cis_selected_controls"
+
+- name: "1.8.6 - Ensure XDMCP is not enabled"
+  ansible.builtin.import_tasks: level-1/1.8.6.yml
+  when: "'1.8.6' in cis_selected_controls"
+
+- name: "1.8.7 - Ensure Wayland is configured"
+  ansible.builtin.import_tasks: level-1/1.8.7.yml
+  when: "'1.8.7' in cis_selected_controls"
 ...
