@@ -7,9 +7,8 @@
 # and puts the tags, which every task here inherits, on the import.
 #
 # Two values are compared: the running one (sysctl -n) and the configured one, the last
-# assignment systemd-sysctl would apply at boot (its --cat-config output, then
-# /etc/sysctl.conf, which is read last; the file is appended in case --cat-config leaves it
-# out). When the configured value is not accepted, the role writes cis_sc_set to its own file
+# assignment systemd-sysctl would apply at boot, in its --cat-config order (RHEL reads
+# /etc/sysctl.conf through the /etc/sysctl.d/99-sysctl.conf link, so it is in there). When the configured value is not accepted, the role writes cis_sc_set to its own file
 # /etc/sysctl.d/99-zz-cis-benchmarks.conf, whose name sorts after the vendor files and
 # 99-sysctl.conf so it wins, and sets the live value too. A configured value that is
 # accepted is never rewritten (kptr_restrict 2 stays 2). A running value that is wrong
@@ -27,7 +26,7 @@
         set -u
         key=$1
         printf 'r=%s\n' "$(sysctl -n "$key" 2>/dev/null | tr -s ' \t' ' ')"
-        { /usr/lib/systemd/systemd-sysctl --cat-config 2>/dev/null; cat /etc/sysctl.conf 2>/dev/null; } | awk -v key="$key" '
+        /usr/lib/systemd/systemd-sysctl --cat-config 2>/dev/null | awk -v key="$key" '
         function trim(s) { gsub(/^[ \t]+|[ \t\r]+$/, "", s); return s }
         /^[ \t]*[#;]/ { next }
         index($0, "=") {
