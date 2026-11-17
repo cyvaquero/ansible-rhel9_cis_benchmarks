@@ -46,4 +46,20 @@ cis_reboot_required: false
 # missing password and changes nothing. Set: the role writes it to /boot/grub2/user.cfg.
 # The hash is a secret: keep it in an Ansible Vault, not in plain text in an inventory.
 cis_grub_password_hash: ""
+
+# Banners (1.7.1, 1.7.2, 1.7.3, 1.8.1): the text the role writes to /etc/motd, /etc/issue and
+# /etc/issue.net, and sets as the GDM login banner, when the current content is not
+# compliant. A file that already has compliant content is never rewritten. Keep it free of
+# the escapes \m \r \s \v and of the operating system name, or the controls can never pass.
+cis_banner_text: "Authorized use only. All activity on this system may be monitored and reported."
+
+# GDM screen lock (1.8.3): the longest idle time, in seconds, before the screen blanks. The
+# check accepts any idle-delay from 1 to this value (0 means never, which is not accepted).
+# The role sets this value when the configured one is not accepted.
+cis_gdm_idle_delay: 900
+
+# GDM screen lock (1.8.3): the longest delay, in seconds, between the screen blanking and
+# the lock. The check accepts any lock-delay from 0 to this value; the role sets this value
+# when the configured one is not accepted.
+cis_gdm_lock_delay: 5
 ...

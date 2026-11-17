@@ -1,0 +1,164 @@
+---
+# Shared logic for the GDM dconf controls (1.8.1 to 1.8.5). A control file imports this once
+# per key with:
+#   cis_dc_id       the CIS ID
+#   cis_dc_db       the system database to write: "gdm" (login screen) or "local"
+#   cis_dc_section  the dconf path without the key and without leading slash,
+#                   for example org/gnome/login-screen
+#   cis_dc_key      the key name
+#   cis_dc_kind     how the effective value is judged: eq, nonempty or range
+#   cis_dc_a        eq: the required value as dconf prints it ("true"); range: the minimum
+#   cis_dc_b        range: the maximum
+#   cis_dc_write    the value the fix writes, as GVariant text (true, uint32 900, 'text')
+# and puts the tags and a gdm-installed condition on the import.
+#
+# The effective value is read from the compiled databases with dconf read, under the profile
+# the key's session uses (gdm for the login screen, user for users) with HOME and
+# XDG_CONFIG_HOME pointed at an empty folder, so the root account's own user database cannot
+# mask what a normal account would get. It needs no GUI session or bus. The key must also
+# be locked: its path must be a line in a file under /etc/dconf/db/*.d/locks, so users cannot
+# override it. A key that is correct but unlocked only gets the lock.
+# The fix writes the key to /etc/dconf/db/<db>.d/00-cis-benchmarks, adds the lock to
+# /etc/dconf/db/<db>.d/locks/00-cis-benchmarks, then runs dconf update (directly, only when
+# something changed). A value from a site file that sorts later still wins; that remains a
+# finding. A user profile with no "system-db:local" line cannot be fixed by the role, so it
+# is a finding too (the role creates /etc/dconf/profile/user only when that file is
+# missing). New values apply to sessions started afterwards; no reboot is flagged.
+# Remediate mode records a finding when the key is still not compliant after the fix; under
+# --check nothing is fixed, so nothing is recorded then.
+# Task names are one template expression because the CIS ID must come first.
+
+- name: "{{ cis_dc_id ~ ' - Read the effective value and lock of ' ~ cis_dc_key }}"
+  ansible.builtin.command:
+    argv: &cis_dc_argv
+      - /bin/bash
+      - -c
+      - |
+        set -u
+        export LC_ALL=C
+        shopt -s nullglob
+        profile=$1; path=$2; kind=$3; a=$4; b=$5
+        tmp=$(mktemp -d) || { echo "value=bad"; echo "lock=bad"; exit 0; }
+        trap 'rm -rf "$tmp"' EXIT
+        raw=$(HOME="$tmp" XDG_CONFIG_HOME="$tmp/.config" DCONF_PROFILE="$profile" dconf read "$path" 2>/dev/null)
+        val=${raw#uint32 }
+        value=bad
+        case "$kind" in
+          eq) [ "$val" = "$a" ] && value=ok ;;
+          nonempty) [ -n "$val" ] && [ "$val" != "''" ] && value=ok ;;
+          range) [[ "$val" =~ ^[0-9]+$ ]] && (( 10#$val >= a && 10#$val <= b )) && value=ok ;;
+        esac
+        lock=bad
+        for f in /etc/dconf/db/*.d/locks/*; do
+          if [ -f "$f" ] && grep -qxF -- "$path" "$f"; then lock=ok; break; fi
+        done
+        echo "value=$value"; echo "lock=$lock"
+      - bash
+      - "{{ cis_dc_db | replace('local', 'user') | string }}"
+      - "/{{ cis_dc_section }}/{{ cis_dc_key }}"
+      - "{{ cis_dc_kind }}"
+      - "{{ cis_dc_a | default('') | string }}"
+      - "{{ cis_dc_b | default('') | string }}"
+  register: cis_dc_check
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: "{{ cis_dc_id ~ ' - Create the dconf folders for ' ~ cis_dc_key }}"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "/etc/dconf/db/{{ cis_dc_db }}.d"
+    - "/etc/dconf/db/{{ cis_dc_db }}.d/locks"
+  when:
+    - not (cis_audit_only | bool)
+    - "'value=ok' not in cis_dc_check.stdout_lines or 'lock=ok' not in cis_dc_check.stdout_lines"
+
+- name: "{{ cis_dc_id ~ ' - Create the dconf profile folder' }}"
+  ansible.builtin.file:
+    path: /etc/dconf/profile
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - not (cis_audit_only | bool)
+    - cis_dc_db == 'local'
+    - "'value=ok' not in cis_dc_check.stdout_lines or 'lock=ok' not in cis_dc_check.stdout_lines"
+
+- name: "{{ cis_dc_id ~ ' - Create the dconf user profile when it is missing' }}"
+  ansible.builtin.copy:
+    dest: /etc/dconf/profile/user
+    content: |
+      user-db:user
+      system-db:local
+    owner: root
+    group: root
+    mode: "0644"
+    force: false
+  when:
+    - not (cis_audit_only | bool)
+    - cis_dc_db == 'local'
+    - "'value=ok' not in cis_dc_check.stdout_lines or 'lock=ok' not in cis_dc_check.stdout_lines"
+
+- name: "{{ cis_dc_id ~ ' - Set ' ~ cis_dc_key ~ ' in the role dconf file' }}"
+  community.general.ini_file:
+    path: "/etc/dconf/db/{{ cis_dc_db }}.d/00-cis-benchmarks"
+    section: "{{ cis_dc_section }}"
+    option: "{{ cis_dc_key }}"
+    value: "{{ cis_dc_write | string }}"
+    no_extra_spaces: true
+    owner: root
+    group: root
+    mode: "0644"
+  register: cis_dc_fix_value
+  when:
+    - not (cis_audit_only | bool)
+    - "'value=ok' not in cis_dc_check.stdout_lines"
+
+- name: "{{ cis_dc_id ~ ' - Lock ' ~ cis_dc_key }}"
+  ansible.builtin.lineinfile:
+    path: "/etc/dconf/db/{{ cis_dc_db }}.d/locks/00-cis-benchmarks"
+    line: "/{{ cis_dc_section }}/{{ cis_dc_key }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  register: cis_dc_fix_lock
+  when:
+    - not (cis_audit_only | bool)
+    - "'lock=ok' not in cis_dc_check.stdout_lines"
+
+# A command, not a handler: the recheck below needs the compiled database right away.
+- name: "{{ cis_dc_id ~ ' - Compile the dconf databases' }}"
+  ansible.builtin.command: /usr/bin/dconf update
+  changed_when: true
+  when:
+    - not ansible_check_mode
+    - cis_dc_fix_value is changed or cis_dc_fix_lock is changed
+
+- name: "{{ cis_dc_id ~ ' - Read the effective value and lock of ' ~ cis_dc_key ~ ' again after the fix' }}"
+  ansible.builtin.command:
+    argv: *cis_dc_argv
+  register: cis_dc_recheck
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+    - "'value=ok' not in cis_dc_check.stdout_lines or 'lock=ok' not in cis_dc_check.stdout_lines"
+
+- name: "{{ cis_dc_id ~ ' - Record the finding' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "{{ cis_dc_id }}"
+    cis_dc_state: "{{ cis_dc_recheck.stdout_lines | default(cis_dc_check.stdout_lines) }}"
+  when:
+    - "'value=ok' not in cis_dc_state or 'lock=ok' not in cis_dc_state"
+    - (cis_audit_only | bool) or not ansible_check_mode
+...

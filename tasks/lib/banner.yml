@@ -1,0 +1,81 @@
+---
+# Shared logic for the banner text controls (1.7.1 to 1.7.3). A control file imports this with:
+#   cis_bn_id       the CIS ID
+#   cis_bn_path     the file
+#   cis_bn_emptyok  "yes" when an empty or missing file is compliant (/etc/motd), else "no"
+# and puts the tags, which every task here inherits, on the import.
+#
+# A file is not compliant when its text holds a login escape (\m, \r, \s or \v, in either
+# case) or the operating system name (ID in /etc/os-release, any case), or, when emptyok is
+# "no", when it is missing or holds nothing but whitespace. An empty /etc/motd is compliant:
+# it discloses nothing. The check reads through a symlink; the fix never replaces one (the
+# link is a finding to resolve by hand). A compliant file is never rewritten, so a site's
+# own banner stays. The fix writes cis_banner_text, and gives a new file mode 0644 only
+# (an existing file keeps its mode: 1.7.4 to 1.7.6 own that). Remediate mode records a
+# finding when the file is still not compliant after the fix; under --check nothing is
+# fixed, so nothing is recorded then.
+# Task names are one template expression because the CIS ID must come first.
+
+- name: "{{ cis_bn_id ~ ' - Read the banner text of ' ~ cis_bn_path }}"
+  ansible.builtin.command:
+    argv: &cis_bn_argv
+      - /bin/bash
+      - -c
+      - |
+        set -u
+        export LC_ALL=C
+        p=$1; emptyok=$2
+        if [ ! -e "$p" ] && [ ! -L "$p" ]; then
+          echo "exists=no"
+          if [ "$emptyok" = yes ]; then echo "state=ok"; else echo "state=bad"; fi
+          exit 0
+        fi
+        echo "exists=yes"
+        if [ -L "$p" ]; then echo "link=yes"; else echo "link=no"; fi
+        if [ ! -f "$p" ]; then echo "state=odd"; exit 0; fi
+        osid=$(awk -F= '$1 == "ID" { gsub(/["'"'"']/, "", $2); print $2; exit }' /etc/os-release 2>/dev/null)
+        if grep -Eiq '\\[mrsv]' "$p" || { [ -n "$osid" ] && grep -Fiq -- "$osid" "$p"; }; then
+          echo "state=bad"; exit 0
+        fi
+        if [ "$emptyok" != yes ] && ! grep -q '[^[:space:]]' "$p"; then echo "state=bad"; exit 0; fi
+        echo "state=ok"
+      - bash
+      - "{{ cis_bn_path }}"
+      - "{{ cis_bn_emptyok }}"
+  register: cis_bn_check
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: "{{ cis_bn_id ~ ' - Write the banner text to ' ~ cis_bn_path }}"
+  ansible.builtin.copy:
+    dest: "{{ cis_bn_path }}"
+    content: "{{ cis_banner_text | trim }}\n"
+    owner: root
+    group: root
+    mode: "{{ '0644' if 'exists=no' in cis_bn_check.stdout_lines else omit }}"
+  when:
+    - not (cis_audit_only | bool)
+    - "'state=bad' in cis_bn_check.stdout_lines"
+    - "'link=yes' not in cis_bn_check.stdout_lines"
+
+- name: "{{ cis_bn_id ~ ' - Read the banner text of ' ~ cis_bn_path ~ ' again after the fix' }}"
+  ansible.builtin.command:
+    argv: *cis_bn_argv
+  register: cis_bn_recheck
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+    - "'state=ok' not in cis_bn_check.stdout_lines"
+
+- name: "{{ cis_bn_id ~ ' - Record the finding' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "{{ cis_bn_id }}"
+  when:
+    - "'state=ok' not in (cis_bn_recheck.stdout_lines | default(cis_bn_check.stdout_lines))"
+    - (cis_audit_only | bool) or not ansible_check_mode
+...

@@ -1,0 +1,121 @@
+---
+# Shared logic for the GDM custom.conf controls (1.8.6, 1.8.7). A control file imports this with:
+#   cis_gc_id       the CIS ID
+#   cis_gc_section  the section in /etc/gdm/custom.conf
+#   cis_gc_key      the option
+#   cis_gc_bad      the values (lowercase, "|" separated) that are not compliant
+#   cis_gc_fix      "false" to set the option to false, "absent" to remove it
+# and puts the tags and a gdm-installed condition on the import.
+#
+# The check prints "val=<value>" for the last assignment of the option in the section
+# (lowercase, empty when unset) and "pending=yes" when GDM is running and custom.conf is
+# newer than its start, because GDM reads the file only when it starts. A fix, or a
+# change made earlier, therefore takes effect after the next GDM start: the control then
+# sets cis_reboot_required, in both modes, and that is not a finding. The role never
+# restarts GDM. Remediate mode records a finding when the option is still not compliant
+# after the fix; under --check nothing is fixed, so nothing is recorded then.
+# Task names are one template expression because the CIS ID must come first.
+
+- name: "{{ cis_gc_id ~ ' - Read ' ~ cis_gc_key ~ ' in /etc/gdm/custom.conf' }}"
+  ansible.builtin.command:
+    argv: &cis_gc_argv
+      - /bin/bash
+      - -c
+      - |
+        set -u
+        export LC_ALL=C
+        f=/etc/gdm/custom.conf
+        sec=$1; key=$2
+        val=
+        if [ -f "$f" ]; then
+          val=$(awk -v sec="[$sec]" -v key="$key" '
+          function trim(s) { gsub(/^[ \t]+|[ \t\r]+$/, "", s); return s }
+          /^[ \t]*#/ { next }
+          /^[ \t]*\[/ { cur = trim($0); next }
+          cur == sec && index($0, "=") {
+            i = index($0, "=")
+            if (trim(substr($0, 1, i - 1)) == key) v = tolower(trim(substr($0, i + 1)))
+          }
+          END { print v }' "$f")
+        fi
+        echo "val=$val"
+        pending=no
+        if [ -f "$f" ] && [ "$(systemctl show -p ActiveState --value gdm.service 2>/dev/null)" = active ]; then
+          mono=$(systemctl show -p ActiveEnterTimestampMonotonic --value gdm.service 2>/dev/null)
+          up=$(cut -d' ' -f1 /proc/uptime)
+          mtime=$(stat -c %Y "$f")
+          now=$(date +%s)
+          if [[ "$mono" =~ ^[0-9]+$ ]]; then
+            start=$(awk -v n="$now" -v u="$up" -v m="$mono" 'BEGIN { printf "%d", n - u + m / 1000000 }')
+            [ "$mtime" -gt "$start" ] && pending=yes
+          fi
+        fi
+        echo "pending=$pending"
+      - bash
+      - "{{ cis_gc_section }}"
+      - "{{ cis_gc_key }}"
+  register: cis_gc_check
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: "{{ cis_gc_id ~ ' - Set ' ~ cis_gc_key ~ ' to false' }}"
+  community.general.ini_file:
+    path: /etc/gdm/custom.conf
+    section: "{{ cis_gc_section }}"
+    option: "{{ cis_gc_key }}"
+    value: "false"
+    no_extra_spaces: true
+    create: false
+  when:
+    - not (cis_audit_only | bool)
+    - cis_gc_fix == 'false'
+    - (cis_gc_check.stdout_lines | select('match', '^val=') | first | default('val=') | regex_replace('^val=', '')) in cis_gc_bad.split('|')
+
+- name: "{{ cis_gc_id ~ ' - Remove ' ~ cis_gc_key ~ ' from /etc/gdm/custom.conf' }}"
+  community.general.ini_file:
+    path: /etc/gdm/custom.conf
+    section: "{{ cis_gc_section }}"
+    option: "{{ cis_gc_key }}"
+    state: absent
+    create: false
+  when:
+    - not (cis_audit_only | bool)
+    - cis_gc_fix == 'absent'
+    - (cis_gc_check.stdout_lines | select('match', '^val=') | first | default('val=') | regex_replace('^val=', '')) in cis_gc_bad.split('|')
+
+- name: "{{ cis_gc_id ~ ' - Read ' ~ cis_gc_key ~ ' in /etc/gdm/custom.conf again after the fix' }}"
+  ansible.builtin.command:
+    argv: *cis_gc_argv
+  register: cis_gc_recheck
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+    - (cis_gc_check.stdout_lines | select('match', '^val=') | first | default('val=') | regex_replace('^val=', '')) in cis_gc_bad.split('|')
+
+- name: "{{ cis_gc_id ~ ' - Work out the state of ' ~ cis_gc_key }}"
+  ansible.builtin.set_fact:
+    cis_gc_state: "{{ cis_gc_recheck.stdout_lines | default(cis_gc_check.stdout_lines) }}"
+
+- name: "{{ cis_gc_id ~ ' - Flag that a reboot is required for GDM to read custom.conf' }}"
+  ansible.builtin.set_fact:
+    cis_reboot_required: true
+  when: "'pending=yes' in cis_gc_state"
+
+- name: "{{ cis_gc_id ~ ' - Report that GDM keeps its old configuration until it restarts' }}"
+  ansible.builtin.debug:
+    msg: "A reboot is pending: /etc/gdm/custom.conf is newer than the running GDM."
+  when: "'pending=yes' in cis_gc_state"
+
+# Under --check the fix does not happen, so remediate mode records nothing then.
+- name: "{{ cis_gc_id ~ ' - Record the finding' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "{{ cis_gc_id }}"
+  when:
+    - (cis_gc_state | select('match', '^val=') | first | default('val=') | regex_replace('^val=', '')) in cis_gc_bad.split('|')
+    - (cis_audit_only | bool) or not ansible_check_mode
+...

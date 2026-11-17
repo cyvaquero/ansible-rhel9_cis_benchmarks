@@ -1,0 +1,17 @@
+---
+# 1.7.5 - /etc/issue is owned by root:root and not writable by group or other (0644 or stricter).
+# The logic, including how a missing file or a symlink is treated, is shared in
+# tasks/lib/banner_access.yml.
+
+- name: "1.7.5 - Ensure access to /etc/issue is configured"
+  ansible.builtin.import_tasks: ../../lib/banner_access.yml
+  vars:
+    cis_ba_id: "1.7.5"
+    cis_ba_path: "/etc/issue"
+  tags:
+    - "1.7.5"
+    - section-1
+    - level-1
+    - server
+    - workstation
+...

@@ -8,6 +8,27 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.15]
+
+### Added
+
+- Controls 1.7.1 to 1.7.6 (command-line warning banners) and 1.8.1 to 1.8.7 (GNOME Display
+  Manager), 13 controls. 1.7.1 to 1.7.3 write `cis_banner_text` to `/etc/motd`, `/etc/issue`
+  and `/etc/issue.net` when the file holds a login escape or the OS name (an empty
+  `/etc/motd` is compliant); a compliant file is left alone. 1.7.4 to 1.7.6 set root:root
+  and 0644 or stricter; a symlink is a finding. The 1.8 controls run only when GDM is
+  installed: 1.8.1 to 1.8.5 write system-wide dconf keys with locks (login banner, user
+  list, idle and lock delay, automount, autorun) and run `dconf update`, checking the
+  compiled value; 1.8.6 disables XDMCP and 1.8.7 removes `WaylandEnable=false` in
+  `/etc/gdm/custom.conf`, flagging `cis_reboot_required` while GDM has not restarted since
+  the file changed. New variables `cis_banner_text`, `cis_gdm_idle_delay` (900) and
+  `cis_gdm_lock_delay` (5). Shared logic is in `tasks/lib/banner.yml`,
+  `banner_access.yml`, `dconf.yml` and `gdm_custom.yml` (#5).
+
+### Changed
+
+- `docs/controls.md` marks the 13 controls implemented (#5).
+
 ## [3.0.0_0.0.14]
 
 ### Added
