@@ -65,4 +65,8 @@
 - name: "1.5.2 - Ensure fs.protected_symlinks is configured"
   ansible.builtin.import_tasks: level-2/1.5.2.yml
   when: "'1.5.2' in cis_selected_controls"
+
+- name: "1.6.7 - Ensure the crypto policy enables post-quantum algorithms"
+  ansible.builtin.import_tasks: level-2/1.6.7.yml
+  when: "'1.6.7' in cis_selected_controls"
 ...
