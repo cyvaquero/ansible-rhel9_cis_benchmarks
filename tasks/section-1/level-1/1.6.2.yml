@@ -1,0 +1,17 @@
+---
+# 1.6.2 - Hash and signature algorithms and certificates must not allow SHA-1. Appends the
+# shipped NO-SHA1 module. The logic is shared in tasks/lib/crypto_policy.yml.
+
+- name: "1.6.2 - Ensure the crypto policy disables SHA-1"
+  ansible.builtin.import_tasks: ../../lib/crypto_policy.yml
+  vars:
+    cis_cp_id: "1.6.2"
+    cis_cp_kind: "sha1"
+    cis_cp_module: "NO-SHA1"
+  tags:
+    - "1.6.2"
+    - section-1
+    - level-1
+    - server
+    - workstation
+...

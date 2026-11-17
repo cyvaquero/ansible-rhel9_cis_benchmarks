@@ -4,10 +4,10 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.13).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.14).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and the kernel module controls 1.1.1.1 to
 1.1.1.11, the mount controls 1.1.2.1.1 to 1.1.2.7.4, the package manager controls 1.2.1.1
-to 1.2.2.1 the SELinux controls 1.3.1.1 to 1.3.1.8, the boot loader controls 1.4.1 to 1.4.5 and the kernel and process hardening controls 1.5.1 to 1.5.10 are implemented; every other
+to 1.2.2.1 the SELinux controls 1.3.1.1 to 1.3.1.8, the boot loader controls 1.4.1 to 1.4.5 the kernel and process hardening controls 1.5.1 to 1.5.10 and the crypto policy controls 1.6.1 to 1.6.7 are implemented; every other
 control is still planned. Do not run this against hosts you care about.
 
 ## Relationship to the RHEL 7 and RHEL 8 projects
@@ -127,7 +127,8 @@ ansible-playbook -i inventory site.yml -e target=webservers
   running kernel still has it; 1.3.1.4 and 1.3.1.5 configure SELinux on a host that is not
   running it; 1.3.1.3 changes the policy type while another policy is loaded; 1.4.2
   changes the `/boot/efi` mount options and the live mount keeps the old ones; 1.4.5
-  removes `systemd.confirm_spawn` while the running kernel still has it) sets
+  removes `systemd.confirm_spawn` while the running kernel still has it; 1.6.1 to 1.6.4 and
+  1.6.7 change the crypto policy, which a service reads only when it starts) sets
   `cis_reboot_required` to `true`, reports that a reboot is pending, and the
   summary prints `Reboot required`. The variable defaults to `false` and is an output:
   read it after the role runs (for example to schedule a reboot) rather than setting it.
@@ -149,6 +150,17 @@ ansible-playbook -i inventory site.yml -e target=webservers
   `/etc/security/limits.d/99-zz-cis-benchmarks.conf` (`* hard core 0`); entries for other
   users or groups are a finding. 1.5.9 and 1.5.10 write
   `/etc/systemd/coredump.conf.d/99-zz-cis-benchmarks.conf`.
+- Crypto policy controls (1.6): compliance is judged on the effective policy
+  (`/etc/crypto-policies/state/CURRENT.pol`) and, for the MAC and SSH controls, on the
+  generated OpenSSH back-ends. A fix changes the policy string with
+  `update-crypto-policies --set`, never a generated file: it keeps the base policy and every
+  module already in the string and appends the missing module (`NO-SHA1` for 1.6.2, `PQ` for
+  1.6.7). 1.6.1 replaces a LEGACY base with DEFAULT. 1.6.3 and 1.6.4 write the role's own
+  modules `CIS-NO-WEAKMAC` and `CIS-NO-SSHCBC` to `/etc/crypto-policies/policies/modules/`,
+  only on a host that needs them. 1.6.7 (Level 2) is a finding on a minor release without
+  the `PQ` module. The role restarts no service and never touches FIPS mode; a reboot is
+  flagged while the policy state is newer than the boot. 1.6.5 and 1.6.6 only report. A
+  back-end edited by hand is a finding, as the role does not edit generated files.
 - Package manager and SELinux controls (1.2, 1.3): 1.2.1.2 never edits `redhat.repo`
   (subscription-manager owns it); a repository there with `gpgcheck=0` is a finding.
   1.3.1.4 moves a disabled SELinux configuration to the running mode (permissive when it is

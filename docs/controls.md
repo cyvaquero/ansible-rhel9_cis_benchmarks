@@ -101,13 +101,13 @@ yet. `implemented`: the control has its task file at
 | 1.5.8 | Ensure core file size is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
 | 1.5.9 | Ensure systemd-coredump ProcessSizeMax is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
 | 1.5.10 | Ensure systemd-coredump Storage is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
-| 1.6.1 | Ensure system wide crypto policy is not legacy | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.6.2 | Ensure system wide crypto policy disables sha1 hash and signature support | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.6.3 | Ensure system wide crypto policy macs are configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.6.4 | Ensure system wide crypto policy disables cbc for ssh | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.6.5 | Ensure system wide crypto policy disables chacha20-poly1305 for ssh | L1 Server, L1 Workstation | Manual | manual | planned |  |
-| 1.6.6 | Ensure system wide crypto policy disables EtM for ssh | L1 Server, L1 Workstation | Manual | manual | planned |  |
-| 1.6.7 | Ensure system wide crypto policy enables post-quantum algorithms | L2 Server, L2 Workstation | Automated | implement | planned | Depends on the RHEL 9 minor release; branch on minor version |
+| 1.6.1 | Ensure system wide crypto policy is not legacy | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 1.6.2 | Ensure system wide crypto policy disables sha1 hash and signature support | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 1.6.3 | Ensure system wide crypto policy macs are configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 1.6.4 | Ensure system wide crypto policy disables cbc for ssh | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 1.6.5 | Ensure system wide crypto policy disables chacha20-poly1305 for ssh | L1 Server, L1 Workstation | Manual | manual | implemented |  |
+| 1.6.6 | Ensure system wide crypto policy disables EtM for ssh | L1 Server, L1 Workstation | Manual | manual | implemented |  |
+| 1.6.7 | Ensure system wide crypto policy enables post-quantum algorithms | L2 Server, L2 Workstation | Automated | implement | implemented | Appends the shipped PQ module when this minor release has it; otherwise a finding |
 | 1.7.1 | Ensure /etc/motd is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 1.7.2 | Ensure /etc/issue is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 1.7.3 | Ensure /etc/issue.net is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |

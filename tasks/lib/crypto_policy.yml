@@ -1,0 +1,199 @@
+---
+# Shared logic for the system-wide crypto policy controls (1.6.1 to 1.6.4 and 1.6.7). A
+# control file imports this with:
+#   cis_cp_id          the CIS ID
+#   cis_cp_kind        what to check: legacy, sha1, mac, sshcbc or pq
+#   cis_cp_module      the policy module that fixes it: a shipped one (NO-SHA1, PQ) or the
+#                      role's own (CIS-NO-WEAKMAC, CIS-NO-SSHCBC); empty for legacy
+#   cis_cp_pmod_body   the text of the role's own module, or empty for a shipped one
+#   cis_cp_drop_legacy true to replace a LEGACY base with DEFAULT (1.6.1 only)
+# and puts the tags on the import.
+#
+# Compliance is judged on the effective policy, /etc/crypto-policies/state/CURRENT.pol, and for
+# the SSH controls (mac, sshcbc) also on the generated OpenSSH back-ends. The fix changes the
+# policy string, never a generated file: it keeps the base policy and every module already in
+# the string, appends the one missing module and runs update-crypto-policies --set once. The
+# string is read again right before the change, so a control builds on the ones before it. A
+# role-owned module is written to /etc/crypto-policies/policies/modules/ first, and only when
+# the check fails. A shipped module that does not exist on this minor release (PQ on an older
+# one) cannot be applied: nothing changes and the control is a finding.
+# A new policy reaches a service only when it next starts, and the role restarts nothing. The
+# check reports "pending" when the policy state was written after the host booted, in both
+# modes, and the control then sets cis_reboot_required; that is not a finding. This is a
+# conservative test: it cannot tell which services read the policy before the change.
+# Remediate mode records a finding when the policy is still not compliant after the fix (or
+# cannot be read); under --check nothing is fixed, so nothing is recorded then.
+
+- name: "{{ cis_cp_id ~ ' - Read the crypto policy state' }}"
+  ansible.builtin.command:
+    argv: &cis_cp_argv
+      - /bin/bash
+      - -c
+      - |
+        set -u
+        kind=$1
+        mod=$2
+        pol=/etc/crypto-policies/state/CURRENT.pol
+        show=$(update-crypto-policies --show 2>/dev/null | head -n 1)
+        printf 'show=%s\n' "$show"
+        if [ -z "$show" ] || [ ! -r "$pol" ]; then
+          echo "bad=unreadable"
+          exit 0
+        fi
+        avail=0
+        for d in /etc/crypto-policies/policies/modules /usr/share/crypto-policies/policies/modules; do
+          [ -n "$mod" ] && [ -f "$d/$mod.pmod" ] && avail=1
+        done
+        echo "avail=$avail"
+        boot=$(( $(date +%s) - $(cut -d. -f1 /proc/uptime) ))
+        if [ "$(stat -c %Y "$pol")" -gt "$boot" ]; then echo "pending=1"; else echo "pending=0"; fi
+        bad=0
+        if [ "$kind" = legacy ]; then
+          base=$(printf '%s' "${show%%:*}" | tr '[:lower:]' '[:upper:]')
+          [ "$base" = LEGACY ] && bad=1
+        fi
+        if [ "$kind" != legacy ]; then
+          bad=$(awk -v kind="$kind" '
+          function trim(s) { gsub(/^[ \t]+|[ \t\r]+$/, "", s); return s }
+          BEGIN { bad = 0; found = 0 }
+          /^[ \t]*[#;]/ { next }
+          index($0, "=") {
+            i = index($0, "=")
+            k = trim(substr($0, 1, i - 1)); v = trim(substr($0, i + 1))
+            n = split(v, t, /[ \t]+/)
+            if (kind == "sha1" && k == "sha1_in_certs" && v != "0") bad = 1
+            for (j = 1; j <= n; j++) {
+              if (t[j] ~ /^-/) continue
+              if (kind == "sha1" && (k == "hash" || k == "sign") && t[j] ~ /SHA1$/) bad = 1
+              if (kind == "mac" && k == "mac" && (t[j] ~ /-64$/ || t[j] ~ /MD5$/)) bad = 1
+              if (kind == "sshcbc" && k == "cipher@SSH" && t[j] ~ /CBC$/) bad = 1
+              if (kind == "pq" && k ~ /^group/ && toupper(t[j]) ~ /ML-?KEM/) found = 1
+            }
+          }
+          END { if (kind == "pq") bad = found ? 0 : 1; print bad }' "$pol")
+          if [ "$kind" = mac ] || [ "$kind" = sshcbc ]; then
+            for f in /etc/crypto-policies/back-ends/opensshserver.config /etc/crypto-policies/back-ends/openssh.config; do
+              [ -r "$f" ] || continue
+              awk -v kind="$kind" '
+              /^[ \t]*MACs[ \t=]/ && kind == "mac" {
+                n = split(tolower($0), t, /[ \t=,]+/)
+                for (j = 2; j <= n; j++) if (t[j] ~ /md5/ || t[j] ~ /umac-64/) bad = 1
+              }
+              /^[ \t]*Ciphers[ \t=]/ && kind == "sshcbc" {
+                n = split(tolower($0), t, /[ \t=,]+/)
+                for (j = 2; j <= n; j++) if (t[j] ~ /-cbc(@|$)/) bad = 1
+              }
+              END { exit bad ? 1 : 0 }' "$f" || bad=1
+            done
+          fi
+        fi
+        echo "bad=$bad"
+      - bash
+      - "{{ cis_cp_kind }}"
+      - "{{ cis_cp_module }}"
+  register: cis_cp_check
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: "{{ cis_cp_id ~ ' - Work out the state of the crypto policy' }}"
+  ansible.builtin.set_fact:
+    cis_cp_show: "{{ cis_cp_check.stdout_lines | select('match', '^show=') | first | default('show=') | regex_replace('^show=', '') }}"
+    cis_cp_bad: "{{ cis_cp_check.stdout_lines | select('match', '^bad=') | first | default('bad=unreadable') | regex_replace('^bad=', '') }}"
+    cis_cp_avail: "{{ cis_cp_check.stdout_lines | select('match', '^avail=') | first | default('avail=0') | regex_replace('^avail=', '') }}"
+
+- name: "{{ cis_cp_id ~ ' - Create the crypto policy module folder' }}"
+  ansible.builtin.file:
+    path: /etc/crypto-policies/policies/modules
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - not (cis_audit_only | bool)
+    - cis_cp_bad == '1'
+    - cis_cp_pmod_body | default('') | length > 0
+
+- name: "{{ cis_cp_id ~ ' - Write the role crypto policy module ' ~ cis_cp_module }}"
+  ansible.builtin.copy:
+    dest: "{{ '/etc/crypto-policies/policies/modules/' ~ cis_cp_module ~ '.pmod' }}"
+    content: "{{ cis_cp_pmod_body }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - not (cis_audit_only | bool)
+    - cis_cp_bad == '1'
+    - cis_cp_pmod_body | default('') | length > 0
+
+# The new string keeps the base and every module already in it (compared without regard to
+# case) and appends the missing one. The policy is the one read above, so a change made by an
+# earlier control in this run is included. A shipped module that is not installed is skipped.
+- name: "{{ cis_cp_id ~ ' - Work out the new crypto policy string' }}"
+  ansible.builtin.set_fact:
+    cis_cp_new: >-
+      {{ ([('DEFAULT' if (cis_cp_drop_legacy | default(false) | bool) and cis_cp_show.split(':')[0] | upper == 'LEGACY'
+            else cis_cp_show.split(':')[0])]
+          + cis_cp_show.split(':')[1:]
+          + ([cis_cp_module]
+             if cis_cp_module | length > 0
+                and cis_cp_module | upper not in (cis_cp_show.split(':')[1:] | map('upper') | list)
+                and (cis_cp_pmod_body | default('') | length > 0 or cis_cp_avail == '1')
+             else [])) | join(':') }}
+  when:
+    - not (cis_audit_only | bool)
+    - cis_cp_bad == '1'
+
+- name: "{{ cis_cp_id ~ ' - Set the crypto policy' }}"
+  ansible.builtin.command:
+    argv:
+      - update-crypto-policies
+      - --set
+      - "{{ cis_cp_new }}"
+  changed_when: true
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - cis_cp_bad == '1'
+    - cis_cp_new != cis_cp_show
+
+- name: "{{ cis_cp_id ~ ' - Read the crypto policy state again after the fix' }}"
+  ansible.builtin.command:
+    argv: *cis_cp_argv
+  register: cis_cp_recheck
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+    - cis_cp_bad == '1'
+
+- name: "{{ cis_cp_id ~ ' - Work out the final state of the crypto policy' }}"
+  ansible.builtin.set_fact:
+    cis_cp_final: >-
+      {{ (cis_cp_recheck.stdout_lines | default(cis_cp_check.stdout_lines))
+         | select('match', '^bad=') | first | default('bad=unreadable') | regex_replace('^bad=', '') }}
+    cis_cp_pending: >-
+      {{ ((cis_cp_recheck.stdout_lines | default(cis_cp_check.stdout_lines))
+          | select('match', '^pending=1') | list | length) > 0 }}
+
+- name: "{{ cis_cp_id ~ ' - Flag that a reboot is required' }}"
+  ansible.builtin.set_fact:
+    cis_reboot_required: true
+  when: cis_cp_pending | bool
+
+- name: "{{ cis_cp_id ~ ' - Report that running services keep the old crypto policy until a restart' }}"
+  ansible.builtin.debug:
+    msg: "A reboot is pending: the crypto policy was written after the host booted, and a service reads it only when it starts."
+  when: cis_cp_pending | bool
+
+# Under --check the fix does not happen, so remediate mode records nothing then.
+- name: "{{ cis_cp_id ~ ' - Record the finding' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "{{ cis_cp_id }}"
+  when:
+    - cis_cp_final != '0'
+    - (cis_audit_only | bool) or not ansible_check_mode
+...

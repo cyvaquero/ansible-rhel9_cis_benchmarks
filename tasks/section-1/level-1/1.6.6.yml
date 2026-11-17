@@ -1,0 +1,40 @@
+---
+# 1.6.6 (manual) - reports how the effective crypto policy treats encrypt-then-MAC (EtM)
+# for SSH, for review: the etm setting in the effective policy, if any, and whether the
+# generated OpenSSH server back-end lists EtM MACs. It only reads, in both modes, and
+# records no finding: summary.yml lists manual controls. The role never changes the policy
+# for it.
+
+- name: "1.6.6 - Check how the crypto policy treats EtM for SSH"
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - |
+        pol=/etc/crypto-policies/state/CURRENT.pol
+        f=/etc/crypto-policies/back-ends/opensshserver.config
+        setting=$(grep -Ei '^[[:space:]]*(ssh_)?etm[[:space:]]*=' "$pol" 2>/dev/null | head -n 1)
+        if [ -r "$f" ] && grep -Ei '^[[:space:]]*MACs[[:space:]=]' "$f" | grep -qi 'etm@'; then
+          macs=listed
+        elif [ -r "$f" ]; then
+          macs="not listed"
+        else
+          macs=unknown
+        fi
+        echo "policy setting: ${setting:-none}; EtM MACs in the SSH server back-end: $macs"
+  register: cis_check_1_6_6
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: &cis_tags_1_6_6
+    - "1.6.6"
+    - section-1
+    - level-1
+    - server
+    - workstation
+
+- name: "1.6.6 - Report how the crypto policy treats EtM for SSH for review"
+  ansible.builtin.debug:
+    msg: "EtM for SSH in the crypto policy: {{ cis_check_1_6_6.stdout | default('unknown') | trim }}"
+  tags: *cis_tags_1_6_6
+...
