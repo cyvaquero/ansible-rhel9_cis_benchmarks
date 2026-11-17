@@ -7,12 +7,14 @@
 # and puts the tags, which every task here inherits, on the import.
 #
 # Two values are compared: the running one (sysctl -n) and the configured one, the last
-# assignment systemd-sysctl would apply at boot, in its --cat-config order (RHEL reads
-# /etc/sysctl.conf through the /etc/sysctl.d/99-sysctl.conf link, so it is in there).
+# assignment applied at boot: systemd-sysctl's --cat-config order, then /etc/sysctl.conf
+# again, because tuned (on by default, reapply_sysctl = 1) re-applies the files after its
+# profile in sysctl --system order, which reads /etc/sysctl.conf last.
 # When the configured value is not accepted, the role writes cis_sc_set to its own file
 # /etc/sysctl.d/99-zz-cis-benchmarks.conf, whose name sorts after the vendor files and
-# 99-sysctl.conf so it wins, and sets the live value too. A configured value that is
-# accepted is never rewritten (kptr_restrict 2 stays 2). A running value that is wrong
+# 99-sysctl.conf, and sets the live value too. A conflicting value in /etc/sysctl.conf
+# still wins under tuned, so it stays a finding for the admin to remove. A configured
+# value that is accepted is never rewritten (kptr_restrict 2 stays 2). A running value that is wrong
 # while the configuration is right is set with sysctl -w. Remediate mode records a finding
 # when either value is still not accepted afterwards (a later file wins); under --check
 # nothing is fixed, so nothing is recorded then.
@@ -27,7 +29,7 @@
         set -u
         key=$1
         printf 'r=%s\n' "$(sysctl -n "$key" 2>/dev/null | tr -s ' \t' ' ')"
-        /usr/lib/systemd/systemd-sysctl --cat-config 2>/dev/null | awk -v key="$key" '
+        { /usr/lib/systemd/systemd-sysctl --cat-config 2>/dev/null; cat /etc/sysctl.conf 2>/dev/null; } | awk -v key="$key" '
         function trim(s) { gsub(/^[ \t]+|[ \t\r]+$/, "", s); return s }
         /^[ \t]*[#;]/ { next }
         index($0, "=") {

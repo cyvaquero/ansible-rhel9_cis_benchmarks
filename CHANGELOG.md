@@ -26,11 +26,6 @@ implements, then the role's own version.
   set `cis_reboot_required` when the live state still differs. Shared logic is
   `tasks/lib/sysctl.yml`, `sulogin_unit.yml` and `coredump.yml` (#5).
 
-### Fixed
-
-- The sysctl controls read the configured value in systemd-sysctl's boot order only, so a
-  value in `/etc/sysctl.conf` that the role file overrides is no longer reported (#31).
-
 ### Changed
 
 - `docs/controls.md` marks the 15 controls implemented (#5).
