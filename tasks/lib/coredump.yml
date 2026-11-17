@@ -1,0 +1,85 @@
+---
+# Shared logic for the systemd-coredump controls (1.5.9, 1.5.10). A control file imports
+# this with:
+#   cis_cd_id     the CIS ID
+#   cis_cd_key    the option in the [Coredump] section
+#   cis_cd_value  the required value (compared without regard to case)
+# and puts the tags on the import.
+#
+# The effective value is the last assignment in systemd-analyze cat-config of coredump.conf
+# (the main file, then the drop-ins in order). When it is wrong, the role sets the option in
+# its own drop-in /etc/systemd/coredump.conf.d/99-zz-cis-benchmarks.conf, which sorts after
+# the other drop-ins and overrides the main file. systemd-coredump reads its configuration
+# for every crash, so no reload is needed. Remediate mode records a finding when a later
+# drop-in still wins; under --check nothing is fixed, so nothing is recorded then.
+
+- name: "{{ cis_cd_id ~ ' - Read the effective ' ~ cis_cd_key }}"
+  ansible.builtin.command:
+    argv: &cis_cd_argv
+      - /bin/sh
+      - -c
+      - |
+        systemd-analyze cat-config systemd/coredump.conf 2>/dev/null | awk -F= -v key="$1" '
+        function trim(s) { gsub(/^[ \t]+|[ \t\r]+$/, "", s); return s }
+        /^[ \t]*\[/ { sec = trim($0); next }
+        /^[ \t]*[#;]/ { next }
+        sec == "[Coredump]" && index($0, "=") && trim($1) == key {
+          v = $0; sub(/^[^=]*=/, "", v); val = trim(v)
+        }
+        END { print "v=" val }'
+      - sh
+      - "{{ cis_cd_key }}"
+  register: cis_cd_check
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: "{{ cis_cd_id ~ ' - Work out whether ' ~ cis_cd_key ~ ' is compliant' }}"
+  ansible.builtin.set_fact:
+    cis_cd_bad: "{{ (cis_cd_check.stdout | trim | regex_replace('^v=', '') | lower) != (cis_cd_value | lower) }}"
+
+- name: "{{ cis_cd_id ~ ' - Create the coredump.conf.d folder' }}"
+  ansible.builtin.file:
+    path: /etc/systemd/coredump.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - not (cis_audit_only | bool)
+    - cis_cd_bad | bool
+
+- name: "{{ cis_cd_id ~ ' - Set ' ~ cis_cd_key ~ ' in the role drop-in' }}"
+  community.general.ini_file:
+    path: /etc/systemd/coredump.conf.d/99-zz-cis-benchmarks.conf
+    section: Coredump
+    option: "{{ cis_cd_key }}"
+    value: "{{ cis_cd_value }}"
+    no_extra_spaces: true
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - not (cis_audit_only | bool)
+    - cis_cd_bad | bool
+
+- name: "{{ cis_cd_id ~ ' - Read the effective ' ~ cis_cd_key ~ ' again after the fix' }}"
+  ansible.builtin.command:
+    argv: *cis_cd_argv
+  register: cis_cd_recheck
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+    - cis_cd_bad | bool
+
+- name: "{{ cis_cd_id ~ ' - Record the finding' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "{{ cis_cd_id }}"
+  when:
+    - (cis_cd_recheck.stdout | default(cis_cd_check.stdout) | trim | regex_replace('^v=', '') | lower) != (cis_cd_value | lower)
+    - (cis_audit_only | bool) or not ansible_check_mode
+...

@@ -1,0 +1,16 @@
+---
+# 1.5.9 - systemd-coredump ProcessSizeMax. The logic is shared in tasks/lib/coredump.yml.
+
+- name: "1.5.9 - Ensure systemd-coredump ProcessSizeMax is configured"
+  ansible.builtin.import_tasks: ../../lib/coredump.yml
+  vars:
+    cis_cd_id: "1.5.9"
+    cis_cd_key: "ProcessSizeMax"
+    cis_cd_value: "0"
+  tags:
+    - "1.5.9"
+    - section-1
+    - level-1
+    - server
+    - workstation
+...

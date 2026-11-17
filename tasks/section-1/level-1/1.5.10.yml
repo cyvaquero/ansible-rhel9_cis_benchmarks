@@ -1,0 +1,16 @@
+---
+# 1.5.10 - systemd-coredump Storage. The logic is shared in tasks/lib/coredump.yml.
+
+- name: "1.5.10 - Ensure systemd-coredump Storage is configured"
+  ansible.builtin.import_tasks: ../../lib/coredump.yml
+  vars:
+    cis_cd_id: "1.5.10"
+    cis_cd_key: "Storage"
+    cis_cd_value: "none"
+  tags:
+    - "1.5.10"
+    - section-1
+    - level-1
+    - server
+    - workstation
+...

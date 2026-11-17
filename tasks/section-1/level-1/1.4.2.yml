@@ -1,0 +1,226 @@
+---
+# 1.4.2 - boot loader configuration is readable by root only. Two parts:
+#  - /boot/grub2/grub.cfg, grubenv and user.cfg (regular files, when present) must be
+#    owned by root:root with no group, other or execute bits; the fix sets 0600 root:root
+#    and leaves stricter modes alone.
+#  - /boot/efi, when /etc/fstab mounts it as vfat (UEFI), must carry uid=0, gid=0 and a
+#    umask of 0077 (or fmask and dmask, each covering 077), because vfat has no file
+#    permissions. A host with no such entry (BIOS) skips this part. The fix rewrites the
+#    fstab options, reloads systemd and tries a remount; if the live mount still does not
+#    match, cis_reboot_required is set. The live check accepts a missing uid or gid (the
+#    kernel hides root).
+# Remediate mode records a finding when anything is still not compliant after the fix
+# (a reboot-pending mount is not a finding); under --check nothing is fixed, so nothing
+# is recorded then.
+
+- name: "1.4.2 - Find boot loader files with the wrong owner or mode"
+  ansible.builtin.command:
+    argv: &cis_argv_1_4_2_files
+      - find
+      - /boot/grub2
+      - -maxdepth
+      - "1"
+      - -type
+      - f
+      - "("
+      - -name
+      - grub.cfg
+      - -o
+      - -name
+      - grubenv
+      - -o
+      - -name
+      - user.cfg
+      - ")"
+      - "("
+      - "!"
+      - -user
+      - root
+      - -o
+      - "!"
+      - -group
+      - root
+      - -o
+      - -perm
+      - /177
+      - ")"
+  register: cis_check_1_4_2_files
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: &cis_tags_1_4_2
+    - "1.4.2"
+    - section-1
+    - level-1
+    - server
+    - workstation
+
+# Prints fstab=absent|ok|bad, opts=<fstab options>, maskok=yes|no and live=absent|ok|bad.
+- name: "1.4.2 - Check the /boot/efi mount options"
+  ansible.builtin.command:
+    argv: &cis_argv_1_4_2_efi
+      - /bin/bash
+      - -c
+      - |
+        set -u
+        get() { tr ',' '\n' <<<"$2" | sed -n "s/^$1=//p" | tail -n 1; }
+        six() { [[ "$1" =~ ^[0-7]+$ ]] && (( (8#$1 & 63) == 63 )); }
+        mask_ok() {
+          local u f d
+          u=$(get umask "$1"); f=$(get fmask "$1"); d=$(get dmask "$1")
+          f=${f:-$u}; d=${d:-$u}
+          six "$f" && six "$d"
+        }
+        read -r ftype fopts < <(awk '$0 !~ /^[ \t]*#/ && $2 == "/boot/efi" { print $3, $4; exit }' /etc/fstab)
+        fstab=absent; maskok=no
+        if [ "${ftype:-}" = vfat ]; then
+          fstab=bad
+          mask_ok "$fopts" && maskok=yes
+          if [ "$maskok" = yes ] && [ "$(get uid "$fopts")" = 0 ] && [ "$(get gid "$fopts")" = 0 ]; then fstab=ok; fi
+        fi
+        live=absent
+        if read -r ltype lopts < <(findmnt -n -o FSTYPE,OPTIONS --mountpoint /boot/efi 2>/dev/null) && [ "$ltype" = vfat ]; then
+          live=bad
+          u=$(get uid "$lopts"); g=$(get gid "$lopts")
+          if mask_ok "$lopts" && { [ -z "$u" ] || [ "$u" = 0 ]; } && { [ -z "$g" ] || [ "$g" = 0 ]; }; then live=ok; fi
+        fi
+        echo "fstab=$fstab"; echo "opts=${fopts:-}"; echo "maskok=$maskok"; echo "live=$live"
+  register: cis_check_1_4_2_efi
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: *cis_tags_1_4_2
+
+- name: "1.4.2 - Work out the /boot/efi state"
+  ansible.builtin.set_fact:
+    cis_state_1_4_2_fstab: >-
+      {{ cis_check_1_4_2_efi.stdout_lines | select('match', '^fstab=') | first
+         | default('fstab=bad') | regex_replace('^fstab=', '') }}
+    cis_state_1_4_2_opts: "{{ cis_check_1_4_2_efi.stdout_lines | select('match', '^opts=') | first | default('opts=') | regex_replace('^opts=', '') }}"
+    cis_state_1_4_2_maskok: >-
+      {{ cis_check_1_4_2_efi.stdout_lines | select('match', '^maskok=') | first
+         | default('maskok=no') | regex_replace('^maskok=', '') == 'yes' }}
+    cis_state_1_4_2_live: >-
+      {{ cis_check_1_4_2_efi.stdout_lines | select('match', '^live=') | first
+         | default('live=bad') | regex_replace('^live=', '') }}
+  tags: *cis_tags_1_4_2
+
+- name: "1.4.2 - Set the owner and mode of the boot loader files"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: file
+    owner: root
+    group: root
+    mode: "0600"
+  loop: "{{ cis_check_1_4_2_files.stdout_lines }}"
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - cis_check_1_4_2_files.rc == 0
+  tags: *cis_tags_1_4_2
+
+- name: "1.4.2 - Rewrite the fstab options of /boot/efi"
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^([^#\s]\S*\s+/boot/efi\s+vfat\s+)\S+(.*)$'
+    line: '\1{{ cis_state_1_4_2_new_opts }}\2'
+    backrefs: true
+  register: cis_fix_1_4_2_fstab
+  vars:
+    cis_state_1_4_2_kept: >-
+      {{ cis_state_1_4_2_opts.split(',')
+         | reject('match', '^(uid|gid)=')
+         | reject('match', '^(umask|fmask|dmask)=' if not cis_state_1_4_2_maskok else '^$')
+         | list }}
+    cis_state_1_4_2_new_opts: >-
+      {{ (cis_state_1_4_2_kept + ['uid=0', 'gid=0'] + ([] if cis_state_1_4_2_maskok else ['umask=0077'])) | join(',') }}
+  when:
+    - not (cis_audit_only | bool)
+    - cis_state_1_4_2_fstab == 'bad'
+  tags: *cis_tags_1_4_2
+
+- name: "1.4.2 - Reload systemd after changing fstab"
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when:
+    - not ansible_check_mode
+    - cis_fix_1_4_2_fstab is changed
+  tags: *cis_tags_1_4_2
+
+# Skipped under --check by the command module itself. A failed remount is checked below.
+- name: "1.4.2 - Remount /boot/efi with the fstab options"
+  ansible.builtin.command:
+    argv:
+      - mount
+      - -o
+      - remount
+      - /boot/efi
+  changed_when: true
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - cis_state_1_4_2_live == 'bad'
+  tags: *cis_tags_1_4_2
+
+- name: "1.4.2 - Check the boot loader files and /boot/efi again after the fix"
+  ansible.builtin.command:
+    argv: "{{ item }}"
+  loop:
+    - *cis_argv_1_4_2_files
+    - *cis_argv_1_4_2_efi
+  register: cis_recheck_1_4_2
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+  tags: *cis_tags_1_4_2
+
+- name: "1.4.2 - Work out what is still not compliant"
+  ansible.builtin.set_fact:
+    cis_state_1_4_2_files_bad: >-
+      {{ (cis_recheck_1_4_2.results[0].stdout_lines | default(cis_check_1_4_2_files.stdout_lines)) | length > 0
+         or cis_check_1_4_2_files.rc != 0 }}
+    cis_state_1_4_2_efi_out: "{{ cis_recheck_1_4_2.results[1].stdout_lines | default(cis_check_1_4_2_efi.stdout_lines) }}"
+  when: cis_recheck_1_4_2.results is defined
+  tags: *cis_tags_1_4_2
+
+- name: "1.4.2 - Work out what is still not compliant when nothing was rechecked"
+  ansible.builtin.set_fact:
+    cis_state_1_4_2_files_bad: "{{ cis_check_1_4_2_files.stdout_lines | length > 0 or cis_check_1_4_2_files.rc != 0 }}"
+    cis_state_1_4_2_efi_out: "{{ cis_check_1_4_2_efi.stdout_lines }}"
+  when: cis_recheck_1_4_2.results is not defined
+  tags: *cis_tags_1_4_2
+
+# The live mount may need a reboot; the fstab entry is what a finding is about.
+- name: "1.4.2 - Flag that a reboot is required for the /boot/efi mount"
+  ansible.builtin.set_fact:
+    cis_reboot_required: true
+    cis_state_1_4_2_reboot: true
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+    - "'fstab=ok' in cis_state_1_4_2_efi_out"
+    - "'live=bad' in cis_state_1_4_2_efi_out"
+  tags: *cis_tags_1_4_2
+
+- name: "1.4.2 - Report that /boot/efi keeps its old options until a reboot"
+  ansible.builtin.debug:
+    msg: "A reboot is pending: /boot/efi is mounted with options that differ from its fstab entry."
+  when: cis_state_1_4_2_reboot | default(false) | bool
+  tags: *cis_tags_1_4_2
+
+# Under --check the fix does not happen, so remediate mode records nothing then.
+- name: "1.4.2 - Record the finding"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "1.4.2"
+  when:
+    - >-
+      cis_state_1_4_2_files_bad | bool
+      or 'fstab=bad' in cis_state_1_4_2_efi_out
+      or ((cis_audit_only | bool) and 'live=bad' in cis_state_1_4_2_efi_out)
+    - (cis_audit_only | bool) or not ansible_check_mode
+  tags: *cis_tags_1_4_2
+...

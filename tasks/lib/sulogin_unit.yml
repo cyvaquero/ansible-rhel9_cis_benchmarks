@@ -1,0 +1,82 @@
+---
+# Shared logic for the rescue and emergency mode authentication controls (1.4.3, 1.4.4).
+# A control file imports this with:
+#   cis_su_id    the CIS ID
+#   cis_su_unit  rescue.service or emergency.service
+#   cis_su_mode  rescue or emergency, the argument of systemd-sulogin-shell
+# and puts the tags on the import.
+#
+# The check reads the effective ExecStart of the unit (vendor file plus every drop-in) and
+# wants it to run systemd-sulogin-shell or sulogin, which ask for the root password. When it
+# does not, the role writes a drop-in that resets ExecStart and sets the stock command, then
+# reloads systemd. A compliant unit is never touched. Remediate mode records a finding when
+# the effective command is still wrong (a later drop-in wins); under --check nothing is fixed,
+# so nothing is recorded then.
+
+- name: "{{ cis_su_id ~ ' - Read the effective ExecStart of ' ~ cis_su_unit }}"
+  ansible.builtin.command:
+    argv: &cis_su_argv
+      - /bin/sh
+      - -c
+      - systemctl show -p ExecStart --value "$1" | grep -Eq 'path=[^ ;]*sulogin'
+      - sh
+      - "{{ cis_su_unit }}"
+  register: cis_su_check
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: "{{ cis_su_id ~ ' - Create the drop-in folder of ' ~ cis_su_unit }}"
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ cis_su_unit }}.d"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - not (cis_audit_only | bool)
+    - cis_su_check.rc != 0
+
+- name: "{{ cis_su_id ~ ' - Restore the password prompt of ' ~ cis_su_unit }}"
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/{{ cis_su_unit }}.d/99-zz-cis-benchmarks.conf"
+    content: |
+      # Managed by rhel9_cis_benchmarks.
+      [Service]
+      ExecStart=
+      ExecStart=-/usr/lib/systemd/systemd-sulogin-shell {{ cis_su_mode }}
+    owner: root
+    group: root
+    mode: "0644"
+  register: cis_su_dropin
+  when:
+    - not (cis_audit_only | bool)
+    - cis_su_check.rc != 0
+
+- name: "{{ cis_su_id ~ ' - Reload systemd after changing ' ~ cis_su_unit }}"
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when:
+    - not ansible_check_mode
+    - cis_su_dropin is changed
+
+- name: "{{ cis_su_id ~ ' - Read the effective ExecStart of ' ~ cis_su_unit ~ ' again after the fix' }}"
+  ansible.builtin.command:
+    argv: *cis_su_argv
+  register: cis_su_recheck
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+    - cis_su_check.rc != 0
+
+- name: "{{ cis_su_id ~ ' - Record the finding' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "{{ cis_su_id }}"
+  when:
+    - (cis_su_recheck.rc | default(cis_su_check.rc)) != 0
+    - (cis_audit_only | bool) or not ansible_check_mode
+...
