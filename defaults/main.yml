@@ -51,7 +51,7 @@ cis_grub_password_hash: ""
 # /etc/issue.net, and sets as the GDM login banner, when the current content is not
 # compliant. A file that already has compliant content is never rewritten. Keep it free of
 # the escapes \m \r \s \v and of the operating system name, or the controls can never pass.
-cis_banner_text: "Authorized use only. All activity on this system may be monitored and reported."
+cis_banner_text: "This computer is for approved users and purposes only. Use of it may be logged and reviewed."
 
 # GDM screen lock (1.8.3): the longest idle time, in seconds, before the screen blanks. The
 # check accepts any idle-delay from 1 to this value (0 means never, which is not accepted).
