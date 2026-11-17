@@ -8,6 +8,24 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.14]
+
+### Added
+
+- Controls 1.6.1 to 1.6.7 (system-wide crypto policy), 7 controls. The checks read the
+  effective policy and, for the MAC and SSH controls, the generated OpenSSH back-ends.
+  Fixes change the policy string with `update-crypto-policies --set`, keeping the base
+  policy and every module in it: 1.6.1 replaces a LEGACY base with DEFAULT, 1.6.2 appends
+  `NO-SHA1`, 1.6.3 and 1.6.4 write and append the role's own `CIS-NO-WEAKMAC` and
+  `CIS-NO-SSHCBC` modules only on a host that needs them, and 1.6.7 (Level 2) appends `PQ`
+  when the release ships it, otherwise it is a finding. 1.6.5 and 1.6.6 only report.
+  The role restarts no service: `cis_reboot_required` is set, in both modes, while the
+  policy state is newer than the boot. Shared logic is `tasks/lib/crypto_policy.yml` (#5).
+
+### Changed
+
+- `docs/controls.md` marks the 7 controls implemented (#5).
+
 ## [3.0.0_0.0.13]
 
 ### Added

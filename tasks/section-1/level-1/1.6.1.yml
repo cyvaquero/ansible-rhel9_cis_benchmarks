@@ -1,0 +1,18 @@
+---
+# 1.6.1 - The base policy must not be LEGACY. A LEGACY base is replaced with DEFAULT and
+# every module is kept. The logic is shared in tasks/lib/crypto_policy.yml.
+
+- name: "1.6.1 - Ensure the crypto policy is not LEGACY"
+  ansible.builtin.import_tasks: ../../lib/crypto_policy.yml
+  vars:
+    cis_cp_id: "1.6.1"
+    cis_cp_kind: "legacy"
+    cis_cp_module: ""
+    cis_cp_drop_legacy: true
+  tags:
+    - "1.6.1"
+    - section-1
+    - level-1
+    - server
+    - workstation
+...
