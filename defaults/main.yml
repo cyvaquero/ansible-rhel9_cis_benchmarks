@@ -40,4 +40,10 @@ cis_default_exclusions:
 # a reboot is pending, and the end-of-run summary prints it. Leave it false: the role sets
 # it, and a value you pass in is overwritten when a control needs a reboot.
 cis_reboot_required: false
+
+# Boot loader (1.4.1): the grub2 password hash, as printed by grub2-mkpasswd-pbkdf2
+# ("grub.pbkdf2.sha512.<iterations>.<salt>.<hash>"). Empty (default): 1.4.1 only reports a
+# missing password and changes nothing. Set: the role writes it to /boot/grub2/user.cfg.
+# The hash is a secret: keep it in an Ansible Vault, not in plain text in an inventory.
+cis_grub_password_hash: ""
 ...

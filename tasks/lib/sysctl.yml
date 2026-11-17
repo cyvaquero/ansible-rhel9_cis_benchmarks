@@ -1,0 +1,119 @@
+---
+# Shared logic for the sysctl controls (1.5.1 to 1.5.7). A control file imports this with:
+#   cis_sc_id    the CIS ID, for the task names and the finding
+#   cis_sc_key   the kernel parameter
+#   cis_sc_ok    accepted values, as strings
+#   cis_sc_set   the value to write when the configured value is not accepted
+# and puts the tags, which every task here inherits, on the import.
+#
+# Two values are compared: the running one (sysctl -n) and the configured one, the last
+# assignment applied at boot: systemd-sysctl's --cat-config order, then /etc/sysctl.conf
+# again, because tuned (on by default, reapply_sysctl = 1) re-applies the files after its
+# profile in sysctl --system order, which reads /etc/sysctl.conf last.
+# When the configured value is not accepted, the role writes cis_sc_set to its own file
+# /etc/sysctl.d/99-zz-cis-benchmarks.conf, whose name sorts after the vendor files and
+# 99-sysctl.conf, and sets the live value too. A conflicting value in /etc/sysctl.conf
+# still wins under tuned, so it stays a finding for the admin to remove. A configured
+# value that is accepted is never rewritten (kptr_restrict 2 stays 2). A running value that is wrong
+# while the configuration is right is set with sysctl -w. Remediate mode records a finding
+# when either value is still not accepted afterwards (a later file wins); under --check
+# nothing is fixed, so nothing is recorded then.
+# Task names are one template expression because the CIS ID must come first.
+
+- name: "{{ cis_sc_id ~ ' - Read the running and configured values of ' ~ cis_sc_key }}"
+  ansible.builtin.command:
+    argv: &cis_sc_argv
+      - /bin/bash
+      - -c
+      - |
+        set -u
+        key=$1
+        printf 'r=%s\n' "$(sysctl -n "$key" 2>/dev/null | tr -s ' \t' ' ')"
+        { /usr/lib/systemd/systemd-sysctl --cat-config 2>/dev/null; cat /etc/sysctl.conf 2>/dev/null; } | awk -v key="$key" '
+        function trim(s) { gsub(/^[ \t]+|[ \t\r]+$/, "", s); return s }
+        /^[ \t]*[#;]/ { next }
+        index($0, "=") {
+          i = index($0, "=")
+          k = trim(substr($0, 1, i - 1)); sub(/^-/, "", k); gsub("/", ".", k)
+          if (k == key) { v = trim(substr($0, i + 1)); gsub(/[ \t]+/, " ", v) }
+        }
+        END { print "c=" v }'
+      - bash
+      - "{{ cis_sc_key }}"
+  register: cis_sc_check
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: "{{ cis_sc_id ~ ' - Work out the state of ' ~ cis_sc_key }}"
+  ansible.builtin.set_fact:
+    cis_sc_running: "{{ cis_sc_check.stdout_lines | select('match', '^r=') | first | default('r=') | regex_replace('^r=', '') }}"
+    cis_sc_conf: "{{ cis_sc_check.stdout_lines | select('match', '^c=') | first | default('c=') | regex_replace('^c=', '') }}"
+
+- name: "{{ cis_sc_id ~ ' - Write ' ~ cis_sc_key ~ ' to the role sysctl file and set it live' }}"
+  ansible.posix.sysctl:
+    name: "{{ cis_sc_key }}"
+    value: "{{ cis_sc_set }}"
+    sysctl_file: /etc/sysctl.d/99-zz-cis-benchmarks.conf
+    sysctl_set: true
+    reload: false
+    state: present
+  register: cis_sc_fix
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - cis_sc_conf not in cis_sc_ok
+
+# The module writes the file with a private mode; systemd-sysctl does not need that.
+- name: "{{ cis_sc_id ~ ' - Set the mode of the role sysctl file' }}"
+  ansible.builtin.file:
+    path: /etc/sysctl.d/99-zz-cis-benchmarks.conf
+    state: file
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - not ansible_check_mode
+    - cis_sc_fix is changed
+
+# The configuration is right but the running value is not: apply the configured value.
+- name: "{{ cis_sc_id ~ ' - Set the running value of ' ~ cis_sc_key }}"
+  ansible.builtin.command:
+    argv:
+      - sysctl
+      - -w
+      - "{{ cis_sc_key ~ '=' ~ cis_sc_conf }}"
+  changed_when: true
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - cis_sc_conf in cis_sc_ok
+    - cis_sc_running not in cis_sc_ok
+
+- name: "{{ cis_sc_id ~ ' - Read ' ~ cis_sc_key ~ ' again after the fix' }}"
+  ansible.builtin.command:
+    argv: *cis_sc_argv
+  register: cis_sc_recheck
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+    - cis_sc_conf not in cis_sc_ok or cis_sc_running not in cis_sc_ok
+
+- name: "{{ cis_sc_id ~ ' - Work out the state of ' ~ cis_sc_key ~ ' after the fix' }}"
+  ansible.builtin.set_fact:
+    cis_sc_running: "{{ cis_sc_recheck.stdout_lines | select('match', '^r=') | first | default('r=') | regex_replace('^r=', '') }}"
+    cis_sc_conf: "{{ cis_sc_recheck.stdout_lines | select('match', '^c=') | first | default('c=') | regex_replace('^c=', '') }}"
+  when: cis_sc_recheck is not skipped
+
+# Under --check the fix does not happen, so remediate mode records nothing then.
+- name: "{{ cis_sc_id ~ ' - Record the finding' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "{{ cis_sc_id }}"
+  when:
+    - cis_sc_running not in cis_sc_ok or cis_sc_conf not in cis_sc_ok
+    - (cis_audit_only | bool) or not ansible_check_mode
+...
