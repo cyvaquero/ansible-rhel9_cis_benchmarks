@@ -8,7 +8,8 @@
 #
 # Two values are compared: the running one (sysctl -n) and the configured one, the last
 # assignment systemd-sysctl would apply at boot, in its --cat-config order (RHEL reads
-# /etc/sysctl.conf through the /etc/sysctl.d/99-sysctl.conf link, so it is in there). When the configured value is not accepted, the role writes cis_sc_set to its own file
+# /etc/sysctl.conf through the /etc/sysctl.d/99-sysctl.conf link, so it is in there).
+# When the configured value is not accepted, the role writes cis_sc_set to its own file
 # /etc/sysctl.d/99-zz-cis-benchmarks.conf, whose name sorts after the vendor files and
 # 99-sysctl.conf so it wins, and sets the live value too. A configured value that is
 # accepted is never rewritten (kptr_restrict 2 stays 2). A running value that is wrong
