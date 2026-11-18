@@ -2,21 +2,31 @@
 # 2.1.20 - no graphical user interface. Server only, skipped by default
 # (cis_default_exclusions) because it removes the desktop.
 #
-# Check: the GUI packages (gdm and gnome-shell) are not installed, and the default systemd
-# target is not graphical.target. Fix, in remediate mode: remove the packages with dnf,
-# which also removes everything that depends on them (the desktop), then point
-# default.target at multi-user.target when it is graphical.target (the same link
-# `systemctl set-default` makes). The packages go away at once, but a display stack that
-# is already running keeps running and the target change applies at the next boot, so
-# while graphical.target is still active on a compliant host the control sets
-# cis_reboot_required, in audit mode too, and that is not a finding. The role never stops
-# the display manager itself and never reboots.
+# Check, one output line per reason, exit 1 when any line exists:
+#   group:graphical-server-environment  the "Server with GUI" environment group is installed
+#                                       (dnf -q group list --installed --ids)
+#   remove:<package>                    gdm or gnome-shell is installed (stricter than the
+#                                       group test, kept on purpose)
+#   target:graphical.target             the default systemd target is graphical
 #
-# The check prints remove:<package> for each installed package and, once none is left,
-# target:<current default> when the default is graphical.target; its exit status is 1
-# when it printed anything. Audit mode only checks and records a finding. A control that
-# still fails after the fix is a finding. Under --check nothing changes and nothing is
-# recorded. cis_services_keep lists 2.1.20 to skip the control.
+# Fix, remediate mode only, in this order:
+#   1. When the group is installed, install the minimal and the Server environments first
+#      (@^minimal-environment, @^server-product-environment), so the packages the GUI group
+#      shares with a plain server, openssh-server above all, stay marked as wanted and are
+#      not removed with it. Removing sshd would lock Ansible out.
+#   2. Remove the group (@^graphical-server-environment).
+#   3. Remove leftover gdm and gnome-shell with dnf, together with their dependents.
+#   4. Link default.target to multi-user.target when it is graphical (the link
+#      `systemctl set-default` makes; works under --check).
+# If openssh-server is gone afterwards the control records a finding and says so; that
+# should never happen.
+# Removal is immediate, but a running display stack keeps running and the target applies
+# at the next boot, so while graphical.target is still active on a compliant host the
+# control sets cis_reboot_required, in audit mode too, and that is not a finding. The role
+# never stops the display manager and never reboots.
+# Audit mode only checks and records a finding. A control that still fails after the fix
+# is a finding. Under --check nothing changes and nothing is recorded.
+# cis_services_keep lists 2.1.20 to skip the control.
 
 - name: "2.1.20 - Handle the graphical user interface unless the site keeps it"
   when: "'2.1.20' not in (cis_services_keep | default([]))"
@@ -33,14 +43,14 @@
           - -c
           - |
             bad=0
-            left=0
-            for p in $1; do
-              if rpm -q "$p" >/dev/null 2>&1; then echo "remove:$p"; bad=1; left=1; fi
-            done
-            if [ "$left" = 0 ]; then
-              cur=$(systemctl get-default 2>/dev/null)
-              if [ "$cur" = graphical.target ]; then echo "target:$cur"; bad=1; fi
+            if dnf -q group list --installed --ids 2>/dev/null | grep -Fq graphical-server-environment; then
+              echo "group:graphical-server-environment"; bad=1
             fi
+            for p in $1; do
+              if rpm -q "$p" >/dev/null 2>&1; then echo "remove:$p"; bad=1; fi
+            done
+            cur=$(systemctl get-default 2>/dev/null)
+            if [ "$cur" = graphical.target ]; then echo "target:$cur"; bad=1; fi
             exit $bad
           - sh
           - "gdm gnome-shell"
@@ -49,17 +59,30 @@
       check_mode: false
       failed_when: false
 
-    - name: "2.1.20 - Remove the graphical user interface and what depends on it"
+    # Before any removal: keep what a plain server shares with the GUI group.
+    - name: "2.1.20 - Install the minimal and Server environments before removing the GUI group"
       ansible.builtin.dnf:
-        name: "{{ cis_check_2_1_20.stdout_lines | select('match', '^remove:') | map('regex_replace', '^remove:', '') | list }}"
+        name:
+          - "@^minimal-environment"
+          - "@^server-product-environment"
+        state: present
+      when:
+        - not (cis_audit_only | bool)
+        - cis_check_2_1_20.stdout_lines | select('match', '^group:') | list | length > 0
+
+    # The install above is not allowed to fail quietly: if it fails the run stops for this
+    # host before anything is removed, because without it sshd could go too.
+    - name: "2.1.20 - Remove the graphical server environment group"
+      ansible.builtin.dnf:
+        name: "@^graphical-server-environment"
         state: absent
       failed_when: false
       when:
         - not (cis_audit_only | bool)
-        - cis_check_2_1_20.stdout_lines | select('match', '^remove:') | list | length > 0
+        - cis_check_2_1_20.stdout_lines | select('match', '^group:') | list | length > 0
 
-    # After the removal, to learn whether the default target still needs changing.
-    - name: "2.1.20 - Check what is left after the removal"
+    # After the group removal, to learn which packages and target are left.
+    - name: "2.1.20 - Check what is left after the group removal"
       ansible.builtin.command:
         argv: *cis_gui_argv
       register: cis_check_2_1_20_after
@@ -70,6 +93,19 @@
         - not (cis_audit_only | bool)
         - not ansible_check_mode
         - cis_check_2_1_20.rc != 0
+
+    - name: "2.1.20 - Remove leftover gdm and gnome-shell and what depends on them"
+      ansible.builtin.dnf:
+        name: >-
+          {{ (cis_check_2_1_20_after.stdout_lines | default(cis_check_2_1_20.stdout_lines))
+             | select('match', '^remove:') | map('regex_replace', '^remove:', '') | list }}
+        state: absent
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - >-
+          (cis_check_2_1_20_after.stdout_lines | default(cis_check_2_1_20.stdout_lines))
+          | select('match', '^remove:') | list | length > 0
 
     # The link systemctl set-default makes; it works under --check and is idempotent.
     - name: "2.1.20 - Set the default target to multi-user"
@@ -96,6 +132,38 @@
         - not (cis_audit_only | bool)
         - not ansible_check_mode
         - cis_check_2_1_20.rc != 0
+
+    - name: "2.1.20 - Check openssh-server survived the group removal"
+      ansible.builtin.command:
+        argv:
+          - rpm
+          - -q
+          - openssh-server
+      register: cis_check_2_1_20_sshd
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_check_2_1_20.stdout_lines | select('match', '^group:') | list | length > 0
+
+    - name: "2.1.20 - Report that openssh-server is gone"
+      ansible.builtin.debug:
+        msg: >-
+          openssh-server is no longer installed after removing the graphical server group.
+          This should never happen: reinstall it before the connection is lost.
+      when:
+        - cis_check_2_1_20_sshd is not skipped
+        - cis_check_2_1_20_sshd.rc != 0
+
+    - name: "2.1.20 - Record the finding when openssh-server is gone"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "2.1.20"
+      when:
+        - cis_check_2_1_20_sshd is not skipped
+        - cis_check_2_1_20_sshd.rc != 0
 
     - name: "2.1.20 - Check whether the graphical target is still running"
       ansible.builtin.command:

@@ -235,13 +235,18 @@ ansible-playbook -i inventory site.yml -e target=webservers
   and, for postfix, `inet_interfaces`. A postfix that is not loopback only gets
   `inet_interfaces = loopback-only` (`postconf -e`) and is restarted only when it is
   running. Any other MTA that listens beyond loopback is a finding and is never edited.
-- Desktop and X server (2.1.20 to 2.1.22, Level 2 Server, skipped by default): the packages
-  (`gdm` and `gnome-shell`; `xorg-x11-server-common`; `xorg-x11-server-Xwayland`) are removed
-  with dnf together with every installed package that depends on them, which removes the
-  desktop. 2.1.20 also points the default target at `multi-user.target` when it is
-  `graphical.target`. The role never stops the display manager or reboots: while the
-  graphical target is still running on a compliant host, it sets `cis_reboot_required`
-  (in audit mode too) and that is not a finding. `cis_services_keep` skips these controls.
+- Desktop and X server (2.1.20 to 2.1.22, Level 2 Server, skipped by default): 2.1.20 fails
+  while the "Server with GUI" environment group is installed, while `gdm` or `gnome-shell`
+  is installed, or while the default target is `graphical.target`. To fix it the role first
+  installs the minimal and Server environments (so `openssh-server` and the other packages
+  shared with a plain server stay wanted), removes the GUI group, removes any leftover
+  `gdm` and `gnome-shell` with their dependents, and points the default target at
+  `multi-user.target`. It records a finding if `openssh-server` is gone afterwards. 2.1.21
+  and 2.1.22 remove `xorg-x11-server-common` and `xorg-x11-server-Xwayland` with dnf
+  together with every installed package that depends on them. The role never stops the
+  display manager or reboots: while the graphical target is still running on a compliant
+  host, it sets `cis_reboot_required` (in audit mode too) and that is not a finding.
+  `cis_services_keep` skips these controls.
 - Listening sockets (2.1.23, manual): the role prints `ss -plntu` for review, never changes
   anything, and records no finding.
 - Client controls (2.2.1 to 2.2.4: ftp, openldap-clients, telnet, tftp): the package is removed
