@@ -8,6 +8,18 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.18]
+
+### Added
+
+- `docs/review-controls.md`: for each implemented audit-only and manual control, what the
+  role reports and what is left for you to decide; the controls skipped by default and why;
+  and the controls that behave differently between RHEL 9 minor releases. The README and
+  `docs/controls.md` link to it. Fixes #12.
+- `tests/check_controls.py` also fails when that page does not list exactly the
+  implemented audit-only and manual controls, with their dispositions, and exactly
+  `cis_default_exclusions`. Fixes #12.
+
 ## [3.0.0_0.0.16]
 
 ### Added
