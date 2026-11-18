@@ -1,0 +1,25 @@
+---
+# 1.8.5 - removable media never autoruns software.
+# Only when GDM is installed (package facts from preflight); without it the control is
+# skipped with no finding. The logic is shared in
+# tasks/lib/dconf.yml.
+
+- name: "1.8.5 - Ensure GDM autorun-never is enabled"
+  ansible.builtin.import_tasks: ../../lib/dconf.yml
+  vars:
+    cis_dc_id: "1.8.5"
+    cis_dc_db: "local"
+    cis_dc_section: "org/gnome/desktop/media-handling"
+    cis_dc_key: "autorun-never"
+    cis_dc_kind: "eq"
+    cis_dc_a: "true"
+    cis_dc_b: ""
+    cis_dc_write: "true"
+  when: "'gdm' in ansible_facts.packages"
+  tags:
+    - "1.8.5"
+    - section-1
+    - level-1
+    - server
+    - workstation
+...

@@ -1,0 +1,45 @@
+---
+# 1.8.3 - the GDM session blanks after a short idle time and locks shortly after.
+# Accepted: idle-delay from 1 to cis_gdm_idle_delay, lock-delay from 0 to cis_gdm_lock_delay.
+# Only when GDM is installed (package facts from preflight); without it the control is
+# skipped with no finding. The logic is shared in
+# tasks/lib/dconf.yml.
+
+- name: "1.8.3 - Ensure the GDM idle delay is configured"
+  ansible.builtin.import_tasks: ../../lib/dconf.yml
+  vars:
+    cis_dc_id: "1.8.3"
+    cis_dc_db: "local"
+    cis_dc_section: "org/gnome/desktop/session"
+    cis_dc_key: "idle-delay"
+    cis_dc_kind: "range"
+    cis_dc_a: "1"
+    cis_dc_b: "{{ cis_gdm_idle_delay }}"
+    cis_dc_write: "uint32 {{ cis_gdm_idle_delay }}"
+  when: "'gdm' in ansible_facts.packages"
+  tags:
+    - "1.8.3"
+    - section-1
+    - level-1
+    - server
+    - workstation
+
+- name: "1.8.3 - Ensure the GDM screen lock delay is configured"
+  ansible.builtin.import_tasks: ../../lib/dconf.yml
+  vars:
+    cis_dc_id: "1.8.3"
+    cis_dc_db: "local"
+    cis_dc_section: "org/gnome/desktop/screensaver"
+    cis_dc_key: "lock-delay"
+    cis_dc_kind: "range"
+    cis_dc_a: "0"
+    cis_dc_b: "{{ cis_gdm_lock_delay }}"
+    cis_dc_write: "uint32 {{ cis_gdm_lock_delay }}"
+  when: "'gdm' in ansible_facts.packages"
+  tags:
+    - "1.8.3"
+    - section-1
+    - level-1
+    - server
+    - workstation
+...

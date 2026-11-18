@@ -4,10 +4,10 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.14).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.15).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and the kernel module controls 1.1.1.1 to
 1.1.1.11, the mount controls 1.1.2.1.1 to 1.1.2.7.4, the package manager controls 1.2.1.1
-to 1.2.2.1 the SELinux controls 1.3.1.1 to 1.3.1.8, the boot loader controls 1.4.1 to 1.4.5 the kernel and process hardening controls 1.5.1 to 1.5.10 and the crypto policy controls 1.6.1 to 1.6.7 are implemented; every other
+to 1.2.2.1 the SELinux controls 1.3.1.1 to 1.3.1.8, the boot loader controls 1.4.1 to 1.4.5 the kernel and process hardening controls 1.5.1 to 1.5.10 and the crypto policy controls 1.6.1 to 1.6.7, the banner controls 1.7.1 to 1.7.6 and the GDM controls 1.8.1 to 1.8.7 are implemented; every other
 control is still planned. Do not run this against hosts you care about.
 
 ## Relationship to the RHEL 7 and RHEL 8 projects
@@ -100,6 +100,14 @@ ansible-playbook -i inventory site.yml -e target=webservers
 |---|---|---|
 | `cis_grub_password_hash` | `""` | A `grub.pbkdf2.sha512...` hash from `grub2-mkpasswd-pbkdf2`. Empty: 1.4.1 only reports a missing boot loader password and changes nothing. Set: the role writes it to `/boot/grub2/user.cfg` (mode 0600). The hash is a secret: keep it in Ansible Vault. A value that is not in the hash format is a finding and is not written. |
 
+### Banners and GDM (1.7, 1.8)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `cis_banner_text` | a short notice that the computer is for approved users and use may be logged | The text 1.7.1 to 1.7.3 write to `/etc/motd`, `/etc/issue` and `/etc/issue.net`, and 1.8.1 sets as the GDM login banner, when the current content is not compliant. Keep it free of the escapes `\m`, `\r`, `\s`, `\v` and of the operating system name, or the controls cannot pass. |
+| `cis_gdm_idle_delay` | `900` | 1.8.3: the longest idle time in seconds before the GDM session blanks. Any idle-delay from 1 to this value is accepted (0, never, is not); the role sets this value otherwise. |
+| `cis_gdm_lock_delay` | `5` | 1.8.3: the longest delay in seconds between blanking and locking. Any lock-delay from 0 to this value is accepted; the role sets this value otherwise. |
+
 ### Audit vs remediate
 
 | Variable | Default | Meaning |
@@ -128,7 +136,8 @@ ansible-playbook -i inventory site.yml -e target=webservers
   running it; 1.3.1.3 changes the policy type while another policy is loaded; 1.4.2
   changes the `/boot/efi` mount options and the live mount keeps the old ones; 1.4.5
   removes `systemd.confirm_spawn` while the running kernel still has it; 1.6.1 to 1.6.4 and
-  1.6.7 change the crypto policy, which a service reads only when it starts) sets
+  1.6.7 change the crypto policy, which a service reads only when it starts; 1.8.6 and
+  1.8.7 change `/etc/gdm/custom.conf`, which a running GDM reads only when it starts) sets
   `cis_reboot_required` to `true`, reports that a reboot is pending, and the
   summary prints `Reboot required`. The variable defaults to `false` and is an output:
   read it after the role runs (for example to schedule a reboot) rather than setting it.
@@ -168,6 +177,30 @@ ansible-playbook -i inventory site.yml -e target=webservers
   lowers an enforcing host. 1.3.1.5 (Level 2) enforces only a host that is running
   SELinux: on a host that is not, run the role again after the relabeling reboot. The
   SELinux changes need `python3-libselinux` on the managed node.
+- Banner controls (1.7): a file is not compliant when it holds a login escape
+  (`\m`, `\r`, `\s`, `\v`, any case) or the operating system name from `/etc/os-release`;
+  `/etc/issue` and `/etc/issue.net` must also hold text, while an empty or missing
+  `/etc/motd` is compliant. The fix writes `cis_banner_text` only to a non-compliant file,
+  so a site's own compliant banner stays. 1.7.4 to 1.7.6 require root:root and no write for
+  group or other and no execute bit (0644 or stricter); the fix keeps stricter modes. A
+  symlink is a finding for all six and is never replaced or chmod-ed. `/etc/motd.d` and
+  sshd's banner (section 5) are not touched.
+- GDM controls (1.8): they run only when the `gdm` package is installed; otherwise they are
+  skipped with no finding. 1.8.1 to 1.8.5 write system-wide dconf keys to
+  `/etc/dconf/db/gdm.d/00-cis-benchmarks` (login screen) and
+  `/etc/dconf/db/local.d/00-cis-benchmarks` (session, screen saver and media handling), lock
+  each key in the matching `locks/00-cis-benchmarks` file so users cannot override it, and run
+  `dconf update`. A key is compliant when its effective value, read from the compiled
+  databases with `dconf read` under the GDM or user profile with an empty home folder, is
+  accepted and the key is locked; a correct but unlocked key only gets the lock. A site file
+  that sorts later and overrides a key stays a finding, as does a `user` profile without
+  `system-db:local`; the role creates `/etc/dconf/profile/user` only when it is missing.
+  1.8.4 sets `automount` and `automount-open` to false (Level 1 for Server, Level 2 for
+  Workstation). 1.8.6 sets `Enable=false` in the `[xdmcp]` section of `/etc/gdm/custom.conf`
+  when it is true, and 1.8.7 removes an active `WaylandEnable=false` from `[daemon]`. GDM
+  reads `custom.conf` only when it starts, so while GDM is running and the file is newer
+  than its start these two set `cis_reboot_required` (in both modes, not a finding).
+  dconf changes apply to sessions started afterwards. The role never restarts GDM.
 - The summary is tagged `summary` and `always`, and lists every selected audit-only and
   manual control even on a run limited by tags.
 

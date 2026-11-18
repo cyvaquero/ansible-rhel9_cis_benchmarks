@@ -1,0 +1,18 @@
+---
+# 1.7.1 - /etc/motd holds a login banner without escape sequences or the operating system name.
+# The logic, including how a missing, empty or symlinked file is treated, is shared in
+# tasks/lib/banner.yml.
+
+- name: "1.7.1 - Ensure /etc/motd is configured"
+  ansible.builtin.import_tasks: ../../lib/banner.yml
+  vars:
+    cis_bn_id: "1.7.1"
+    cis_bn_path: "/etc/motd"
+    cis_bn_emptyok: "yes"
+  tags:
+    - "1.7.1"
+    - section-1
+    - level-1
+    - server
+    - workstation
+...
