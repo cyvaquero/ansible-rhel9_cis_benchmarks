@@ -27,14 +27,14 @@ never reference any outside project, path or host. `tests/` needs no managed hos
     module names (`ansible.builtin.*`, `ansible.posix.*`, `community.general.*`).
   - No `# Standards:` headers, `templates/old/` or `ansible-review` files. Adds Server
     and Workstation profiles and an audit mode.
-- Use the current RHEL 9 mechanism unless the benchmark specifies otherwise: `dnf` not
-  `yum`, `ss` not `netstat`, chrony not ntpd, authselect not authconfig, firewalld not
-  iptables, systemd units not xinetd, `sysctl.d` and `sshd_config.d` drop-ins,
-  crypto-policies subpolicies.
+- Use the current RHEL 9 mechanism unless the benchmark specifies otherwise: `dnf` not `yum`,
+  `ss` not `netstat`, chrony not ntpd, authselect not authconfig, firewalld not iptables,
+  systemd units not xinetd, `sysctl.d` and `sshd_config.d` drop-ins, crypto-policies subpolicies.
 - Variables use the `cis_` prefix; every default lives in `defaults/main.yml` with a
   comment naming its CIS ID. No real hostnames: use `example.com` names and RFC 5737
   addresses (`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`).
 - `docs/controls.md` is the inventory; update dispositions and Status in the same branch.
+  Built audit-only and manual controls and `cis_default_exclusions` go in `docs/review-controls.md`.
 
 ## Selection and modes
 
