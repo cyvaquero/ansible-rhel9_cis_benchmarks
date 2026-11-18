@@ -70,4 +70,24 @@
 - name: "2.1.18 - Ensure web server services are not in use"
   ansible.builtin.import_tasks: level-1/2.1.18.yml
   when: "'2.1.18' in cis_selected_controls"
+
+- name: "2.1.19 - Ensure mail transfer agents are configured for local-only mode"
+  ansible.builtin.import_tasks: level-1/2.1.19.yml
+  when: "'2.1.19' in cis_selected_controls"
+
+- name: "2.1.23 - Ensure only approved services are listening on a network interface"
+  ansible.builtin.import_tasks: level-1/2.1.23.yml
+  when: "'2.1.23' in cis_selected_controls"
+
+- name: "2.2.1 - Ensure ftp client is not installed"
+  ansible.builtin.import_tasks: level-1/2.2.1.yml
+  when: "'2.2.1' in cis_selected_controls"
+
+- name: "2.2.3 - Ensure telnet client is not installed"
+  ansible.builtin.import_tasks: level-1/2.2.3.yml
+  when: "'2.2.3' in cis_selected_controls"
+
+- name: "2.2.4 - Ensure tftp client is not installed"
+  ansible.builtin.import_tasks: level-1/2.2.4.yml
+  when: "'2.2.4' in cis_selected_controls"
 ...

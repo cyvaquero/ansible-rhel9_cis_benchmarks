@@ -1,0 +1,253 @@
+---
+# 2.1.20 - no graphical user interface. Server only, skipped by default
+# (cis_default_exclusions) because it removes the desktop.
+#
+# Check, one output line per reason, exit 1 when any line exists:
+#   group:graphical-server-environment  the "Server with GUI" environment group is installed
+#                                       (dnf -q group list --ids)
+#   dnfgroups:unknown                   dnf could not list the groups: not compliant, and the
+#                                       group steps below do not run
+#   remove:<package>                    gdm or gnome-shell is installed (stricter than the
+#                                       group test, kept on purpose)
+#   target:graphical.target             the default systemd target is graphical
+#
+# Fix, remediate mode only, in this order:
+#   1. When the group is installed, mark the minimal and the Server environments as
+#      installed first (dnf group mark install; skipped under --check), so the packages the
+#      GUI group shares with a plain server, openssh-server above all, stay wanted and are
+#      not removed with it. Removing sshd would lock Ansible out. They are marked, not
+#      installed, so packages other controls removed (cockpit, for 2.1.3) do not come back.
+#   2. Remove the group (@graphical-server-environment). If step 1 fails, steps 2 to 4 are
+#      skipped, the group stays, and the control records a finding.
+#   3. Remove leftover gdm and gnome-shell with dnf, together with their dependents.
+#   4. Link default.target to multi-user.target when it is graphical (the link
+#      `systemctl set-default` makes; works under --check).
+# If openssh-server is gone afterwards the control records a finding and says so; that
+# should never happen.
+# Removal is immediate, but a running display stack keeps running and the target applies
+# at the next boot, so while graphical.target is still active on a compliant host the
+# control sets cis_reboot_required, in audit mode too, and that is not a finding. The role
+# never stops the display manager and never reboots.
+# Audit mode only checks and records a finding. A control that still fails after the fix
+# is a finding. Under --check nothing changes and nothing is recorded.
+# cis_services_keep lists 2.1.20 to skip the control.
+
+- name: "2.1.20 - Handle the graphical user interface unless the site keeps it"
+  when: "'2.1.20' not in (cis_services_keep | default([]))"
+  tags:
+    - "2.1.20"
+    - section-2
+    - level-2
+    - server
+  block:
+    - name: "2.1.20 - Check the graphical user interface is not installed"
+      ansible.builtin.command:
+        argv: &cis_gui_argv
+          - /bin/sh
+          - -c
+          - |
+            bad=0
+            # dnf 4 rejects --installed together with --ids, so list everything and read
+            # only the "Installed Environment Groups:" section (it ends at the next line
+            # that does not start with whitespace).
+            if grp=$(dnf -q group list --ids 2>/dev/null); then
+              if printf '%s\n' "$grp" | awk '
+                  /^[^[:space:]]/ { in_sec = ($0 == "Installed Environment Groups:"); next }
+                  in_sec && /\(graphical-server-environment\)/ { found = 1 }
+                  END { exit !found }'; then
+                echo "group:graphical-server-environment"; bad=1
+              fi
+            else
+              echo "dnfgroups:unknown"; bad=1
+            fi
+            for p in $1; do
+              if rpm -q "$p" >/dev/null 2>&1; then echo "remove:$p"; bad=1; fi
+            done
+            cur=$(systemctl get-default 2>/dev/null)
+            if [ "$cur" = graphical.target ]; then echo "target:$cur"; bad=1; fi
+            exit $bad
+          - sh
+          - "gdm gnome-shell"
+      register: cis_check_2_1_20
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    # Before any removal: keep what a plain server shares with the GUI group. The dnf module
+    # (used for the removal below) looks "@name" up as a group and then as an environment; a "^" prefix would break it.
+    # When this marking fails nothing is removed and the target stays: without it sshd could
+    # go with the group. The failure is recorded as a finding, not a failed host.
+    - name: "2.1.20 - Mark the minimal and Server environments, then remove the GUI group"
+      when:
+        - not (cis_audit_only | bool)
+        - cis_check_2_1_20.stdout_lines | select('match', '^group:') | list | length > 0
+      block:
+        # Marked, not installed: the dnf module cannot mark, and installing them would bring
+        # back packages other controls removed (cockpit, for 2.1.3). Marking makes dnf treat
+        # the packages the two environments share with the GUI group as wanted, so removing
+        # the group keeps them. Skipped under --check.
+        - name: "2.1.20 - Mark the minimal and Server environments as installed before removing the GUI group"
+          ansible.builtin.command:
+            argv:
+              - dnf
+              - -y
+              - group
+              - mark
+              - install
+              - minimal-environment
+              - server-product-environment
+          changed_when: true
+          when: not ansible_check_mode
+
+        - name: "2.1.20 - Remove the graphical server environment group"
+          ansible.builtin.dnf:
+            name: "@graphical-server-environment"
+            state: absent
+          failed_when: false
+      rescue:
+        - name: "2.1.20 - Note that the server environments could not be marked"
+          ansible.builtin.set_fact:
+            cis_state_2_1_20_envs_failed: true
+
+        - name: "2.1.20 - Report that the GUI group was left in place"
+          ansible.builtin.debug:
+            msg: >-
+              The graphical server group was left in place because the minimal and Server
+              environments could not be marked first (removing it could remove openssh-server).
+
+        - name: "2.1.20 - Record the finding when the server environments could not be marked"
+          ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+          vars:
+            cis_finding_id: "2.1.20"
+
+    # After the group removal, to learn which packages and target are left.
+    - name: "2.1.20 - Check what is left after the group removal"
+      ansible.builtin.command:
+        argv: *cis_gui_argv
+      register: cis_check_2_1_20_after
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_check_2_1_20.rc != 0
+
+    - name: "2.1.20 - Remove leftover gdm and gnome-shell and what depends on them"
+      ansible.builtin.dnf:
+        name: >-
+          {{ (cis_check_2_1_20_after.stdout_lines | default(cis_check_2_1_20.stdout_lines))
+             | select('match', '^remove:') | map('regex_replace', '^remove:', '') | list }}
+        state: absent
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not (cis_state_2_1_20_envs_failed | default(false) | bool)
+        - >-
+          (cis_check_2_1_20_after.stdout_lines | default(cis_check_2_1_20.stdout_lines))
+          | select('match', '^remove:') | list | length > 0
+
+    # The link systemctl set-default makes; it works under --check and is idempotent.
+    - name: "2.1.20 - Set the default target to multi-user"
+      ansible.builtin.file:
+        path: /etc/systemd/system/default.target
+        src: /usr/lib/systemd/system/multi-user.target
+        state: link
+        force: true
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not (cis_state_2_1_20_envs_failed | default(false) | bool)
+        - >-
+          (cis_check_2_1_20_after.stdout_lines | default(cis_check_2_1_20.stdout_lines))
+          | select('match', '^target:') | list | length > 0
+
+    - name: "2.1.20 - Check again after the fix"
+      ansible.builtin.command:
+        argv: *cis_gui_argv
+      register: cis_recheck_2_1_20
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_check_2_1_20.rc != 0
+
+    - name: "2.1.20 - Check openssh-server survived the group removal"
+      ansible.builtin.command:
+        argv:
+          - rpm
+          - -q
+          - openssh-server
+      register: cis_check_2_1_20_sshd
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_check_2_1_20.stdout_lines | select('match', '^group:') | list | length > 0
+
+    - name: "2.1.20 - Report that openssh-server is gone"
+      ansible.builtin.debug:
+        msg: >-
+          openssh-server is no longer installed after removing the graphical server group.
+          This should never happen: reinstall it before the connection is lost.
+      when:
+        - cis_check_2_1_20_sshd is not skipped
+        - cis_check_2_1_20_sshd.rc != 0
+
+    - name: "2.1.20 - Record the finding when openssh-server is gone"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "2.1.20"
+      when:
+        - cis_check_2_1_20_sshd is not skipped
+        - cis_check_2_1_20_sshd.rc != 0
+
+    - name: "2.1.20 - Check whether the graphical target is still running"
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - is-active
+          - graphical.target
+      register: cis_check_2_1_20_active
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    - name: "2.1.20 - Work out whether the graphical target waits for a reboot"
+      ansible.builtin.set_fact:
+        cis_state_2_1_20_pending: >-
+          {{ (cis_recheck_2_1_20.rc | default(cis_check_2_1_20.rc)) == 0
+             and cis_check_2_1_20_active.stdout == 'active' }}
+
+    - name: "2.1.20 - Flag that a reboot is required"
+      ansible.builtin.set_fact:
+        cis_reboot_required: true
+      when: cis_state_2_1_20_pending | bool
+
+    - name: "2.1.20 - Report that the graphical target stops at the next reboot"
+      ansible.builtin.debug:
+        msg: "A reboot is pending: the graphical interface is removed or disabled but the graphical target is still running."
+      when: cis_state_2_1_20_pending | bool
+
+    - name: "2.1.20 - Record the finding when the check fails in audit mode"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "2.1.20"
+      when:
+        - cis_audit_only | bool
+        - cis_check_2_1_20.rc != 0
+
+    # Under --check the fix does not happen, so the second check says nothing new.
+    - name: "2.1.20 - Record the finding when the fix did not take effect"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "2.1.20"
+      when:
+        - cis_recheck_2_1_20 is not skipped
+        - not ansible_check_mode
+        - cis_recheck_2_1_20.rc != 0
+...

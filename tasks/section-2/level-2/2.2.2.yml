@@ -1,0 +1,18 @@
+---
+# 2.2.2 - ldap client not installed. The logic is shared in tasks/lib/client_not_installed.yml:
+# the package is removed when nothing else installed needs it, otherwise it stays and is a
+# finding.
+
+- name: "2.2.2 - Ensure ldap client is not installed"
+  ansible.builtin.import_tasks: ../../lib/client_not_installed.yml
+  vars:
+    cis_client_id: "2.2.2"
+    cis_client_name: "ldap"
+    cis_client_packages: [openldap-clients]
+  tags:
+    - "2.2.2"
+    - section-2
+    - level-2
+    - server
+    - workstation
+...

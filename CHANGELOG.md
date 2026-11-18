@@ -8,6 +8,24 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.19]
+
+### Added
+
+- Section 2.1.19 to 2.1.23 and 2.2 controls. 2.1.19 passes a host with no mail transfer
+  agent or one that listens only on loopback for the mail ports; it sets postfix to
+  `loopback-only` (restarting it only when running) and reports any other agent that
+  listens more widely. 2.1.20 (Level 2 Server, skipped by default) fails on the "Server with GUI"
+  group, gdm or gnome-shell, or a graphical default target; it marks the minimal and
+  Server environments as installed first (without installing them, so packages other
+  controls removed stay removed) so sshd stays, removes the group and the leftover packages,
+  sets the default target to `multi-user.target` and flags a pending reboot while the
+  graphical target is still running. 2.1.21 and 2.1.22 remove the X server and Xwayland
+  together with everything that depends on them. 2.1.23 prints the listening sockets
+  for review. 2.2.1 to 2.2.4 remove the ftp, openldap-clients, telnet and tftp clients
+  unless another installed package needs them, which is a finding. Part of #6.
+- `cis_services_keep` also skips 2.1.19 to 2.1.22. Part of #6.
+
 ## [3.0.0_0.0.18]
 
 ### Added
