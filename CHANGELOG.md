@@ -8,6 +8,15 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.20]
+
+### Fixed
+
+- `LICENSE` no longer says parts of the role are adapted from the RHEL 7 and RHEL 8
+  projects or misstates their licenses; it is the plain MIT license. The README credits
+  those projects for the structure and approach, says no code is copied from them and
+  lists each one's actual license. Fixes #39.
+
 ## [3.0.0_0.0.19]
 
 ### Added
