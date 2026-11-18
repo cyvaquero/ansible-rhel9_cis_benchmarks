@@ -2,11 +2,6 @@ MIT License
 
 Copyright (c) 2026 Guy Heckman
 
-Portions of the structure and approach are adapted from
-Ansible-RHEL7-CIS-Benchmarks and Ansible-RHEL8-CIS-Benchmarks,
-Copyright (c) 2019 HarryHarcourt, released under the MIT License, which in
-turn build on ansible-role-cis-amazon-linux by Anth Courtney.
-
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
