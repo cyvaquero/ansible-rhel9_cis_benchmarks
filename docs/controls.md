@@ -126,24 +126,24 @@ yet. `implemented`: the control has its task file at
 
 | CIS ID | Title | Profile | Type | Disposition | Status | Notes |
 |---|---|---|---|---|---|---|
-| 2.1.1 | Ensure autofs services are not in use | L1 Server, L2 Workstation | Automated | implement | planned | Variable to keep the service when the site needs it |
-| 2.1.2 | Ensure avahi daemon services are not in use | L1 Server, L2 Workstation | Automated | implement | planned |  |
-| 2.1.3 | Ensure cockpit web services are not in use | L2 Server, L2 Workstation | Automated | implement | planned |  |
-| 2.1.4 | Ensure dhcp server services are not in use | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.1.5 | Ensure dns server services are not in use | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.1.6 | Ensure dnsmasq services are not in use | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.1.7 | Ensure samba file server services are not in use | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.1.8 | Ensure ftp server services are not in use | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.1.9 | Ensure message access server services are not in use | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.1.10 | Ensure network file system services are not in use | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.1.11 | Ensure print server services are not in use | L1 Server | Automated | implement | planned |  |
-| 2.1.12 | Ensure rpcbind services are not in use | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.1.13 | Ensure rsync services are not in use | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.1.14 | Ensure snmp services are not in use | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.1.15 | Ensure telnet server services are not in use | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.1.16 | Ensure tftp server services are not in use | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.1.17 | Ensure web proxy server services are not in use | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.1.18 | Ensure web server services are not in use | L1 Server, L1 Workstation | Automated | implement | planned |  |
+| 2.1.1 | Ensure autofs services are not in use | L1 Server, L2 Workstation | Automated | implement | implemented | Applies to 2.1.1 to 2.1.18: remove the package when nothing else needs it, otherwise stop and mask its units; `cis_services_keep` keeps a service the site needs |
+| 2.1.2 | Ensure avahi daemon services are not in use | L1 Server, L2 Workstation | Automated | implement | implemented |  |
+| 2.1.3 | Ensure cockpit web services are not in use | L2 Server, L2 Workstation | Automated | implement | implemented |  |
+| 2.1.4 | Ensure dhcp server services are not in use | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 2.1.5 | Ensure dns server services are not in use | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 2.1.6 | Ensure dnsmasq services are not in use | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 2.1.7 | Ensure samba file server services are not in use | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 2.1.8 | Ensure ftp server services are not in use | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 2.1.9 | Ensure message access server services are not in use | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 2.1.10 | Ensure network file system services are not in use | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 2.1.11 | Ensure print server services are not in use | L1 Server | Automated | implement | implemented |  |
+| 2.1.12 | Ensure rpcbind services are not in use | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 2.1.13 | Ensure rsync services are not in use | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 2.1.14 | Ensure snmp services are not in use | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 2.1.15 | Ensure telnet server services are not in use | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 2.1.16 | Ensure tftp server services are not in use | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 2.1.17 | Ensure web proxy server services are not in use | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 2.1.18 | Ensure web server services are not in use | L1 Server, L1 Workstation | Automated | implement | implemented |  |
 | 2.1.19 | Ensure mail transfer agents are configured for local-only mode | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 2.1.20 | Ensure a graphical user interface is not in use | L2 Server | Automated | implement | planned | Server only; excluded by default because it removes the desktop |
 | 2.1.21 | Ensure X window server services are not in use | L2 Server | Automated | implement | planned | Server only; excluded by default because it removes the desktop |

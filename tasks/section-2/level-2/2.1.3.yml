@@ -1,0 +1,17 @@
+---
+# 2.1.3 - cockpit service not in use. The logic is shared in tasks/lib/service_not_in_use.yml.
+
+- name: "2.1.3 - Ensure cockpit services are not in use"
+  ansible.builtin.import_tasks: ../../lib/service_not_in_use.yml
+  vars:
+    cis_svc_id: "2.1.3"
+    cis_svc_name: "cockpit"
+    cis_svc_packages: [cockpit, cockpit-ws]
+    cis_svc_units: [cockpit.socket, cockpit.service]
+  tags:
+    - "2.1.3"
+    - section-2
+    - level-2
+    - server
+    - workstation
+...

@@ -1,0 +1,17 @@
+---
+# 2.1.10 - network file system service not in use. The logic is shared in tasks/lib/service_not_in_use.yml.
+
+- name: "2.1.10 - Ensure network file system services are not in use"
+  ansible.builtin.import_tasks: ../../lib/service_not_in_use.yml
+  vars:
+    cis_svc_id: "2.1.10"
+    cis_svc_name: "network file system"
+    cis_svc_packages: [nfs-utils]
+    cis_svc_units: [nfs-server.service]
+  tags:
+    - "2.1.10"
+    - section-2
+    - level-1
+    - server
+    - workstation
+...

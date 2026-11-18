@@ -1,0 +1,17 @@
+---
+# 2.1.18 - web server service not in use. The logic is shared in tasks/lib/service_not_in_use.yml.
+
+- name: "2.1.18 - Ensure web server services are not in use"
+  ansible.builtin.import_tasks: ../../lib/service_not_in_use.yml
+  vars:
+    cis_svc_id: "2.1.18"
+    cis_svc_name: "web server"
+    cis_svc_packages: [httpd, nginx]
+    cis_svc_units: [httpd.socket, httpd.service, nginx.service]
+  tags:
+    - "2.1.18"
+    - section-2
+    - level-1
+    - server
+    - workstation
+...
