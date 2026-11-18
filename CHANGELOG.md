@@ -20,6 +20,13 @@ implements, then the role's own version.
   implemented audit-only and manual controls, with their dispositions, and exactly
   `cis_default_exclusions`. Fixes #12.
 
+## [3.0.0_0.0.17]
+
+### Fixed
+
+- The README status now lists the implemented control ranges as bullets instead of one
+  run-on sentence with missing commas. Fixes #35.
+
 ## [3.0.0_0.0.16]
 
 ### Added
