@@ -1,0 +1,26 @@
+---
+# 2.1.23 (manual) - lists the listening TCP and UDP sockets with their processes for
+# review. It only reads, in both modes, and records no finding: summary.yml lists manual
+# controls.
+
+- name: "2.1.23 - Find the listening sockets"
+  ansible.builtin.command:
+    argv:
+      - ss
+      - -plntu
+  register: cis_check_2_1_23
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: &cis_tags_2_1_23
+    - "2.1.23"
+    - section-2
+    - level-1
+    - server
+    - workstation
+
+- name: "2.1.23 - Report the listening sockets for review"
+  ansible.builtin.debug:
+    msg: "{{ ['Listening sockets to review (ss -plntu):'] + (cis_check_2_1_23.stdout_lines | default([])) }}"
+  tags: *cis_tags_2_1_23
+...

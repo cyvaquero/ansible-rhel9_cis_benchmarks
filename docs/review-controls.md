@@ -32,6 +32,7 @@ so with `cis_fail_on_findings: true` they always count. Leave one out with
 | 1.3.1.6 | manual | The processes running in the `unconfined_service_t` SELinux domain; none when SELinux is off | Whether each service needs a confined policy |
 | 1.6.5 | manual | Whether the SSH server crypto policy offers the chacha20-poly1305 cipher | Whether the cipher is acceptable at your site; if not, add a policy module that drops it |
 | 1.6.6 | manual | How the effective crypto policy treats encrypt-then-MAC for SSH | Whether that is acceptable; if not, add a policy module for it |
+| 2.1.23 | manual | The listening TCP and UDP sockets with their processes (`ss -plntu`) | Whether each listener is approved for the host; stop or remove the rest |
 
 ## Excluded by default
 
@@ -41,9 +42,9 @@ shorter list, to run them; `cis_exclusions` is separate and unaffected.
 
 | CIS ID | Why it is skipped |
 |---|---|
-| 2.1.20 | Removes the graphical desktop from a server |
-| 2.1.21 | Removes the X window server, which the desktop needs |
-| 2.1.22 | Removes Xwayland, which the desktop needs |
+| 2.1.20 | Removes the graphical desktop and what depends on it from a server, and sets the default target to multi-user |
+| 2.1.21 | Removes the X window server and what depends on it, which includes the desktop |
+| 2.1.22 | Removes Xwayland and what depends on it, which includes the desktop |
 | 5.2.6 | Makes `sudo` ask for a password, which breaks passwordless become for Ansible |
 
 ## Controls that depend on the RHEL 9 minor release

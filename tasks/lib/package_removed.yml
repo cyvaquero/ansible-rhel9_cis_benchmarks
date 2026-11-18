@@ -1,0 +1,79 @@
+---
+# Shared logic for the controls that remove a package together with whatever depends on
+# it (2.1.21, 2.1.22; 2.1.20 does its own tasks because it also sets the default target).
+# A control file imports this with:
+#   cis_pkg_id        the CIS ID, for the task names and the finding
+#   cis_pkg_name      a short label for the task names
+#   cis_pkg_packages  the packages to remove
+# and puts the tags, which every task here inherits, on the import.
+#
+# The check prints remove:<package> for each listed package that is installed and exits 1
+# when it printed any. Remediate mode removes them with dnf, which also removes every
+# installed package that depends on them (the desktop, for the X server): that is the
+# point of these controls, so they are skipped by default (cis_default_exclusions). It
+# then checks again; a control that still fails is recorded as a finding without failing
+# the run. Audit mode only checks and records a finding. Under --check nothing changes and
+# nothing is recorded. A site that needs the packages lists the CIS ID in
+# cis_services_keep: the whole control is skipped with no finding.
+# Needs cis_selected_controls (preflight) and finding.yml.
+
+- name: "{{ cis_pkg_id ~ ' - Handle the ' ~ cis_pkg_name ~ ' packages unless the site keeps them' }}"
+  when: cis_pkg_id not in (cis_services_keep | default([]))
+  block:
+    - name: "{{ cis_pkg_id ~ ' - Check the ' ~ cis_pkg_name ~ ' packages are not installed' }}"
+      ansible.builtin.command:
+        argv: &cis_pkg_argv
+          - /bin/sh
+          - -c
+          - |
+            bad=0
+            for p in $1; do
+              if rpm -q "$p" >/dev/null 2>&1; then echo "remove:$p"; bad=1; fi
+            done
+            exit $bad
+          - sh
+          - "{{ cis_pkg_packages | join(' ') }}"
+      register: cis_pkg_check
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    - name: "{{ cis_pkg_id ~ ' - Remove the ' ~ cis_pkg_name ~ ' packages and what depends on them' }}"
+      ansible.builtin.dnf:
+        name: "{{ cis_pkg_check.stdout_lines | select('match', '^remove:') | map('regex_replace', '^remove:', '') | list }}"
+        state: absent
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - cis_pkg_check.rc != 0
+
+    - name: "{{ cis_pkg_id ~ ' - Check again after the fix' }}"
+      ansible.builtin.command:
+        argv: *cis_pkg_argv
+      register: cis_pkg_recheck
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_pkg_check.rc != 0
+
+    - name: "{{ cis_pkg_id ~ ' - Record the finding when the check fails in audit mode' }}"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "{{ cis_pkg_id }}"
+      when:
+        - cis_audit_only | bool
+        - cis_pkg_check.rc != 0
+
+    # Under --check the fix does not happen, so the second check says nothing new.
+    - name: "{{ cis_pkg_id ~ ' - Record the finding when the fix did not take effect' }}"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "{{ cis_pkg_id }}"
+      when:
+        - cis_pkg_recheck is not skipped
+        - not ansible_check_mode
+        - cis_pkg_recheck.rc != 0
+...

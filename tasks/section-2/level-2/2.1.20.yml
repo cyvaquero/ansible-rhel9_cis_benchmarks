@@ -1,0 +1,144 @@
+---
+# 2.1.20 - no graphical user interface. Server only, skipped by default
+# (cis_default_exclusions) because it removes the desktop.
+#
+# Check: the GUI packages (gdm and gnome-shell) are not installed, and the default systemd
+# target is not graphical.target. Fix, in remediate mode: remove the packages with dnf,
+# which also removes everything that depends on them (the desktop), then point
+# default.target at multi-user.target when it is graphical.target (the same link
+# `systemctl set-default` makes). The packages go away at once, but a display stack that
+# is already running keeps running and the target change applies at the next boot, so
+# while graphical.target is still active on a compliant host the control sets
+# cis_reboot_required, in audit mode too, and that is not a finding. The role never stops
+# the display manager itself and never reboots.
+#
+# The check prints remove:<package> for each installed package and, once none is left,
+# target:<current default> when the default is graphical.target; its exit status is 1
+# when it printed anything. Audit mode only checks and records a finding. A control that
+# still fails after the fix is a finding. Under --check nothing changes and nothing is
+# recorded. cis_services_keep lists 2.1.20 to skip the control.
+
+- name: "2.1.20 - Handle the graphical user interface unless the site keeps it"
+  when: "'2.1.20' not in (cis_services_keep | default([]))"
+  tags:
+    - "2.1.20"
+    - section-2
+    - level-2
+    - server
+  block:
+    - name: "2.1.20 - Check the graphical user interface is not installed"
+      ansible.builtin.command:
+        argv: &cis_gui_argv
+          - /bin/sh
+          - -c
+          - |
+            bad=0
+            left=0
+            for p in $1; do
+              if rpm -q "$p" >/dev/null 2>&1; then echo "remove:$p"; bad=1; left=1; fi
+            done
+            if [ "$left" = 0 ]; then
+              cur=$(systemctl get-default 2>/dev/null)
+              if [ "$cur" = graphical.target ]; then echo "target:$cur"; bad=1; fi
+            fi
+            exit $bad
+          - sh
+          - "gdm gnome-shell"
+      register: cis_check_2_1_20
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    - name: "2.1.20 - Remove the graphical user interface and what depends on it"
+      ansible.builtin.dnf:
+        name: "{{ cis_check_2_1_20.stdout_lines | select('match', '^remove:') | map('regex_replace', '^remove:', '') | list }}"
+        state: absent
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - cis_check_2_1_20.stdout_lines | select('match', '^remove:') | list | length > 0
+
+    # After the removal, to learn whether the default target still needs changing.
+    - name: "2.1.20 - Check what is left after the removal"
+      ansible.builtin.command:
+        argv: *cis_gui_argv
+      register: cis_check_2_1_20_after
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_check_2_1_20.rc != 0
+
+    # The link systemctl set-default makes; it works under --check and is idempotent.
+    - name: "2.1.20 - Set the default target to multi-user"
+      ansible.builtin.file:
+        path: /etc/systemd/system/default.target
+        src: /usr/lib/systemd/system/multi-user.target
+        state: link
+        force: true
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - >-
+          (cis_check_2_1_20_after.stdout_lines | default(cis_check_2_1_20.stdout_lines))
+          | select('match', '^target:') | list | length > 0
+
+    - name: "2.1.20 - Check again after the fix"
+      ansible.builtin.command:
+        argv: *cis_gui_argv
+      register: cis_recheck_2_1_20
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_check_2_1_20.rc != 0
+
+    - name: "2.1.20 - Check whether the graphical target is still running"
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - is-active
+          - graphical.target
+      register: cis_check_2_1_20_active
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    - name: "2.1.20 - Work out whether the graphical target waits for a reboot"
+      ansible.builtin.set_fact:
+        cis_state_2_1_20_pending: >-
+          {{ (cis_recheck_2_1_20.rc | default(cis_check_2_1_20.rc)) == 0
+             and cis_check_2_1_20_active.stdout == 'active' }}
+
+    - name: "2.1.20 - Flag that a reboot is required"
+      ansible.builtin.set_fact:
+        cis_reboot_required: true
+      when: cis_state_2_1_20_pending | bool
+
+    - name: "2.1.20 - Report that the graphical target stops at the next reboot"
+      ansible.builtin.debug:
+        msg: "A reboot is pending: the graphical interface is removed or disabled but the graphical target is still running."
+      when: cis_state_2_1_20_pending | bool
+
+    - name: "2.1.20 - Record the finding when the check fails in audit mode"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "2.1.20"
+      when:
+        - cis_audit_only | bool
+        - cis_check_2_1_20.rc != 0
+
+    # Under --check the fix does not happen, so the second check says nothing new.
+    - name: "2.1.20 - Record the finding when the fix did not take effect"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "2.1.20"
+      when:
+        - cis_recheck_2_1_20 is not skipped
+        - not ansible_check_mode
+        - cis_recheck_2_1_20.rc != 0
+...
