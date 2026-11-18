@@ -1,0 +1,17 @@
+---
+# 2.1.21 - X window server not installed. Removes the X server package and, with it, what
+# depends on it (the desktop). Skipped by default (cis_default_exclusions). The logic is
+# shared in tasks/lib/package_removed.yml.
+
+- name: "2.1.21 - Ensure X window server services are not in use"
+  ansible.builtin.import_tasks: ../../lib/package_removed.yml
+  vars:
+    cis_pkg_id: "2.1.21"
+    cis_pkg_name: "X window server"
+    cis_pkg_packages: [xorg-x11-server-common]
+  tags:
+    - "2.1.21"
+    - section-2
+    - level-2
+    - server
+...

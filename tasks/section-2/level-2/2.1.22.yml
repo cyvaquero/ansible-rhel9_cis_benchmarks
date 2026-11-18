@@ -1,0 +1,17 @@
+---
+# 2.1.22 - Xwayland not installed. Removes the Xwayland package and, with it, what depends
+# on it (the desktop). Skipped by default (cis_default_exclusions). The logic is shared in
+# tasks/lib/package_removed.yml.
+
+- name: "2.1.22 - Ensure Xwayland is not in use"
+  ansible.builtin.import_tasks: ../../lib/package_removed.yml
+  vars:
+    cis_pkg_id: "2.1.22"
+    cis_pkg_name: "Xwayland"
+    cis_pkg_packages: [xorg-x11-server-Xwayland]
+  tags:
+    - "2.1.22"
+    - section-2
+    - level-2
+    - server
+...
