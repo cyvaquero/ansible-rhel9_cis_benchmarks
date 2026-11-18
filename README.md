@@ -4,11 +4,21 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.16).** The role skeleton, preflight check, profile
-selection, audit mode and lint CI exist, and the kernel module controls 1.1.1.1 to
-1.1.1.11, the mount controls 1.1.2.1.1 to 1.1.2.7.4, the package manager controls 1.2.1.1
-to 1.2.2.1 the SELinux controls 1.3.1.1 to 1.3.1.8, the boot loader controls 1.4.1 to 1.4.5 the kernel and process hardening controls 1.5.1 to 1.5.10 and the crypto policy controls 1.6.1 to 1.6.7, the banner controls 1.7.1 to 1.7.6 the GDM controls 1.8.1 to 1.8.7 and the service controls 2.1.1 to 2.1.18 are implemented; every other
-control is still planned. Do not run this against hosts you care about.
+**Status: pre-alpha (3.0.0_0.0.17).** The role skeleton, preflight check, profile
+selection, audit mode and lint CI exist, and these controls are implemented:
+
+- kernel modules, 1.1.1.1 to 1.1.1.11;
+- mounts, 1.1.2.1.1 to 1.1.2.7.4;
+- package manager, 1.2.1.1 to 1.2.2.1;
+- SELinux, 1.3.1.1 to 1.3.1.8;
+- boot loader, 1.4.1 to 1.4.5;
+- kernel and process hardening, 1.5.1 to 1.5.10;
+- crypto policy, 1.6.1 to 1.6.7;
+- command-line banners, 1.7.1 to 1.7.6;
+- GDM, 1.8.1 to 1.8.7;
+- services, 2.1.1 to 2.1.18.
+
+Every other control is still planned. Do not run this against hosts you care about.
 
 ## Relationship to the RHEL 7 and RHEL 8 projects
 
