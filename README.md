@@ -4,7 +4,7 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.17).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.18).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and these controls are implemented:
 
 - kernel modules, 1.1.1.1 to 1.1.1.11;
@@ -43,7 +43,10 @@ an audit mode.
 
 [docs/controls.md](docs/controls.md) lists every benchmark recommendation by CIS ID with
 its profile, whether this role implements it, only audits it, or leaves it for manual
-review, and its status: `implemented` (the task file exists) or `planned`. The
+review, and its status: `implemented` (the task file exists) or `planned`.
+[docs/review-controls.md](docs/review-controls.md) lists the implemented controls that only
+report, what each one reports and what is left for you to decide, plus the controls
+excluded by default and those that depend on the RHEL 9 minor release. The
 benchmark text itself is not reproduced here; get the benchmark from
 [CIS](https://www.cisecurity.org/cis-benchmarks).
 
@@ -138,7 +141,8 @@ ansible-playbook -i inventory site.yml -e target=webservers
   changes anything.
 - Controls marked audit-only or manual in `docs/controls.md` only report, in either
   mode. Every one that is selected is listed as a finding, whether or not its check
-  passes, so it is not forgotten.
+  passes, so it is not forgotten. [docs/review-controls.md](docs/review-controls.md) says
+  what each one reports.
 - At the end of every run a summary lists, per host, the failing CIS IDs (in
   `docs/controls.md` order) and how many are audit-only or manual controls to review.
   With `cis_fail_on_findings: true` the host then fails, which suits a CI gate:

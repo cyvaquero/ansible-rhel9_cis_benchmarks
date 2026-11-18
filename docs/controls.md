@@ -6,6 +6,7 @@
 
 Every recommendation in that benchmark, with the disposition in this project and whether it is implemented yet.
 Only CIS IDs and short titles appear here. Read the benchmark itself for descriptions, audit and remediation steps.
+[review-controls.md](review-controls.md) says what each implemented audit-only and manual control reports and what is left to decide.
 
 ## Dispositions
 
