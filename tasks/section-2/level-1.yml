@@ -1,8 +1,73 @@
 ---
-# Section 2, Level 1 controls. Placeholder: controls are added per section.
+# Section 2, Level 1 controls, one file per control in level-1/.
+#
+# import_tasks, not include_tasks: see tasks/section-1/level-1.yml.
 
-- name: "Section 2 Level 1 - No controls yet"
-  ansible.builtin.debug:
-    msg: "No controls in this file yet"
-    verbosity: 1
+- name: "2.1.1 - Ensure autofs services are not in use"
+  ansible.builtin.import_tasks: level-1/2.1.1.yml
+  when: "'2.1.1' in cis_selected_controls"
+
+- name: "2.1.2 - Ensure avahi daemon services are not in use"
+  ansible.builtin.import_tasks: level-1/2.1.2.yml
+  when: "'2.1.2' in cis_selected_controls"
+
+- name: "2.1.4 - Ensure dhcp server services are not in use"
+  ansible.builtin.import_tasks: level-1/2.1.4.yml
+  when: "'2.1.4' in cis_selected_controls"
+
+- name: "2.1.5 - Ensure dns server services are not in use"
+  ansible.builtin.import_tasks: level-1/2.1.5.yml
+  when: "'2.1.5' in cis_selected_controls"
+
+- name: "2.1.6 - Ensure dnsmasq services are not in use"
+  ansible.builtin.import_tasks: level-1/2.1.6.yml
+  when: "'2.1.6' in cis_selected_controls"
+
+- name: "2.1.7 - Ensure samba file server services are not in use"
+  ansible.builtin.import_tasks: level-1/2.1.7.yml
+  when: "'2.1.7' in cis_selected_controls"
+
+- name: "2.1.8 - Ensure ftp server services are not in use"
+  ansible.builtin.import_tasks: level-1/2.1.8.yml
+  when: "'2.1.8' in cis_selected_controls"
+
+- name: "2.1.9 - Ensure message access server services are not in use"
+  ansible.builtin.import_tasks: level-1/2.1.9.yml
+  when: "'2.1.9' in cis_selected_controls"
+
+- name: "2.1.10 - Ensure network file system services are not in use"
+  ansible.builtin.import_tasks: level-1/2.1.10.yml
+  when: "'2.1.10' in cis_selected_controls"
+
+- name: "2.1.11 - Ensure print server services are not in use"
+  ansible.builtin.import_tasks: level-1/2.1.11.yml
+  when: "'2.1.11' in cis_selected_controls"
+
+- name: "2.1.12 - Ensure rpcbind services are not in use"
+  ansible.builtin.import_tasks: level-1/2.1.12.yml
+  when: "'2.1.12' in cis_selected_controls"
+
+- name: "2.1.13 - Ensure rsync daemon services are not in use"
+  ansible.builtin.import_tasks: level-1/2.1.13.yml
+  when: "'2.1.13' in cis_selected_controls"
+
+- name: "2.1.14 - Ensure snmp services are not in use"
+  ansible.builtin.import_tasks: level-1/2.1.14.yml
+  when: "'2.1.14' in cis_selected_controls"
+
+- name: "2.1.15 - Ensure telnet server services are not in use"
+  ansible.builtin.import_tasks: level-1/2.1.15.yml
+  when: "'2.1.15' in cis_selected_controls"
+
+- name: "2.1.16 - Ensure tftp server services are not in use"
+  ansible.builtin.import_tasks: level-1/2.1.16.yml
+  when: "'2.1.16' in cis_selected_controls"
+
+- name: "2.1.17 - Ensure web proxy server services are not in use"
+  ansible.builtin.import_tasks: level-1/2.1.17.yml
+  when: "'2.1.17' in cis_selected_controls"
+
+- name: "2.1.18 - Ensure web server services are not in use"
+  ansible.builtin.import_tasks: level-1/2.1.18.yml
+  when: "'2.1.18' in cis_selected_controls"
 ...

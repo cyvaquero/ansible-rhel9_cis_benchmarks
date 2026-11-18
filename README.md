@@ -4,10 +4,10 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.15).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.16).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and the kernel module controls 1.1.1.1 to
 1.1.1.11, the mount controls 1.1.2.1.1 to 1.1.2.7.4, the package manager controls 1.2.1.1
-to 1.2.2.1 the SELinux controls 1.3.1.1 to 1.3.1.8, the boot loader controls 1.4.1 to 1.4.5 the kernel and process hardening controls 1.5.1 to 1.5.10 and the crypto policy controls 1.6.1 to 1.6.7, the banner controls 1.7.1 to 1.7.6 and the GDM controls 1.8.1 to 1.8.7 are implemented; every other
+to 1.2.2.1 the SELinux controls 1.3.1.1 to 1.3.1.8, the boot loader controls 1.4.1 to 1.4.5 the kernel and process hardening controls 1.5.1 to 1.5.10 and the crypto policy controls 1.6.1 to 1.6.7, the banner controls 1.7.1 to 1.7.6 the GDM controls 1.8.1 to 1.8.7 and the service controls 2.1.1 to 2.1.18 are implemented; every other
 control is still planned. Do not run this against hosts you care about.
 
 ## Relationship to the RHEL 7 and RHEL 8 projects
@@ -108,6 +108,12 @@ ansible-playbook -i inventory site.yml -e target=webservers
 | `cis_gdm_idle_delay` | `900` | 1.8.3: the longest idle time in seconds before the GDM session blanks. Any idle-delay from 1 to this value is accepted (0, never, is not); the role sets this value otherwise. |
 | `cis_gdm_lock_delay` | `5` | 1.8.3: the longest delay in seconds between blanking and locking. Any lock-delay from 0 to this value is accepted; the role sets this value otherwise. |
 
+### Services (2.1.1 to 2.1.18)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `cis_services_keep` | `[]` | CIS IDs of service controls whose service the site needs, for example `["2.1.1", "2.1.10"]`. A listed control is skipped with no change and no finding. |
+
 ### Audit vs remediate
 
 | Variable | Default | Meaning |
@@ -201,6 +207,14 @@ ansible-playbook -i inventory site.yml -e target=webservers
   reads `custom.conf` only when it starts, so while GDM is running and the file is newer
   than its start these two set `cis_reboot_required` (in both modes, not a finding).
   dconf changes apply to sessions started afterwards. The role never restarts GDM.
+- Service controls (2.1.1 to 2.1.18): for each service the role decides on the host. A
+  package of the service that no other installed package needs is removed with dnf (decided
+  with an `rpm -e --test` of the control's installed packages together). A package that
+  another package needs stays installed and its units (services, sockets, paths) are
+  stopped and masked instead, and the same happens to a unit that exists with no listed
+  package installed. Masked and inactive units are compliant. Dependents are never
+  removed. Audit mode only reports. `cis_services_keep` lists the controls to skip for a
+  service the site needs.
 - The summary is tagged `summary` and `always`, and lists every selected audit-only and
   manual control even on a run limited by tags.
 
