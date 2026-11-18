@@ -4,7 +4,7 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.19).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.20).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and these controls are implemented:
 
 - kernel modules, 1.1.1.1 to 1.1.1.11;
@@ -29,7 +29,14 @@ This role follows the structure and approach of
 which build on [ansible-role-cis-amazon-linux](https://github.com/anthcourtney/ansible-role-cis-amazon-linux)
 by Anth Courtney. It is a new implementation for RHEL 9: control IDs follow the RHEL 9
 benchmark, it uses current RHEL 9 tooling, and it adds Server and Workstation profiles and
-an audit mode.
+an audit mode. No code is copied from those projects.
+
+Their licenses, for reference:
+
+- ansible-rhel7_cis_benchmarks: MIT, copyright 2019 HarryHarcourt.
+- ansible-rhel8_cis_benchmarks: no license file; its README says BSD and its role
+  metadata says MIT.
+- ansible-role-cis-amazon-linux: MIT, copyright 2014 Mikael Sandström.
 
 ## Requirements
 
