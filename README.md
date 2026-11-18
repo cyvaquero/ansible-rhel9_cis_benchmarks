@@ -4,7 +4,7 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.18).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.19).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and these controls are implemented:
 
 - kernel modules, 1.1.1.1 to 1.1.1.11;
@@ -16,7 +16,8 @@ selection, audit mode and lint CI exist, and these controls are implemented:
 - crypto policy, 1.6.1 to 1.6.7;
 - command-line banners, 1.7.1 to 1.7.6;
 - GDM, 1.8.1 to 1.8.7;
-- services, 2.1.1 to 2.1.18.
+- services, 2.1.1 to 2.1.23;
+- service clients, 2.2.1 to 2.2.4.
 
 Every other control is still planned. Do not run this against hosts you care about.
 
@@ -121,11 +122,11 @@ ansible-playbook -i inventory site.yml -e target=webservers
 | `cis_gdm_idle_delay` | `900` | 1.8.3: the longest idle time in seconds before the GDM session blanks. Any idle-delay from 1 to this value is accepted (0, never, is not); the role sets this value otherwise. |
 | `cis_gdm_lock_delay` | `5` | 1.8.3: the longest delay in seconds between blanking and locking. Any lock-delay from 0 to this value is accepted; the role sets this value otherwise. |
 
-### Services (2.1.1 to 2.1.18)
+### Services (2.1.1 to 2.1.22)
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `cis_services_keep` | `[]` | CIS IDs of service controls whose service the site needs, for example `["2.1.1", "2.1.10"]`. A listed control is skipped with no change and no finding. |
+| `cis_services_keep` | `[]` | CIS IDs of service controls whose service the site needs, for example `["2.1.1", "2.1.10"]`. A listed control (2.1.1 to 2.1.22) is skipped with no change and no finding. |
 
 ### Audit vs remediate
 
@@ -229,6 +230,29 @@ ansible-playbook -i inventory site.yml -e target=webservers
   package installed. Masked and inactive units are compliant. Dependents are never
   removed. Audit mode only reports. `cis_services_keep` lists the controls to skip for a
   service the site needs.
+- Mail transfer agents (2.1.19): a host with no MTA, or whose MTA listens only on loopback
+  for the mail ports (25, 465, 587), passes. The check reads the listening sockets (`ss`)
+  and, for postfix, `inet_interfaces`. A postfix that is not loopback only gets
+  `inet_interfaces = loopback-only` (`postconf -e`) and is restarted only when it is
+  running. Any other MTA that listens beyond loopback is a finding and is never edited.
+- Desktop and X server (2.1.20 to 2.1.22, Level 2 Server, skipped by default): 2.1.20 fails
+  while the "Server with GUI" environment group is installed, while `gdm` or `gnome-shell`
+  is installed, or while the default target is `graphical.target`. To fix it the role first
+  marks the minimal and Server environments as installed (so `openssh-server` and the other
+  packages shared with a plain server stay wanted; nothing is installed, so packages other
+  controls removed do not come back), removes the GUI group, removes any leftover
+  `gdm` and `gnome-shell` with their dependents, and points the default target at
+  `multi-user.target`. It records a finding if `openssh-server` is gone afterwards. 2.1.21
+  and 2.1.22 remove `xorg-x11-server-common` and `xorg-x11-server-Xwayland` with dnf
+  together with every installed package that depends on them. The role never stops the
+  display manager or reboots: while the graphical target is still running on a compliant
+  host, it sets `cis_reboot_required` (in audit mode too) and that is not a finding.
+  `cis_services_keep` skips these controls.
+- Listening sockets (2.1.23, manual): the role prints `ss -plntu` for review, never changes
+  anything, and records no finding.
+- Client controls (2.2.1 to 2.2.4: ftp, openldap-clients, telnet, tftp): the package is removed
+  when no other installed package needs it (an `rpm -e --test` decides); one that is needed
+  stays installed, dependents are never removed, and that is a finding.
 - The summary is tagged `summary` and `always`, and lists every selected audit-only and
   manual control even on a run limited by tags.
 

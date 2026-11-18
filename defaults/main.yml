@@ -63,7 +63,7 @@ cis_gdm_idle_delay: 900
 # when the configured one is not accepted.
 cis_gdm_lock_delay: 5
 
-# Services (2.1.1 to 2.1.18): CIS IDs of the service controls whose service the site needs.
+# Services (2.1.1 to 2.1.22): CIS IDs of the service controls whose service the site needs.
 # A listed control is skipped completely: nothing is removed, stopped or masked, and no
 # finding is recorded. Example: ["2.1.1", "2.1.10"] keeps autofs and the NFS server.
 cis_services_keep: []

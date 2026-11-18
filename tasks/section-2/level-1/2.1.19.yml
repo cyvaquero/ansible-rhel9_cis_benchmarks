@@ -1,0 +1,122 @@
+---
+# 2.1.19 - mail transfer agents listen on loopback only. Compliant: no MTA, or nothing
+# listens on the mail ports (25, 465, 587) beyond the loopback addresses and, when postfix
+# is installed, its inet_interfaces is loopback only. The check reads the listening
+# sockets (ss) and the postfix configuration (postconf).
+#
+# Fix, for postfix only: postconf -e inet_interfaces=loopback-only when its configuration
+# is not loopback only, then restart postfix only when it is running (also when the
+# configuration was already right but a running postfix still listens elsewhere). Any
+# other MTA (sendmail, exim) that listens beyond loopback is a finding and is never edited.
+# A listener that is still there after the fix is a finding; under --check nothing changes
+# and nothing is recorded. cis_services_keep lists 2.1.19 to skip the control.
+#
+# The check prints one line per problem: config:<inet_interfaces value>,
+# listen:<address>:<port>:<process> and, as information, postfix:active. Its exit status
+# is 1 when a config: or listen: line exists.
+
+- name: "2.1.19 - Handle mail transfer agents unless the site keeps them"
+  when: "'2.1.19' not in (cis_services_keep | default([]))"
+  tags:
+    - "2.1.19"
+    - section-2
+    - level-1
+    - server
+    - workstation
+  block:
+    - name: "2.1.19 - Check mail transfer agents listen on loopback only"
+      ansible.builtin.command:
+        argv: &cis_mta_argv
+          - /bin/sh
+          - -c
+          - |
+            bad=0
+            # Listening TCP sockets on the mail ports that are not on a loopback address.
+            lst=$(ss -H -ltnp 2>/dev/null | while read -r state rq sq local peer proc; do
+              port=${local##*:}
+              case "$port" in (25|465|587) ;; (*) continue ;; esac
+              addr=${local%:*}
+              addr=${addr#[}
+              addr=${addr%]}
+              case "$addr" in
+                (127.*|::1|::ffff:127.*) continue ;;
+              esac
+              name=$(printf '%s' "$proc" | sed -n 's/.*(("\([^"]*\)".*/\1/p')
+              echo "listen:$addr:$port:${name:-unknown}"
+            done)
+            if [ -n "$lst" ]; then printf '%s\n' "$lst"; bad=1; fi
+            if rpm -q postfix >/dev/null 2>&1; then
+              val=$(postconf -h inet_interfaces 2>/dev/null)
+              ok=yes
+              for v in $(printf '%s' "$val" | tr ',' ' '); do
+                case "$v" in
+                  loopback-only|localhost|127.*|::1|"[::1]") ;;
+                  *) ok=no ;;
+                esac
+              done
+              [ -n "$val" ] || ok=no
+              if [ "$ok" = no ]; then echo "config:$val"; bad=1; fi
+              if systemctl is-active --quiet postfix 2>/dev/null; then echo "postfix:active"; fi
+            fi
+            exit $bad
+      register: cis_check_2_1_19
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    # Only postfix is edited; the config: line appears only when postfix is installed.
+    - name: "2.1.19 - Set postfix to listen on loopback only"
+      ansible.builtin.command:
+        argv:
+          - postconf
+          - -e
+          - inet_interfaces=loopback-only
+      changed_when: true
+      when:
+        - not (cis_audit_only | bool)
+        - cis_check_2_1_19.stdout_lines | select('match', '^config:') | list | length > 0
+
+    # A running postfix keeps its old sockets until it restarts. A stopped one is left
+    # alone: it reads the new setting when it starts.
+    - name: "2.1.19 - Restart postfix when it is running and was listening beyond loopback"
+      ansible.builtin.systemd:
+        name: postfix
+        state: restarted
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - cis_check_2_1_19.stdout_lines | select('match', '^postfix:active') | list | length > 0
+        - >-
+          (cis_check_2_1_19.stdout_lines | select('match', '^config:') | list | length > 0)
+          or (cis_check_2_1_19.stdout_lines | select('match', '^listen:.*:master$') | list | length > 0)
+
+    - name: "2.1.19 - Check again after the fix"
+      ansible.builtin.command:
+        argv: *cis_mta_argv
+      register: cis_recheck_2_1_19
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_check_2_1_19.rc != 0
+
+    - name: "2.1.19 - Record the finding when the check fails in audit mode"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "2.1.19"
+      when:
+        - cis_audit_only | bool
+        - cis_check_2_1_19.rc != 0
+
+    # Under --check the fix does not happen, so the second check says nothing new.
+    - name: "2.1.19 - Record the finding when the fix did not take effect"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "2.1.19"
+      when:
+        - cis_recheck_2_1_19 is not skipped
+        - not ansible_check_mode
+        - cis_recheck_2_1_19.rc != 0
+...

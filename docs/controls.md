@@ -145,15 +145,15 @@ yet. `implemented`: the control has its task file at
 | 2.1.16 | Ensure tftp server services are not in use | L1 Server, L1 Workstation | Automated | implement | implemented |  |
 | 2.1.17 | Ensure web proxy server services are not in use | L1 Server, L1 Workstation | Automated | implement | implemented |  |
 | 2.1.18 | Ensure web server services are not in use | L1 Server, L1 Workstation | Automated | implement | implemented |  |
-| 2.1.19 | Ensure mail transfer agents are configured for local-only mode | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.1.20 | Ensure a graphical user interface is not in use | L2 Server | Automated | implement | planned | Server only; excluded by default because it removes the desktop |
-| 2.1.21 | Ensure X window server services are not in use | L2 Server | Automated | implement | planned | Server only; excluded by default because it removes the desktop |
-| 2.1.22 | Ensure Xwayland is not in use | L2 Server | Automated | implement | planned | Server only; excluded by default because it removes the desktop |
-| 2.1.23 | Ensure only approved services are listening on a network interface | L1 Server, L1 Workstation | Manual | manual | planned | Report listening sockets for review |
-| 2.2.1 | Ensure ftp client is not installed | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.2.2 | Ensure ldap client is not installed | L2 Server, L2 Workstation | Automated | implement | planned |  |
-| 2.2.3 | Ensure telnet client is not installed | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.2.4 | Ensure tftp client is not installed | L1 Server, L1 Workstation | Automated | implement | planned |  |
+| 2.1.19 | Ensure mail transfer agents are configured for local-only mode | L1 Server, L1 Workstation | Automated | implement | implemented | Postfix is set to loopback-only; any other MTA that listens beyond loopback is a finding; `cis_services_keep` skips it |
+| 2.1.20 | Ensure a graphical user interface is not in use | L2 Server | Automated | implement | implemented | Server only; excluded by default because it removes the desktop and what depends on it; sets the default target to multi-user and a pending reboot |
+| 2.1.21 | Ensure X window server services are not in use | L2 Server | Automated | implement | implemented | Server only; excluded by default because it removes the desktop and what depends on it |
+| 2.1.22 | Ensure Xwayland is not in use | L2 Server | Automated | implement | implemented | Server only; excluded by default because it removes the desktop and what depends on it |
+| 2.1.23 | Ensure only approved services are listening on a network interface | L1 Server, L1 Workstation | Manual | manual | implemented | Report listening sockets for review |
+| 2.2.1 | Ensure ftp client is not installed | L1 Server, L1 Workstation | Automated | implement | implemented | Removed when nothing else installed needs it, otherwise a finding |
+| 2.2.2 | Ensure ldap client is not installed | L2 Server, L2 Workstation | Automated | implement | implemented | As for 2.2.1 |
+| 2.2.3 | Ensure telnet client is not installed | L1 Server, L1 Workstation | Automated | implement | implemented | As for 2.2.1 |
+| 2.2.4 | Ensure tftp client is not installed | L1 Server, L1 Workstation | Automated | implement | implemented | As for 2.2.1 |
 | 2.3.1 | Ensure time synchronization is in use | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 2.3.2 | Ensure chrony is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 2.3.3 | Ensure chrony is not run as the root user | L1 Server, L1 Workstation | Automated | implement | planned |  |
