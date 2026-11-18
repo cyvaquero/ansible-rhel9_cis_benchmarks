@@ -238,8 +238,9 @@ ansible-playbook -i inventory site.yml -e target=webservers
 - Desktop and X server (2.1.20 to 2.1.22, Level 2 Server, skipped by default): 2.1.20 fails
   while the "Server with GUI" environment group is installed, while `gdm` or `gnome-shell`
   is installed, or while the default target is `graphical.target`. To fix it the role first
-  installs the minimal and Server environments (so `openssh-server` and the other packages
-  shared with a plain server stay wanted), removes the GUI group, removes any leftover
+  marks the minimal and Server environments as installed (so `openssh-server` and the other
+  packages shared with a plain server stay wanted; nothing is installed, so packages other
+  controls removed do not come back), removes the GUI group, removes any leftover
   `gdm` and `gnome-shell` with their dependents, and points the default target at
   `multi-user.target`. It records a finding if `openssh-server` is gone afterwards. 2.1.21
   and 2.1.22 remove `xorg-x11-server-common` and `xorg-x11-server-Xwayland` with dnf
