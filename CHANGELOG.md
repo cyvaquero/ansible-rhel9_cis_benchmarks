@@ -8,6 +8,26 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.16]
+
+### Added
+
+- Controls 2.1.1 to 2.1.18, the services that should not be in use: autofs, avahi, cockpit,
+  dhcp server, dns server, dnsmasq, samba, ftp server, message access servers (dovecot,
+  cyrus-imapd), nfs server, print server (cups), rpcbind, rsync daemon, snmp, telnet
+  server, tftp server, web proxy (squid) and web servers (httpd, nginx). On each host the
+  role removes an installed service package with dnf when no other installed package needs
+  it. When another package needs it, the package stays and the service's units (services,
+  sockets, paths) are stopped and masked; the same applies to a unit that exists with none
+  of its packages installed. Dependent packages are never removed. A masked, inactive unit
+  is compliant. Audit mode only reports. New variable `cis_services_keep` (default `[]`)
+  lists the CIS IDs of services the site needs; those controls are skipped with no finding.
+  Shared logic is in `tasks/lib/service_not_in_use.yml`. Part of #6.
+
+### Changed
+
+- `docs/controls.md` marks the 18 controls implemented. Part of #6.
+
 ## [3.0.0_0.0.15]
 
 ### Added
