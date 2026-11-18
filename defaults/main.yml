@@ -67,4 +67,24 @@ cis_gdm_lock_delay: 5
 # A listed control is skipped completely: nothing is removed, stopped or masked, and no
 # finding is recorded. Example: ["2.1.1", "2.1.10"] keeps autofs and the NFS server.
 cis_services_keep: []
+
+# Time synchronization (2.3.2): chrony directive lines to add to /etc/chrony.conf when chrony
+# has no time source at all (no server or pool line there or in the files it includes).
+# Each item is a full directive line, for example "server time.example.com iburst" or
+# "pool pool.example.com iburst". Existing lines are never edited or removed, and chronyd is
+# restarted only when it is running. An item that is not a server or pool line stops the
+# fix. Empty (default): a host with no time source is only reported.
+cis_time_sources: []
+
+# Job schedulers (2.4.1.9): users to add to /etc/cron.allow when they are not already in it.
+# Users already in the file are never removed. IMPORTANT: with the default empty list, a host
+# that had no /etc/cron.allow gets an empty one, and from then on only root can use crontab
+# (the deny file is ignored once the allow file exists). List every account that needs cron,
+# for example ["backup", "appuser"]; only plain login names are accepted.
+cis_cron_allow_users: []
+
+# Job schedulers (2.4.2.1): users to add to /etc/at.allow, with the same rules as
+# cis_cron_allow_users. IMPORTANT: with the default empty list, a host that had no
+# /etc/at.allow gets an empty one, and from then on only root can use at.
+cis_at_allow_users: []
 ...

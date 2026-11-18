@@ -1,0 +1,74 @@
+---
+# 2.4.1.1 - the cron daemon (crond) is enabled and active. Applies only when cronie is
+# installed; without it the control is compliant and nothing is installed. The fix unmasks,
+# enables and starts crond. A control that still fails after the fix is a finding; under
+# --check nothing changes and nothing is recorded in remediate mode.
+#
+# The check prints state=ok or state=bad; its exit status is 1 when state=bad.
+
+- name: "2.4.1.1 - Handle the cron daemon"
+  tags:
+    - "2.4.1.1"
+    - section-2
+    - level-1
+    - server
+    - workstation
+  block:
+    - name: "2.4.1.1 - Check the cron daemon is enabled and active"
+      ansible.builtin.command:
+        argv: &cis_crond_argv
+          - /bin/sh
+          - -c
+          - |
+            rpm -q cronie >/dev/null 2>&1 || { echo "state=ok"; exit 0; }
+            if [ "$(systemctl is-enabled crond 2>/dev/null)" = enabled ] && systemctl is-active --quiet crond 2>/dev/null; then
+              echo "state=ok"
+              exit 0
+            fi
+            echo "state=bad"
+            exit 1
+      register: cis_check_2_4_1_1
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    - name: "2.4.1.1 - Unmask, enable and start the cron daemon"
+      ansible.builtin.systemd:
+        name: crond
+        masked: false
+        enabled: true
+        state: started
+      when:
+        - not (cis_audit_only | bool)
+        - cis_check_2_4_1_1.rc != 0
+
+    - name: "2.4.1.1 - Check again after the fix"
+      ansible.builtin.command:
+        argv: *cis_crond_argv
+      register: cis_recheck_2_4_1_1
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_check_2_4_1_1.rc != 0
+
+    - name: "2.4.1.1 - Record the finding when the check fails in audit mode"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "2.4.1.1"
+      when:
+        - cis_audit_only | bool
+        - cis_check_2_4_1_1.rc != 0
+
+    # Under --check the fix does not happen, so the second check says nothing new.
+    - name: "2.4.1.1 - Record the finding when the fix did not take effect"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "2.4.1.1"
+      when:
+        - cis_recheck_2_4_1_1 is not skipped
+        - not ansible_check_mode
+        - cis_recheck_2_4_1_1.rc != 0
+...

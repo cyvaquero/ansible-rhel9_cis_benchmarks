@@ -1,0 +1,23 @@
+---
+# 2.4.1.9 - only permitted users may use crontab: /etc/cron.allow exists, owned by root with
+# group root or crontab, mode 0640 or stricter, and /etc/cron.deny, when present, has the
+# same owner, group and mode. Applies only when cronie is installed. The logic is shared in
+# tasks/lib/job_allow.yml. cis_cron_allow_users lists users to add to cron.allow; with the
+# default empty list a new cron.allow is empty, so only root can use crontab.
+
+- name: "2.4.1.9 - Ensure access to crontab is configured"
+  ansible.builtin.import_tasks: ../../lib/job_allow.yml
+  vars:
+    cis_ja_id: "2.4.1.9"
+    cis_ja_pkg: cronie
+    cis_ja_allow: /etc/cron.allow
+    cis_ja_deny: /etc/cron.deny
+    cis_ja_group: crontab
+    cis_ja_users: "{{ cis_cron_allow_users }}"
+  tags:
+    - "2.4.1.9"
+    - section-2
+    - level-1
+    - server
+    - workstation
+...

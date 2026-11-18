@@ -1,0 +1,132 @@
+---
+# 2.3.2 - chrony has at least one time source: a server or pool directive in
+# /etc/chrony.conf or in a file it pulls in with include, confdir (*.conf) or sourcedir
+# (*.sources). The check follows those directives itself (up to eight levels deep).
+# sourcedir /run/chrony-dhcp is skipped: DHCP sources are runtime state, not configuration.
+#
+# chrony not installed is a finding: 2.3.1 installs it, and nothing is installed here. With
+# no source and a non-empty cis_time_sources, remediate mode appends each item (a full
+# directive line such as "server time.example.com iburst") to /etc/chrony.conf, never
+# editing or removing an existing line, then restarts chronyd only when it is running. An
+# item that is not a server or pool line stops the fix (nothing is written) and the control
+# stays a finding. With an empty list there is no fix and the control is a finding.
+# A control that still fails after the fix is a finding; under --check nothing changes and
+# nothing is recorded in remediate mode.
+#
+# The check prints state=nochrony, state=nosource or state=ok, and active=yes when chronyd
+# is running; its exit status is 1 unless state=ok.
+
+- name: "2.3.2 - Handle chrony time sources"
+  tags:
+    - "2.3.2"
+    - section-2
+    - level-1
+    - server
+    - workstation
+  block:
+    - name: "2.3.2 - Check chrony has a time source"
+      ansible.builtin.command:
+        argv: &cis_chrony_src_argv
+          - /bin/bash
+          - -c
+          - |
+            set -u
+            export LC_ALL=C
+            shopt -s nullglob
+            conf=$1
+            if ! rpm -q chrony >/dev/null 2>&1; then echo "state=nochrony"; exit 1; fi
+            found=0
+            # scan <file> <depth>: sets found=1 on a server or pool directive.
+            scan() {
+              local f=$1 d=$2 kw rest g dir
+              [ -f "$f" ] || return 0
+              while read -r kw rest || [ -n "$kw" ]; do
+                case "$kw" in ''|'#'*|'!'*|';'*|'%'*) continue ;; esac
+                kw=$(printf '%s' "$kw" | tr 'A-Z' 'a-z')
+                case "$kw" in
+                  server|pool) found=1 ;;
+                  include)
+                    [ "$d" -lt 8 ] || continue
+                    for g in $rest; do
+                      for dir in $g; do scan "$dir" $((d + 1)); done
+                    done ;;
+                  confdir|sourcedir)
+                    [ "$d" -lt 8 ] || continue
+                    for dir in $rest; do
+                      case "$dir" in /run/chrony-dhcp|/var/run/chrony-dhcp) continue ;; esac
+                      if [ "$kw" = confdir ]; then
+                        for g in "$dir"/*.conf; do scan "$g" $((d + 1)); done
+                      else
+                        for g in "$dir"/*.sources; do scan "$g" $((d + 1)); done
+                      fi
+                    done ;;
+                esac
+              done < "$f"
+            }
+            scan "$conf" 0
+            systemctl is-active --quiet chronyd 2>/dev/null && echo "active=yes"
+            if [ "$found" = 1 ]; then echo "state=ok"; exit 0; fi
+            echo "state=nosource"
+            exit 1
+          - bash
+          - /etc/chrony.conf
+      register: cis_check_2_3_2
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    - name: "2.3.2 - Add the configured time sources to chrony.conf"
+      ansible.builtin.lineinfile:  # noqa: risky-file-permissions
+        path: /etc/chrony.conf
+        line: "{{ item | trim }}"
+        create: true  # a missing file is created only here, never edited otherwise
+        owner: root
+        group: root
+      loop: "{{ cis_time_sources }}"
+      register: cis_add_2_3_2
+      when:
+        - not (cis_audit_only | bool)
+        - "'state=nosource' in cis_check_2_3_2.stdout_lines"
+        - cis_time_sources | length > 0
+        - cis_time_sources | reject('match', '^\\s*(server|pool)\\s+\\S') | list | length == 0
+
+    # A running chronyd keeps its old sources until it restarts. A stopped one reads the new
+    # ones when it starts.
+    - name: "2.3.2 - Restart chronyd when it is running"
+      ansible.builtin.systemd:
+        name: chronyd
+        state: restarted
+      when:
+        - cis_add_2_3_2 is changed
+        - "'active=yes' in cis_check_2_3_2.stdout_lines"
+
+    - name: "2.3.2 - Check again after the fix"
+      ansible.builtin.command:
+        argv: *cis_chrony_src_argv
+      register: cis_recheck_2_3_2
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_check_2_3_2.rc != 0
+
+    - name: "2.3.2 - Record the finding when the check fails in audit mode"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "2.3.2"
+      when:
+        - cis_audit_only | bool
+        - cis_check_2_3_2.rc != 0
+
+    # Under --check the fix does not happen, so the second check says nothing new.
+    - name: "2.3.2 - Record the finding when the fix did not take effect"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "2.3.2"
+      when:
+        - cis_recheck_2_3_2 is not skipped
+        - not ansible_check_mode
+        - cis_recheck_2_3_2.rc != 0
+...

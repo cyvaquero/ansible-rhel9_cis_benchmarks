@@ -154,19 +154,19 @@ yet. `implemented`: the control has its task file at
 | 2.2.2 | Ensure ldap client is not installed | L2 Server, L2 Workstation | Automated | implement | implemented | As for 2.2.1 |
 | 2.2.3 | Ensure telnet client is not installed | L1 Server, L1 Workstation | Automated | implement | implemented | As for 2.2.1 |
 | 2.2.4 | Ensure tftp client is not installed | L1 Server, L1 Workstation | Automated | implement | implemented | As for 2.2.1 |
-| 2.3.1 | Ensure time synchronization is in use | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.3.2 | Ensure chrony is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.3.3 | Ensure chrony is not run as the root user | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.4.1.1 | Ensure cron daemon is enabled and active | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.4.1.2 | Ensure access to /etc/crontab is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.4.1.3 | Ensure access to /etc/cron.hourly is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.4.1.4 | Ensure access to /etc/cron.daily is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.4.1.5 | Ensure access to /etc/cron.weekly is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.4.1.6 | Ensure access to /etc/cron.monthly is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.4.1.7 | Ensure access to /etc/cron.yearly is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.4.1.8 | Ensure access to /etc/cron.d is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.4.1.9 | Ensure access to crontab is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 2.4.2.1 | Ensure access to at is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
+| 2.3.1 | Ensure time synchronization is in use | L1 Server, L1 Workstation | Automated | implement | implemented | Installs chrony |
+| 2.3.2 | Ensure chrony is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Adds cis_time_sources only when no source is configured; DHCP sources ignored |
+| 2.3.3 | Ensure chrony is not run as the root user | L1 Server, L1 Workstation | Automated | implement | implemented | Removes only the -u root option; missing file is compliant |
+| 2.4.1.1 | Ensure cron daemon is enabled and active | L1 Server, L1 Workstation | Automated | implement | implemented | Only when cronie is installed |
+| 2.4.1.2 | Ensure access to /etc/crontab is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Only when cronie is installed; shared logic in tasks/lib/cron_access.yml |
+| 2.4.1.3 | Ensure access to /etc/cron.hourly is configured | L1 Server, L1 Workstation | Automated | implement | implemented | As for 2.4.1.2 |
+| 2.4.1.4 | Ensure access to /etc/cron.daily is configured | L1 Server, L1 Workstation | Automated | implement | implemented | As for 2.4.1.2 |
+| 2.4.1.5 | Ensure access to /etc/cron.weekly is configured | L1 Server, L1 Workstation | Automated | implement | implemented | As for 2.4.1.2 |
+| 2.4.1.6 | Ensure access to /etc/cron.monthly is configured | L1 Server, L1 Workstation | Automated | implement | implemented | As for 2.4.1.2 |
+| 2.4.1.7 | Ensure access to /etc/cron.yearly is configured | L1 Server, L1 Workstation | Automated | implement | implemented | As for 2.4.1.2 |
+| 2.4.1.8 | Ensure access to /etc/cron.d is configured | L1 Server, L1 Workstation | Automated | implement | implemented | As for 2.4.1.2 |
+| 2.4.1.9 | Ensure access to crontab is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Only when cronie is installed; adds cis_cron_allow_users, an empty cron.allow leaves only root |
+| 2.4.2.1 | Ensure access to at is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Only when at is installed; adds cis_at_allow_users, an empty at.allow leaves only root |
 
 ## 3 Network
 

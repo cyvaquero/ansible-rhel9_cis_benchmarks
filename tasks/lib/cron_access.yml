@@ -1,0 +1,74 @@
+---
+# Shared logic for the cron file and directory access controls (2.4.1.2 to 2.4.1.8). A
+# control file imports this with:
+#   cis_ca_id    the CIS ID
+#   cis_ca_path  the file or directory
+#   cis_ca_type  file or directory, the type the path must have
+# and puts the tags, which every task here inherits, on the import.
+#
+# Compliant: the expected type, owned by root:root, with no permission for group or other
+# (mode 0600 or stricter for a file, 0700 or stricter for a directory). Without the cronie
+# package, or with the path missing, the control is compliant: nothing is installed or
+# created (RHEL 9 ships no /etc/cron.yearly). A symlink or a path of another type is never
+# changed (chown and chmod would act on the link target); it is a finding. The fix removes
+# the group and other bits, keeps the owner bits, and sets root:root. Remediate mode records
+# a finding when the path is still not compliant after the fix; under --check nothing is
+# fixed, so nothing is recorded then.
+# Task names are one template expression because the CIS ID must come first.
+
+- name: "{{ cis_ca_id ~ ' - Read the owner and mode of ' ~ cis_ca_path }}"
+  ansible.builtin.command:
+    argv: &cis_ca_argv
+      - /bin/bash
+      - -c
+      - |
+        set -u
+        export LC_ALL=C
+        p=$1
+        want=$2
+        rpm -q cronie >/dev/null 2>&1 || { echo "state=ok"; exit 0; }
+        if [ ! -e "$p" ] && [ ! -L "$p" ]; then echo "state=ok"; exit 0; fi
+        if [ -L "$p" ]; then echo "state=link"; exit 0; fi
+        read -r u g m t < <(stat -c '%u %g %a %F' "$p")
+        case "$want:$t" in file:regular*|directory:directory) ;; *) echo "state=odd"; exit 0 ;; esac
+        if [ "$u" = 0 ] && [ "$g" = 0 ] && (( (8#$m & 8#077) == 0 )); then echo "state=ok"; else echo "state=bad"; fi
+      - bash
+      - "{{ cis_ca_path }}"
+      - "{{ cis_ca_type }}"
+  register: cis_ca_check
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: "{{ cis_ca_id ~ ' - Set the owner and mode of ' ~ cis_ca_path }}"
+  ansible.builtin.file:
+    path: "{{ cis_ca_path }}"
+    state: "{{ cis_ca_type }}"
+    owner: root
+    group: root
+    mode: "go-rwx"
+    follow: false
+  when:
+    - not (cis_audit_only | bool)
+    - "'state=bad' in cis_ca_check.stdout_lines"
+
+- name: "{{ cis_ca_id ~ ' - Read the owner and mode of ' ~ cis_ca_path ~ ' again after the fix' }}"
+  ansible.builtin.command:
+    argv: *cis_ca_argv
+  register: cis_ca_recheck
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+    - "'state=bad' in cis_ca_check.stdout_lines"
+
+- name: "{{ cis_ca_id ~ ' - Record the finding' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "{{ cis_ca_id }}"
+  when:
+    - "'state=ok' not in (cis_ca_recheck.stdout_lines | default(cis_ca_check.stdout_lines))"
+    - (cis_audit_only | bool) or not ansible_check_mode
+...
