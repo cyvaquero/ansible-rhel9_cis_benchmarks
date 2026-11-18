@@ -1,0 +1,16 @@
+---
+# 2.1.11 - print server service not in use. The logic is shared in tasks/lib/service_not_in_use.yml.
+
+- name: "2.1.11 - Ensure print server services are not in use"
+  ansible.builtin.import_tasks: ../../lib/service_not_in_use.yml
+  vars:
+    cis_svc_id: "2.1.11"
+    cis_svc_name: "print server"
+    cis_svc_packages: [cups]
+    cis_svc_units: [cups.socket, cups.service, cups.path]
+  tags:
+    - "2.1.11"
+    - section-2
+    - level-1
+    - server
+...

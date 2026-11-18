@@ -1,0 +1,17 @@
+---
+# 2.1.6 - dnsmasq service not in use. The logic is shared in tasks/lib/service_not_in_use.yml.
+
+- name: "2.1.6 - Ensure dnsmasq services are not in use"
+  ansible.builtin.import_tasks: ../../lib/service_not_in_use.yml
+  vars:
+    cis_svc_id: "2.1.6"
+    cis_svc_name: "dnsmasq"
+    cis_svc_packages: [dnsmasq]
+    cis_svc_units: [dnsmasq.service]
+  tags:
+    - "2.1.6"
+    - section-2
+    - level-1
+    - server
+    - workstation
+...

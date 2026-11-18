@@ -1,0 +1,17 @@
+---
+# 2.1.17 - web proxy server service not in use. The logic is shared in tasks/lib/service_not_in_use.yml.
+
+- name: "2.1.17 - Ensure web proxy server services are not in use"
+  ansible.builtin.import_tasks: ../../lib/service_not_in_use.yml
+  vars:
+    cis_svc_id: "2.1.17"
+    cis_svc_name: "web proxy server"
+    cis_svc_packages: [squid]
+    cis_svc_units: [squid.service]
+  tags:
+    - "2.1.17"
+    - section-2
+    - level-1
+    - server
+    - workstation
+...
