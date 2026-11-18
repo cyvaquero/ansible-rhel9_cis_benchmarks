@@ -1,0 +1,17 @@
+---
+# 1.7.6 - /etc/issue.net is owned by root:root and not writable by group or other (0644 or stricter).
+# The logic, including how a missing file or a symlink is treated, is shared in
+# tasks/lib/banner_access.yml.
+
+- name: "1.7.6 - Ensure access to /etc/issue.net is configured"
+  ansible.builtin.import_tasks: ../../lib/banner_access.yml
+  vars:
+    cis_ba_id: "1.7.6"
+    cis_ba_path: "/etc/issue.net"
+  tags:
+    - "1.7.6"
+    - section-1
+    - level-1
+    - server
+    - workstation
+...

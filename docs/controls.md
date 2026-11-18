@@ -108,19 +108,19 @@ yet. `implemented`: the control has its task file at
 | 1.6.5 | Ensure system wide crypto policy disables chacha20-poly1305 for ssh | L1 Server, L1 Workstation | Manual | manual | implemented |  |
 | 1.6.6 | Ensure system wide crypto policy disables EtM for ssh | L1 Server, L1 Workstation | Manual | manual | implemented |  |
 | 1.6.7 | Ensure system wide crypto policy enables post-quantum algorithms | L2 Server, L2 Workstation | Automated | implement | implemented | Appends the shipped PQ module when this minor release has it; otherwise a finding |
-| 1.7.1 | Ensure /etc/motd is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.7.2 | Ensure /etc/issue is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.7.3 | Ensure /etc/issue.net is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.7.4 | Ensure access to /etc/motd is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.7.5 | Ensure access to /etc/issue is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.7.6 | Ensure access to /etc/issue.net is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 1.8.1 | Ensure GDM login banner is configured | L1 Server, L1 Workstation | Automated | implement | planned | Only when GDM is installed |
-| 1.8.2 | Ensure GDM disable-user-list is configured | L1 Server, L1 Workstation | Automated | implement | planned | Only when GDM is installed |
-| 1.8.3 | Ensure GDM screen lock is configured | L1 Server, L1 Workstation | Automated | implement | planned | Only when GDM is installed |
-| 1.8.4 | Ensure GDM automount is configured | L1 Server, L2 Workstation | Automated | implement | planned | Only when GDM is installed |
-| 1.8.5 | Ensure GDM autorun-never is configured | L1 Server, L1 Workstation | Automated | implement | planned | Only when GDM is installed |
-| 1.8.6 | Ensure XDMCP is not enabled | L1 Server, L1 Workstation | Automated | implement | planned | Only when GDM is installed |
-| 1.8.7 | Ensure Wayland is configured | L1 Server, L1 Workstation | Automated | implement | planned | Only when GDM is installed |
+| 1.7.1 | Ensure /etc/motd is configured | L1 Server, L1 Workstation | Automated | implement | implemented | An empty file is compliant; a symlink is a finding |
+| 1.7.2 | Ensure /etc/issue is configured | L1 Server, L1 Workstation | Automated | implement | implemented | A symlink is a finding |
+| 1.7.3 | Ensure /etc/issue.net is configured | L1 Server, L1 Workstation | Automated | implement | implemented | A symlink is a finding |
+| 1.7.4 | Ensure access to /etc/motd is configured | L1 Server, L1 Workstation | Automated | implement | implemented | A symlink is a finding, never changed |
+| 1.7.5 | Ensure access to /etc/issue is configured | L1 Server, L1 Workstation | Automated | implement | implemented | A symlink is a finding, never changed |
+| 1.7.6 | Ensure access to /etc/issue.net is configured | L1 Server, L1 Workstation | Automated | implement | implemented | A symlink is a finding, never changed |
+| 1.8.1 | Ensure GDM login banner is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Only when GDM is installed |
+| 1.8.2 | Ensure GDM disable-user-list is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Only when GDM is installed |
+| 1.8.3 | Ensure GDM screen lock is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Only when GDM is installed |
+| 1.8.4 | Ensure GDM automount is configured | L1 Server, L2 Workstation | Automated | implement | implemented | Only when GDM is installed; sets automount and automount-open |
+| 1.8.5 | Ensure GDM autorun-never is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Only when GDM is installed |
+| 1.8.6 | Ensure XDMCP is not enabled | L1 Server, L1 Workstation | Automated | implement | implemented | Only when GDM is installed; the reboot flag is set while GDM predates custom.conf |
+| 1.8.7 | Ensure Wayland is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Only when GDM is installed; the reboot flag is set while GDM predates custom.conf |
 
 ## 2 Services
 
