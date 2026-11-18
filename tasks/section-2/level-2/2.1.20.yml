@@ -4,7 +4,9 @@
 #
 # Check, one output line per reason, exit 1 when any line exists:
 #   group:graphical-server-environment  the "Server with GUI" environment group is installed
-#                                       (dnf -q group list --installed --ids)
+#                                       (dnf -q group list --ids)
+#   dnfgroups:unknown                   dnf could not list the groups: not compliant, and the
+#                                       group steps below do not run
 #   remove:<package>                    gdm or gnome-shell is installed (stricter than the
 #                                       group test, kept on purpose)
 #   target:graphical.target             the default systemd target is graphical
@@ -43,8 +45,18 @@
           - -c
           - |
             bad=0
-            if dnf -q group list --installed --ids 2>/dev/null | grep -Fq graphical-server-environment; then
-              echo "group:graphical-server-environment"; bad=1
+            # dnf 4 rejects --installed together with --ids, so list everything and read
+            # only the "Installed Environment Groups:" section (it ends at the next line
+            # that does not start with whitespace).
+            if grp=$(dnf -q group list --ids 2>/dev/null); then
+              if printf '%s\n' "$grp" | awk '
+                  /^[^[:space:]]/ { in_sec = ($0 == "Installed Environment Groups:"); next }
+                  in_sec && /\(graphical-server-environment\)/ { found = 1 }
+                  END { exit !found }'; then
+                echo "group:graphical-server-environment"; bad=1
+              fi
+            else
+              echo "dnfgroups:unknown"; bad=1
             fi
             for p in $1; do
               if rpm -q "$p" >/dev/null 2>&1; then echo "remove:$p"; bad=1; fi
