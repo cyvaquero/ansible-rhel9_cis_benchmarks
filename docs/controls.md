@@ -201,14 +201,14 @@ yet. `implemented`: the control has its task file at
 | 3.3.1.18 | Ensure net.ipv4.tcp_syncookies is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
 | 3.3.1.19 | Ensure net.ipv4.conf.all.route_localnet is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
 | 3.3.1.20 | Ensure net.ipv4.conf.default.route_localnet is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
-| 3.3.2.1 | Ensure net.ipv6.conf.all.forwarding is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.2.2 | Ensure net.ipv6.conf.default.forwarding is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.2.3 | Ensure net.ipv6.conf.all.accept_redirects is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.2.4 | Ensure net.ipv6.conf.default.accept_redirects is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.2.5 | Ensure net.ipv6.conf.all.accept_source_route is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.2.6 | Ensure net.ipv6.conf.default.accept_source_route is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.2.7 | Ensure net.ipv6.conf.all.accept_ra is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.2.8 | Ensure net.ipv6.conf.default.accept_ra is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
+| 3.3.2.1 | Ensure net.ipv6.conf.all.forwarding is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Skipped when IPv6 is disabled |
+| 3.3.2.2 | Ensure net.ipv6.conf.default.forwarding is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Skipped when IPv6 is disabled |
+| 3.3.2.3 | Ensure net.ipv6.conf.all.accept_redirects is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Skipped when IPv6 is disabled |
+| 3.3.2.4 | Ensure net.ipv6.conf.default.accept_redirects is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Skipped when IPv6 is disabled |
+| 3.3.2.5 | Ensure net.ipv6.conf.all.accept_source_route is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Skipped when IPv6 is disabled |
+| 3.3.2.6 | Ensure net.ipv6.conf.default.accept_source_route is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Skipped when IPv6 is disabled |
+| 3.3.2.7 | Ensure net.ipv6.conf.all.accept_ra is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Skipped when IPv6 is disabled |
+| 3.3.2.8 | Ensure net.ipv6.conf.default.accept_ra is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Skipped when IPv6 is disabled |
 
 ## 4 Host Based Firewall
 

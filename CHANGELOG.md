@@ -8,6 +8,19 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.25]
+
+### Added
+
+- Section 3.3.2 controls, the IPv6 kernel parameters 3.3.2.1 to 3.3.2.8, using the same
+  sysctl logic as 3.3.1: each sets one parameter to 0. They are skipped with no finding
+  when IPv6 is disabled (the `ipv6` module parameter `disable` is missing or not 0, or the
+  `all` and `default` `disable_ipv6` sysctls are both 1), which preflight records in the
+  new fact `cis_ipv6_disabled`. IPv6 forwarding (3.3.2.1, 3.3.2.2) is set to 0, so hosts
+  that route IPv6 or run containers or libvirt with IPv6 networking must list those IDs in
+  `cis_exclusions`; hosts that rely on the kernel's router-advertisement handling must list
+  3.3.2.7 and 3.3.2.8. Part of #7.
+
 ## [3.0.0_0.0.24]
 
 ### Added
