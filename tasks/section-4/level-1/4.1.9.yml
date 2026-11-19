@@ -1,0 +1,145 @@
+---
+# 4.1.9 - nftables.service is neither enabled nor active (disabled, masked, inactive and
+# not installed all pass), and the packages iptables-services and ufw are not installed.
+# Installed means a package providing either name is installed, so the real package
+# (iptables-nft-services on RHEL 9) is found, tested and removed, not the virtual name.
+# The nftables package itself stays: firewalld needs it. The fix stops, disables and masks
+# nftables.service, and removes iptables-services and ufw with dnf unless another installed
+# package needs them (the rpm erase test of tasks/lib/service_not_in_use.yml; a package
+# something needs is kept and the control stays a finding). firewalld is reloaded
+# afterwards when it was running, because stopping nftables.service flushes the rules.
+# A control that still fails after the fix is a finding; under --check nothing changes and
+# nothing is recorded in remediate mode.
+#
+# The check prints one line per action: nft:nftables.service, remove:<package>,
+# keep:<package>, and fwrunning=yes when firewalld is active; its exit status is 1 when a
+# nft:, remove: or keep: line is printed.
+- name: "4.1.9 - Handle conflicting firewall utilities"
+  tags:
+    - "4.1.9"
+    - section-4
+    - level-1
+    - level-2
+    - server
+    - workstation
+  block:
+    - name: "4.1.9 - Check the state"
+      ansible.builtin.command:
+        argv: &cis_fw_4_1_9_argv
+          - /bin/sh
+          - -c
+          - |
+            erase=""
+            blocked=""
+            # On RHEL 9 iptables-services is provided by iptables-nft-services, so ask
+            # which installed packages provide each name and test those.
+            for v in iptables-services ufw; do
+              names=$(rpm -q --qf '%{NAME}\n' --whatprovides "$v" 2>/dev/null) || continue
+              for p in $names; do
+                case " $erase " in *" $p "*) ;; *) erase="$erase $p" ;; esac
+              done
+            done
+            while :; do
+              set -- $erase
+              [ $# -gt 0 ] || break
+              out=$(rpm -e --test "$@" 2>&1) && break
+              # Failure lines read "<capability> is needed by (installed) <package>".
+              caps=$(printf '%s\n' "$out" | sed -n 's/^[[:space:]]*\([^[:space:]][^[:space:]]*\)[[:space:]].*is needed by (installed).*/\1/p' | sort -u)
+              drop=""
+              for c in $caps; do
+                for n in $(rpm -q --qf '%{NAME}\n' --whatprovides "$c" 2>/dev/null); do
+                  case " $erase " in *" $n "*) drop="$drop $n" ;; esac
+                done
+              done
+              # Failed for a reason we cannot read: keep everything.
+              [ -n "$drop" ] || drop=$erase
+              new=""
+              for p in $erase; do
+                case " $drop " in
+                  *" $p "*) blocked="$blocked $p" ;;
+                  *) new="$new $p" ;;
+                esac
+              done
+              erase=$new
+            done
+            bad=0
+            for p in $erase; do echo "remove:$p"; bad=1; done
+            for p in $blocked; do echo "keep:$p"; bad=1; done
+            enabled=$(systemctl is-enabled nftables.service 2>/dev/null)
+            active=$(systemctl show -p ActiveState --value nftables.service 2>/dev/null)
+            nft=0
+            case "$enabled" in enabled|enabled-runtime) nft=1 ;; esac
+            case "$active" in active|activating|reloading) nft=1 ;; esac
+            if [ "$nft" = 1 ]; then
+              echo "nft:nftables.service"
+              bad=1
+            fi
+            systemctl is-active --quiet firewalld.service 2>/dev/null && echo "fwrunning=yes"
+            exit $bad
+      register: cis_check_4_1_9
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    - name: "4.1.9 - Stop, disable and mask nftables.service"
+      ansible.builtin.systemd:
+        name: nftables.service
+        state: stopped
+        enabled: false
+        masked: true
+      register: cis_nft_4_1_9
+      when:
+        - not (cis_audit_only | bool)
+        - "'nft:nftables.service' in cis_check_4_1_9.stdout_lines"
+
+    - name: "4.1.9 - Remove the conflicting packages nothing else needs"
+      ansible.builtin.dnf:
+        name: "{{ cis_check_4_1_9.stdout_lines | select('match', '^remove:') | map('regex_replace', '^remove:', '') | list }}"
+        state: absent
+      register: cis_rm_4_1_9
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - cis_check_4_1_9.stdout_lines | select('match', '^remove:') | list | length > 0
+
+    - name: "4.1.9 - Reload firewalld so it restores its rules"
+      ansible.builtin.command:
+        argv:
+          - firewall-cmd
+          - --reload
+      changed_when: true
+      when:
+        - not (cis_audit_only | bool)
+        - "'fwrunning=yes' in cis_check_4_1_9.stdout_lines"
+        - cis_nft_4_1_9 is changed or cis_rm_4_1_9 is changed
+
+    - name: "4.1.9 - Check again after the fix"
+      ansible.builtin.command:
+        argv: *cis_fw_4_1_9_argv
+      register: cis_recheck_4_1_9
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_check_4_1_9.rc != 0
+
+    - name: "4.1.9 - Record the finding when the check fails in audit mode"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "4.1.9"
+      when:
+        - cis_audit_only | bool
+        - cis_check_4_1_9.rc != 0
+
+    # Under --check the fix does not happen, so the second check says nothing new.
+    - name: "4.1.9 - Record the finding when the fix did not take effect"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "4.1.9"
+      when:
+        - cis_recheck_4_1_9 is not skipped
+        - not ansible_check_mode
+        - cis_recheck_4_1_9.rc != 0
+...

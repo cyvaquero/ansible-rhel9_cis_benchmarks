@@ -1,0 +1,76 @@
+---
+# 4.1.2 - the firewalld backend is nftables. Only an explicit FirewallBackend=iptables in
+# /etc/firewalld/firewalld.conf is non-compliant (the last such line wins, as in firewalld);
+# a missing file, a missing line or any other value is left alone. The fix sets the last
+# FirewallBackend line to nftables and restarts firewalld only when it is running, through
+# the handler, so the new backend applies. A control that still fails after the fix is a
+# finding; under --check nothing changes and nothing is recorded in remediate mode.
+#
+# The check prints state=ok or state=bad; its exit status is 1 when state=bad.
+- name: "4.1.2 - Handle the firewalld backend"
+  tags:
+    - "4.1.2"
+    - section-4
+    - level-1
+    - level-2
+    - server
+    - workstation
+  block:
+    - name: "4.1.2 - Check the state"
+      ansible.builtin.command:
+        argv: &cis_fw_4_1_2_argv
+          - /bin/sh
+          - -c
+          - |
+            f=/etc/firewalld/firewalld.conf
+            v=$(sed -n 's/^[[:space:]]*FirewallBackend[[:space:]]*=[[:space:]]*//p' "$f" 2>/dev/null | tail -n 1 | tr -d '[:space:]' | tr 'A-Z' 'a-z')
+            if [ "$v" = iptables ]; then
+              echo "state=bad"
+              exit 1
+            fi
+            echo "state=ok"
+      register: cis_check_4_1_2
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    - name: "4.1.2 - Set the firewalld backend to nftables"
+      ansible.builtin.lineinfile:
+        path: /etc/firewalld/firewalld.conf
+        regexp: '^\s*FirewallBackend\s*='
+        line: FirewallBackend=nftables
+      notify: Restart firewalld when running
+      when:
+        - not (cis_audit_only | bool)
+        - cis_check_4_1_2.rc != 0
+
+    - name: "4.1.2 - Check again after the fix"
+      ansible.builtin.command:
+        argv: *cis_fw_4_1_2_argv
+      register: cis_recheck_4_1_2
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_check_4_1_2.rc != 0
+
+    - name: "4.1.2 - Record the finding when the check fails in audit mode"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "4.1.2"
+      when:
+        - cis_audit_only | bool
+        - cis_check_4_1_2.rc != 0
+
+    # Under --check the fix does not happen, so the second check says nothing new.
+    - name: "4.1.2 - Record the finding when the fix did not take effect"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "4.1.2"
+      when:
+        - cis_recheck_4_1_2 is not skipped
+        - not ansible_check_mode
+        - cis_recheck_4_1_2.rc != 0
+...

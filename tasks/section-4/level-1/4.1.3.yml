@@ -1,0 +1,99 @@
+---
+# 4.1.3 - firewalld.service is unmasked, enabled and active. The fix unmasks, enables and
+# starts it. Starting it begins filtering, so it is made only when firewalld already runs
+# or the SSH guard (tasks/lib/firewalld_ssh_guard.yml) says the zone that applies to the
+# role's own connection allows SSH or accepts everything; otherwise the host is left alone,
+# a message says why and the control is a finding. With firewalld not installed there is
+# nothing to fix here (4.1.1 installs it). A control that still fails after the fix is a
+# finding; under --check nothing changes and nothing is recorded in remediate mode.
+#
+# The check prints state=ok, state=bad or state=nopkg, and active=yes or active=no; its
+# exit status is 1 unless state=ok.
+- name: "4.1.3 - Handle the firewalld service"
+  tags:
+    - "4.1.3"
+    - section-4
+    - level-1
+    - level-2
+    - server
+    - workstation
+  block:
+    - name: "4.1.3 - Check the state"
+      ansible.builtin.command:
+        argv: &cis_fw_4_1_3_argv
+          - /bin/sh
+          - -c
+          - |
+            if ! rpm -q firewalld >/dev/null 2>&1; then
+              echo "state=nopkg"
+              exit 1
+            fi
+            active=no
+            systemctl is-active --quiet firewalld.service 2>/dev/null && active=yes
+            echo "active=$active"
+            load=$(systemctl show -p LoadState --value firewalld.service 2>/dev/null)
+            enabled=$(systemctl is-enabled firewalld.service 2>/dev/null)
+            if [ "$load" != masked ] && [ "$enabled" = enabled ] && [ "$active" = yes ]; then
+              echo "state=ok"
+              exit 0
+            fi
+            echo "state=bad"
+            exit 1
+      register: cis_check_4_1_3
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    - name: "4.1.3 - Unmask, enable and start firewalld"
+      ansible.builtin.systemd:
+        name: firewalld.service
+        masked: false
+        enabled: true
+        state: started
+      when:
+        - not (cis_audit_only | bool)
+        - "'state=bad' in cis_check_4_1_3.stdout_lines"
+        - "'active=yes' in cis_check_4_1_3.stdout_lines or cis_fw_guard_start_ok | default(false) | bool"
+
+    - name: "4.1.3 - Report that firewalld was not started because SSH may not be allowed"
+      ansible.builtin.debug:
+        msg: >-
+          firewalld is not started: SSH is not known to be allowed in the zone that applies to
+          this connection ({{ cis_fw_guard_zone | default('unknown') }}). Allow SSH there, or
+          start firewalld by hand.
+      when:
+        - not (cis_audit_only | bool)
+        - "'state=bad' in cis_check_4_1_3.stdout_lines"
+        - "'active=no' in cis_check_4_1_3.stdout_lines"
+        - not (cis_fw_guard_start_ok | default(false) | bool)
+
+    - name: "4.1.3 - Check again after the fix"
+      ansible.builtin.command:
+        argv: *cis_fw_4_1_3_argv
+      register: cis_recheck_4_1_3
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_check_4_1_3.rc != 0
+
+    - name: "4.1.3 - Record the finding when the check fails in audit mode"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "4.1.3"
+      when:
+        - cis_audit_only | bool
+        - cis_check_4_1_3.rc != 0
+
+    # Under --check the fix does not happen, so the second check says nothing new.
+    - name: "4.1.3 - Record the finding when the fix did not take effect"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "4.1.3"
+      when:
+        - cis_recheck_4_1_3 is not skipped
+        - not ansible_check_mode
+        - cis_recheck_4_1_3.rc != 0
+...

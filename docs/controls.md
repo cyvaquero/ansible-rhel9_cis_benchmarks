@@ -214,15 +214,15 @@ yet. `implemented`: the control has its task file at
 
 | CIS ID | Title | Profile | Type | Disposition | Status | Notes |
 |---|---|---|---|---|---|---|
-| 4.1.1 | Ensure firewalld is installed | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 4.1.2 | Ensure firewalld backend is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 4.1.3 | Ensure firewalld.service is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 4.1.4 | Ensure firewalld active zone target is configured | L1 Server, L1 Workstation | Automated | implement | planned | Lockout risk: SSH must stay allowed in the active zone |
+| 4.1.1 | Ensure firewalld is installed | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 4.1.2 | Ensure firewalld backend is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Only an explicit iptables backend is changed; restarts firewalld only when it is running |
+| 4.1.3 | Ensure firewalld.service is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Starts firewalld only when SSH is already allowed in the zone that applies to the role's connection; shared guard in tasks/lib/firewalld_ssh_guard.yml |
+| 4.1.4 | Ensure firewalld active zone target is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Changes an ACCEPT target only when SSH is already allowed in the zone that applies to the role's connection; adds cis_firewalld_zone_target |
 | 4.1.5 | Ensure firewalld loopback traffic is configured | L1 Server, L1 Workstation | Manual | manual | planned |  |
 | 4.1.6 | Ensure firewalld loopback source address traffic is configured | L1 Server, L1 Workstation | Manual | manual | planned |  |
 | 4.1.7 | Ensure firewalld services and ports are configured | L1 Server, L1 Workstation | Manual | manual | planned |  |
 | 4.1.8 | Ensure firewalld default zone is set to drop | L2 Server, L2 Workstation | Manual | manual | planned | Lockout risk |
-| 4.1.9 | Ensure conflicting firewall utilities are not in use with firewalld | L1 Server, L1 Workstation | Automated | implement | planned |  |
+| 4.1.9 | Ensure conflicting firewall utilities are not in use with firewalld | L1 Server, L1 Workstation | Automated | implement | implemented | Stops and masks nftables.service; removes the packages providing iptables-services and ufw only when nothing else needs them |
 | 4.1.10 | Ensure firewalld logs denied packets | L2 Server, L2 Workstation | Automated | implement | planned |  |
 | 4.1.11 | Ensure firewalld blocks ICMP timestamp requests and replies | L2 Server, L2 Workstation | Automated | implement | planned |  |
 

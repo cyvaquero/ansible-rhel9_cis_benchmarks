@@ -1,0 +1,62 @@
+---
+# 4.1.1 - firewalld is installed. Remediate mode installs it with dnf; audit mode records a
+# finding. Whether it runs and what it allows are for 4.1.2 to 4.1.4. Under --check nothing
+# changes and nothing is recorded in remediate mode.
+- name: "4.1.1 - Handle the firewalld package"
+  tags:
+    - "4.1.1"
+    - section-4
+    - level-1
+    - level-2
+    - server
+    - workstation
+  block:
+    - name: "4.1.1 - Check firewalld is installed"
+      ansible.builtin.command:
+        argv: &cis_fw_4_1_1_argv
+          - rpm
+          - -q
+          - firewalld
+      register: cis_check_4_1_1
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    - name: "4.1.1 - Install firewalld"
+      ansible.builtin.dnf:
+        name: firewalld
+        state: present
+      when:
+        - not (cis_audit_only | bool)
+        - cis_check_4_1_1.rc != 0
+
+    - name: "4.1.1 - Check again after the fix"
+      ansible.builtin.command:
+        argv: *cis_fw_4_1_1_argv
+      register: cis_recheck_4_1_1
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_check_4_1_1.rc != 0
+
+    - name: "4.1.1 - Record the finding when the check fails in audit mode"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "4.1.1"
+      when:
+        - cis_audit_only | bool
+        - cis_check_4_1_1.rc != 0
+
+    # Under --check the fix does not happen, so the second check says nothing new.
+    - name: "4.1.1 - Record the finding when the fix did not take effect"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "4.1.1"
+      when:
+        - cis_recheck_4_1_1 is not skipped
+        - not ansible_check_mode
+        - cis_recheck_4_1_1.rc != 0
+...
