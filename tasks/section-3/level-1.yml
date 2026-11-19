@@ -1,8 +1,41 @@
 ---
-# Section 3, Level 1 controls. Placeholder: controls are added per section.
+# Section 3, Level 1 controls, one file per control in level-1/.
+#
+# import_tasks, not include_tasks: see tasks/section-1/level-1.yml.
 
-- name: "Section 3 Level 1 - No controls yet"
-  ansible.builtin.debug:
-    msg: "No controls in this file yet"
-    verbosity: 1
+- name: "3.1.1 - Review the IPv6 status"
+  ansible.builtin.import_tasks: level-1/3.1.1.yml
+  when: "'3.1.1' in cis_selected_controls"
+
+- name: "3.1.2 - Ensure wireless interfaces are not available"
+  ansible.builtin.import_tasks: level-1/3.1.2.yml
+  when: "'3.1.2' in cis_selected_controls"
+
+- name: "3.1.3 - Ensure bluetooth services are not in use"
+  ansible.builtin.import_tasks: level-1/3.1.3.yml
+  when: "'3.1.3' in cis_selected_controls"
+
+- name: "3.2.1 - Ensure the dccp kernel module is not available"
+  ansible.builtin.import_tasks: level-1/3.2.1.yml
+  when: "'3.2.1' in cis_selected_controls"
+
+- name: "3.2.2 - Ensure the tipc kernel module is not available"
+  ansible.builtin.import_tasks: level-1/3.2.2.yml
+  when: "'3.2.2' in cis_selected_controls"
+
+- name: "3.2.3 - Ensure the rds kernel module is not available"
+  ansible.builtin.import_tasks: level-1/3.2.3.yml
+  when: "'3.2.3' in cis_selected_controls"
+
+- name: "3.2.4 - Ensure the sctp kernel module is not available"
+  ansible.builtin.import_tasks: level-1/3.2.4.yml
+  when: "'3.2.4' in cis_selected_controls"
+
+- name: "3.2.5 - Ensure the atm kernel module is not available"
+  ansible.builtin.import_tasks: level-1/3.2.5.yml
+  when: "'3.2.5' in cis_selected_controls"
+
+- name: "3.2.6 - Ensure the can kernel module is not available"
+  ansible.builtin.import_tasks: level-1/3.2.6.yml
+  when: "'3.2.6' in cis_selected_controls"
 ...

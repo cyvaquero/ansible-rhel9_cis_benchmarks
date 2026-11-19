@@ -33,6 +33,7 @@ so with `cis_fail_on_findings: true` they always count. Leave one out with
 | 1.6.5 | manual | Whether the SSH server crypto policy offers the chacha20-poly1305 cipher | Whether the cipher is acceptable at your site; if not, add a policy module that drops it |
 | 1.6.6 | manual | How the effective crypto policy treats encrypt-then-MAC for SSH | Whether that is acceptable; if not, add a policy module for it |
 | 2.1.23 | manual | The listening TCP and UDP sockets with their processes (`ss -plntu`) | Whether each listener is approved for the host; stop or remove the rest |
+| 3.1.1 | manual | Whether IPv6 is disabled: the `ipv6` module parameter and the `all` and `default` `disable_ipv6` sysctls | Whether the host should use IPv6; disable it only if no service needs it |
 
 ## Excluded by default
 

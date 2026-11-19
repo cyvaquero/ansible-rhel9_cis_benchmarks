@@ -1,0 +1,58 @@
+---
+# 3.1.2 - wireless interfaces. The driver module of every wireless interface is made
+# unavailable with tasks/lib/kernel_module.yml (blocked, blacklisted, unloaded). A host
+# with no wireless interface is compliant. Once a driver is unloaded its interface is
+# gone, so a second run finds nothing to do.
+#
+# An interface whose driver module cannot be found (built into the kernel, or no device
+# link) cannot be made unavailable by the role and is a finding. A driver that cannot be
+# unloaded, for example because another module uses it, is a finding from the shared logic.
+
+- name: "3.1.2 - Find the wireless interface driver modules"
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - |
+        # module:<name> per driver module, nomodule:<interface> per interface without one.
+        for d in /sys/class/net/*/wireless; do
+          [ -d "$d" ] || continue
+          i=$(basename "$(dirname "$d")")
+          link=/sys/class/net/$i/device/driver/module
+          if [ -L "$link" ]; then
+            echo "module:$(basename "$(readlink -f "$link")")"
+          else
+            echo "nomodule:$i"
+          fi
+        done | sort -u
+  register: cis_check_3_1_2
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: &cis_tags_3_1_2
+    - "3.1.2"
+    - section-3
+    - level-1
+    - server
+
+- name: "3.1.2 - Make each wireless driver module unavailable"
+  ansible.builtin.include_tasks:
+    file: ../../lib/kernel_module.yml
+    apply:
+      tags: *cis_tags_3_1_2
+  vars:
+    cis_km_id: "3.1.2"
+    cis_km_module: "{{ item | regex_replace('^module:', '') }}"
+  loop: "{{ cis_check_3_1_2.stdout_lines | default([]) | select('match', '^module:') | list }}"
+  tags: *cis_tags_3_1_2
+
+- name: "3.1.2 - Record the finding for a wireless interface with no driver module"
+  ansible.builtin.include_tasks:
+    file: "{{ role_path }}/tasks/finding.yml"
+    apply:
+      tags: *cis_tags_3_1_2
+  vars:
+    cis_finding_id: "3.1.2"
+  when: cis_check_3_1_2.stdout_lines | default([]) | select('match', '^nomodule:') | list | length > 0
+  tags: *cis_tags_3_1_2
+...

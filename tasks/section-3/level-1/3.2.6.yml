@@ -1,0 +1,15 @@
+---
+# 3.2.6 - can kernel module. The logic is shared in tasks/lib/kernel_module.yml.
+
+- name: "3.2.6 - Ensure the can kernel module is not available"
+  ansible.builtin.import_tasks: ../../lib/kernel_module.yml
+  vars:
+    cis_km_id: "3.2.6"
+    cis_km_module: "can"
+  tags:
+    - "3.2.6"
+    - section-3
+    - level-1
+    - server
+    - workstation
+...

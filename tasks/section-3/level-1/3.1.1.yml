@@ -1,0 +1,40 @@
+---
+# 3.1.1 (manual) - reports whether IPv6 is enabled for review. It only reads, in both
+# modes, and records no finding: summary.yml lists manual controls.
+
+- name: "3.1.1 - Read the IPv6 state"
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - |
+        # One "name=value" line per setting; "absent" when the file does not exist.
+        for f in /sys/module/ipv6/parameters/disable \
+                 /proc/sys/net/ipv6/conf/all/disable_ipv6 \
+                 /proc/sys/net/ipv6/conf/default/disable_ipv6; do
+          if [ -r "$f" ]; then v=$(cat "$f"); else v=absent; fi
+          echo "$f=$v"
+        done
+  register: cis_check_3_1_1
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: &cis_tags_3_1_1
+    - "3.1.1"
+    - section-3
+    - level-1
+    - server
+    - workstation
+
+# The module parameter is 1 when the kernel disabled IPv6 at boot, and the module's own
+# file is missing when the module is not loaded or built in without it. The sysctls are
+# 1 when IPv6 is switched off for existing (all) or new (default) interfaces.
+- name: "3.1.1 - Report the IPv6 state for review"
+  ansible.builtin.debug:
+    msg: >-
+      IPv6 state to review:
+      {{ cis_check_3_1_1.stdout_lines | default([]) | join('; ')
+         if cis_check_3_1_1.rc == 0 else 'could not be read' }}
+      (disable=1 means IPv6 is disabled there, 0 means enabled; absent means not available)
+  tags: *cis_tags_3_1_1
+...
