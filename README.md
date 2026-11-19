@@ -4,7 +4,7 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.25).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.26).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and these controls are implemented:
 
 - kernel modules, 1.1.1.1 to 1.1.1.11;
@@ -22,7 +22,8 @@ selection, audit mode and lint CI exist, and these controls are implemented:
 - job schedulers, 2.4.1.1 to 2.4.2.1;
 - network devices and kernel modules, 3.1.1 to 3.2.6;
 - IPv4 kernel parameters, 3.3.1.1 to 3.3.1.20;
-- IPv6 kernel parameters, 3.3.2.1 to 3.3.2.8.
+- IPv6 kernel parameters, 3.3.2.1 to 3.3.2.8;
+- firewalld basics, 4.1.1 to 4.1.4 and 4.1.9.
 
 Every other control is still planned. Do not run this against hosts you care about.
 
@@ -74,7 +75,8 @@ example `cis_rhel_minor_release | int >= 4`.
 
 It then validates the selection variables below and fails with a clear message on an
 invalid `cis_profile`, a `cis_apply_level_2`, `cis_audit_only` or `cis_fail_on_findings`
-that is not true or false, or a CIS ID in `cis_exclusions` that is not in the benchmark.
+that is not true or false, a `cis_firewalld_zone_target` other than `default`, `REJECT` or
+`DROP`, or a CIS ID in `cis_exclusions` that is not in the benchmark.
 
 ## Usage (planned)
 
@@ -153,6 +155,12 @@ ansible-playbook -i inventory site.yml -e target=webservers
 once an allow file exists the deny file is ignored. List every account that needs them
 before running the role on such a host. To skip a control, list its ID in `cis_exclusions`;
 `cis_services_keep` applies only to the service controls (2.1.1 to 2.1.22, and 3.1.3).
+
+### Firewall (4.1)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `cis_firewalld_zone_target` | `default` | 4.1.4: the permanent target set on an active zone whose target is `ACCEPT` or empty. One of `default`, `REJECT` or `DROP`; anything else stops the run at preflight. A target that is already acceptable is never changed. |
 
 ### Audit vs remediate
 
@@ -310,6 +318,35 @@ before running the role on such a host. To skip a control, list its ID in `cis_e
   that relies on the kernel's own router-advertisement handling for its IPv6 address or
   default route (not NetworkManager, which processes router advertisements itself) lists
   3.3.2.7 and 3.3.2.8 in `cis_exclusions`.
+- Firewall (4.1): 4.1.1 installs `firewalld`. 4.1.2 changes `FirewallBackend` in
+  `/etc/firewalld/firewalld.conf` only when it is explicitly `iptables` (a missing line
+  already means `nftables`), and restarts `firewalld` only when it is running. 4.1.3
+  unmasks, enables and starts `firewalld.service`. 4.1.4 checks every active zone bound to
+  an interface other than `lo` or `virbr*`: its target must not be `ACCEPT` or empty, and
+  the runtime and permanent targets must match. A zone with such a target gets
+  `cis_firewalld_zone_target` as its permanent target, then `firewalld` is reloaded; a
+  runtime and permanent mismatch with an acceptable permanent target is fixed by the reload
+  alone (which also drops runtime-only changes). No active zone is a finding with nothing
+  to change. 4.1.9 requires `nftables.service` to be neither enabled nor active (disabled,
+  masked or absent all pass) and `iptables-services` and `ufw` not to be installed; it
+  stops, disables and masks the service and removes each package that nothing else needs,
+  keeping the `nftables` package itself, then reloads `firewalld` if it is running. A package
+  something else needs is kept and the control is a finding.
+- SSH guard (4.1.3, 4.1.4): starting `firewalld` and replacing an `ACCEPT` target can begin
+  filtering and cut the role's own SSH connection, so the role makes these two changes only
+  when SSH is already allowed in the zone that applies to that connection. The role reads
+  the connection from `SSH_CONNECTION`. The zone is the one whose sources match the
+  controller address; else the zone of the interface that carries the server address
+  (NetworkManager `connection.zone`, then the firewalld binding); else the default zone.
+  SSH is allowed there when its permanent configuration has the `ssh` service and the
+  connection is on port 22, or a TCP port or range containing the connection port, which
+  must be one that `sshd -T` reports; rich rules are not read. For 4.1.3 a zone target of
+  `ACCEPT` also counts as allowed, and enabling a `firewalld` that already runs needs no
+  guard. A connection that is not SSH (for example `local`) passes. When anything cannot be
+  determined (an `ipset:` or `mac:` zone source, two zones matching the controller, an
+  unknown interface), the guard fails. In every failing case the host is left unchanged, a
+  message says so, and the control is a finding to fix by hand: allow SSH in the zone, then
+  run the role again.
 - Time synchronization (2.3): 2.3.1 installs `chrony`. 2.3.2 looks for a `server` or `pool`
   line in `/etc/chrony.conf` and in the files its `include`, `confdir` and `sourcedir`
   directives pull in; `sourcedir /run/chrony-dhcp` is ignored because DHCP sources exist

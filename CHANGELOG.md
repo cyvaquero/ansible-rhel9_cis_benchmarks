@@ -8,6 +8,22 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.26]
+
+### Added
+
+- Section 4.1 firewalld basics: 4.1.1 installs `firewalld`; 4.1.2 sets `FirewallBackend`
+  to `nftables` only when it is explicitly `iptables` and restarts `firewalld` only when it
+  runs; 4.1.3 unmasks, enables and starts `firewalld.service`; 4.1.4 sets the permanent
+  target of active zones that are `ACCEPT` or empty and reloads `firewalld`, and reloads
+  alone on a runtime and permanent mismatch; 4.1.9 stops, disables and masks
+  `nftables.service` when it is enabled or active and removes `iptables-services` and `ufw`
+  when nothing else needs them. Starting `firewalld` (4.1.3) and replacing an `ACCEPT`
+  target (4.1.4) happen only when SSH is already allowed in the zone that applies to the
+  role's own connection; otherwise the host is left unchanged and the control is a finding
+  to fix by hand. New variable `cis_firewalld_zone_target` (default `default`, or `REJECT`
+  or `DROP`), validated at preflight. Part of #8.
+
 ## [3.0.0_0.0.25]
 
 ### Added

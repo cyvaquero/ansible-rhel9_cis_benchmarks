@@ -1,0 +1,152 @@
+---
+# SSH guard for the firewalld controls that could cut the role's own connection: 4.1.3
+# starting firewalld and 4.1.4 replacing an ACCEPT zone target. Imported once per host, by
+# tasks/section-4/level-1.yml, in remediate mode only. It reads the host and changes
+# nothing, and it sets three facts the controls test with | default(false):
+#   cis_fw_guard_start_ok    starting firewalld cannot cut SSH (4.1.3)
+#   cis_fw_guard_replace_ok  replacing an ACCEPT target cannot cut SSH (4.1.4)
+#   cis_fw_guard_zone        the zone that applies to the connection, for messages
+#
+# Decision:
+# - The connection is found from SSH_CONNECTION, read with become off (sudo drops it). With
+#   no SSH_CONNECTION on a non-SSH connection plugin (for example local) both are true. On
+#   an SSH connection plugin with no SSH_CONNECTION nothing can be decided: both are false.
+# - Effective zone: the one zone whose sources match the controller address; else the zone
+#   of the interface that carries the server address (NetworkManager connection.zone, then
+#   the firewalld binding); else the default zone. An ipset: or mac: source, two zones
+#   matching the controller, a server address on no interface, or an unknown zone make the
+#   answer unknown (both false).
+# - SSH is allowed in the zone when its permanent configuration has the service ssh and
+#   the connection is on port 22, or a tcp port (or range) containing the connection port;
+#   the connection port must be one sshd -T reports. Rich rules are not read.
+# - Starting firewalld is also safe when the zone target is ACCEPT. Replacing an ACCEPT
+#   target is not made safe by that target: only the service or port counts.
+# - firewalld running: firewall-cmd (--permanent for the zone contents); stopped:
+#   firewall-offline-cmd.
+# The script prints state=known or state=unknown (with why=), zone=, target=, ssh=yes|no.
+
+- name: "4.1.3 - Read the SSH connection of this run"
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - 'printf "%s" "${SSH_CONNECTION:-}"'
+  register: cis_fw_conn
+  become: false
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: "4.1.3 - Work out whether SSH is allowed in the zone that applies to this run"
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - |
+        export LC_ALL=C
+        fail() { echo "state=unknown"; echo "why=$1"; exit 0; }
+        set -- $1
+        [ $# -eq 4 ] || fail badconnection
+        cip=$1
+        sip=$3
+        sport=$4
+        command -v firewall-offline-cmd >/dev/null 2>&1 || fail nofirewalld
+        if systemctl is-active --quiet firewalld.service 2>/dev/null; then
+          fw() { firewall-cmd "$@"; }
+          fwp() { firewall-cmd --permanent "$@"; }
+        else
+          fw() { firewall-offline-cmd "$@"; }
+          fwp() { firewall-offline-cmd "$@"; }
+        fi
+        py=$(command -v python3 || echo /usr/libexec/platform-python)
+        zone=""
+        for z in $(fwp --get-zones 2>/dev/null); do
+          for s in $(fwp --zone="$z" --list-sources 2>/dev/null); do
+            case "$s" in ipset:*|mac:*) fail "source-$s" ;; esac
+            "$py" - "$cip" "$s" <<'PY'
+        import ipaddress, sys
+        try:
+            sys.exit(0 if ipaddress.ip_address(sys.argv[1]) in ipaddress.ip_network(sys.argv[2], strict=False) else 1)
+        except ValueError:
+            sys.exit(2)
+        PY
+            case $? in
+              0) case " $zone " in *" $z "*) ;; *) zone="$zone $z" ;; esac ;;
+              1) ;;
+              *) fail "source-$s" ;;
+            esac
+          done
+        done
+        set -- $zone
+        [ $# -le 1 ] || fail manysourcezones
+        zone=${1:-}
+        if [ -z "$zone" ]; then
+          dev=$(ip -o addr show 2>/dev/null | awk -v a="$sip" '{ split($4, x, "/"); if (x[1] == a) { print $2; exit } }')
+          [ -n "$dev" ] || fail nointerface
+          if command -v nmcli >/dev/null 2>&1 && systemctl is-active --quiet NetworkManager.service 2>/dev/null; then
+            uuid=$(nmcli -g GENERAL.CON-UUID device show "$dev" 2>/dev/null)
+            if [ -n "$uuid" ] && [ "$uuid" != -- ]; then
+              zone=$(nmcli -g connection.zone connection show uuid "$uuid" 2>/dev/null)
+            fi
+            [ "$zone" != -- ] || zone=""
+          fi
+          if [ -z "$zone" ]; then
+            for z in $(fw --get-zone-of-interface="$dev" 2>/dev/null) $(fwp --get-zone-of-interface="$dev" 2>/dev/null); do
+              zone=$z
+              break
+            done
+            case "$zone" in no|"") zone="" ;; esac
+          fi
+          [ -n "$zone" ] || zone=$(fw --get-default-zone 2>/dev/null)
+        fi
+        [ -n "$zone" ] || fail nozone
+        target=$(fwp --zone="$zone" --get-target 2>/dev/null)
+        [ -n "$target" ] || fail "nozone-$zone"
+        ports=$(sshd -T 2>/dev/null | awk '$1 == "port" { print $2 }')
+        case " $(echo $ports) " in *" $sport "*) ;; *) fail portmismatch ;; esac
+        ssh=no
+        if [ "$sport" = 22 ]; then
+          for s in $(fwp --zone="$zone" --list-services 2>/dev/null); do
+            [ "$s" != ssh ] || ssh=yes
+          done
+        fi
+        for p in $(fwp --zone="$zone" --list-ports 2>/dev/null); do
+          case "$p" in
+            */tcp)
+              r=${p%/tcp}
+              lo=${r%-*}
+              hi=${r#*-}
+              if [ "$sport" -ge "$lo" ] 2>/dev/null && [ "$sport" -le "$hi" ] 2>/dev/null; then ssh=yes; fi ;;
+          esac
+        done
+        echo "state=known"
+        echo "zone=$zone"
+        echo "target=$target"
+        echo "ssh=$ssh"
+      - sh
+      - "{{ cis_fw_conn.stdout | default('') }}"
+  register: cis_fw_guard_read
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when: cis_fw_conn.stdout | default('') | length > 0
+
+- name: "4.1.3 - Record the SSH guard"
+  ansible.builtin.set_fact:
+    cis_fw_guard_start_ok: "{{ cis_fw_guard_ok_start }}"
+    cis_fw_guard_replace_ok: "{{ cis_fw_guard_ok_replace }}"
+    cis_fw_guard_zone: "{{ cis_fw_guard_lines | select('match', '^zone=') | map('regex_replace', '^zone=', '') | first | default('unknown') }}"
+  vars:
+    cis_fw_over_ssh: "{{ cis_fw_conn.stdout | default('') | length > 0 }}"
+    cis_fw_guard_lines: "{{ cis_fw_guard_read.stdout_lines | default([]) }}"
+    cis_fw_guard_known: "{{ 'state=known' in cis_fw_guard_lines }}"
+    cis_fw_guard_ssh: "{{ 'ssh=yes' in cis_fw_guard_lines }}"
+    cis_fw_guard_acc: "{{ 'target=ACCEPT' in cis_fw_guard_lines }}"
+    # No SSH_CONNECTION: fine on a connection that is not SSH, undecidable on one that is.
+    cis_fw_not_ssh_ok: "{{ (ansible_connection | default('ssh')) is not search('ssh|paramiko|smart') }}"
+    cis_fw_guard_ok_start: >-
+      {{ (cis_fw_guard_known and (cis_fw_guard_ssh or cis_fw_guard_acc)) if cis_fw_over_ssh
+         else cis_fw_not_ssh_ok }}
+    cis_fw_guard_ok_replace: >-
+      {{ (cis_fw_guard_known and cis_fw_guard_ssh) if cis_fw_over_ssh else cis_fw_not_ssh_ok }}
+...

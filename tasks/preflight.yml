@@ -138,6 +138,18 @@
     - always
     - preflight
 
+- name: "Preflight - Validate the firewalld zone target"
+  ansible.builtin.assert:
+    that:
+      - cis_firewalld_zone_target in ['default', 'REJECT', 'DROP']
+    fail_msg: >-
+      cis_firewalld_zone_target must be one of default, REJECT or DROP (ACCEPT is what 4.1.4
+      replaces). Got {{ cis_firewalld_zone_target | to_json }}.
+    quiet: true
+  tags:
+    - always
+    - preflight
+
 - name: "Preflight - Compute the selected controls"
   ansible.builtin.set_fact:
     # The single list every control task or include tests with

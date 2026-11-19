@@ -90,4 +90,9 @@ cis_cron_allow_users: []
 # /etc/at.allow gets an empty one, and from then on only root can use at. Invalid names stop
 # the run at preflight.
 cis_at_allow_users: []
+
+# Firewall (4.1.4): the permanent target set on an active firewalld zone whose target is
+# empty or ACCEPT. One of default, REJECT or DROP; preflight stops the run on anything else.
+# The control never lowers a target that is already acceptable.
+cis_firewalld_zone_target: default
 ...
