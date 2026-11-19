@@ -328,7 +328,8 @@ before running the role on such a host. To skip a control, list its ID in `cis_e
   runtime and permanent mismatch with an acceptable permanent target is fixed by the reload
   alone (which also drops runtime-only changes). No active zone is a finding with nothing
   to change. 4.1.9 requires `nftables.service` to be neither enabled nor active (disabled,
-  masked or absent all pass) and `iptables-services` and `ufw` not to be installed; it
+  masked or absent all pass) and `iptables-services` and `ufw` (or the packages that provide them, such as
+  `iptables-nft-services`) not to be installed; it
   stops, disables and masks the service and removes each package that nothing else needs,
   keeping the `nftables` package itself, then reloads `firewalld` if it is running. A package
   something else needs is kept and the control is a finding.

@@ -222,7 +222,7 @@ yet. `implemented`: the control has its task file at
 | 4.1.6 | Ensure firewalld loopback source address traffic is configured | L1 Server, L1 Workstation | Manual | manual | planned |  |
 | 4.1.7 | Ensure firewalld services and ports are configured | L1 Server, L1 Workstation | Manual | manual | planned |  |
 | 4.1.8 | Ensure firewalld default zone is set to drop | L2 Server, L2 Workstation | Manual | manual | planned | Lockout risk |
-| 4.1.9 | Ensure conflicting firewall utilities are not in use with firewalld | L1 Server, L1 Workstation | Automated | implement | implemented | Stops and masks nftables.service; removes iptables-services and ufw only when nothing else needs them |
+| 4.1.9 | Ensure conflicting firewall utilities are not in use with firewalld | L1 Server, L1 Workstation | Automated | implement | implemented | Stops and masks nftables.service; removes the packages providing iptables-services and ufw only when nothing else needs them |
 | 4.1.10 | Ensure firewalld logs denied packets | L2 Server, L2 Workstation | Automated | implement | planned |  |
 | 4.1.11 | Ensure firewalld blocks ICMP timestamp requests and replies | L2 Server, L2 Workstation | Automated | implement | planned |  |
 

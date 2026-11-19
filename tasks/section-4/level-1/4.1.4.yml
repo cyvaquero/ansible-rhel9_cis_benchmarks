@@ -49,8 +49,10 @@
             bad=0
             reload=0
             for z in $zones; do
-              rt=$(firewall-cmd --zone="$z" --get-target 2>/dev/null)
-              pt=$(firewall-cmd --permanent --zone="$z" --get-target 2>/dev/null)
+              # The runtime target comes from list-all: --get-target needs --permanent.
+              # Both sides drop any %% (%%REJECT%% is REJECT) so they compare equal.
+              rt=$(firewall-cmd --zone="$z" --list-all 2>/dev/null | sed -n 's/^[[:space:]]*target:[[:space:]]*//p' | head -n 1 | tr -d '%[:space:]')
+              pt=$(firewall-cmd --permanent --zone="$z" --get-target 2>/dev/null | tr -d '%[:space:]')
               case "$pt" in
                 ACCEPT) echo "accept:$z"; bad=1 ;;
                 "") echo "empty:$z"; bad=1 ;;

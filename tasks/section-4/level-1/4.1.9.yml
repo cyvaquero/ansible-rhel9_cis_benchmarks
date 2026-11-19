@@ -1,6 +1,8 @@
 ---
 # 4.1.9 - nftables.service is neither enabled nor active (disabled, masked, inactive and
 # not installed all pass), and the packages iptables-services and ufw are not installed.
+# Installed means a package providing either name is installed, so the real package
+# (iptables-nft-services on RHEL 9) is found, tested and removed, not the virtual name.
 # The nftables package itself stays: firewalld needs it. The fix stops, disables and masks
 # nftables.service, and removes iptables-services and ufw with dnf unless another installed
 # package needs them (the rpm erase test of tasks/lib/service_not_in_use.yml; a package
@@ -29,8 +31,13 @@
           - |
             erase=""
             blocked=""
-            for p in iptables-services ufw; do
-              rpm -q "$p" >/dev/null 2>&1 && erase="$erase $p"
+            # On RHEL 9 iptables-services is provided by iptables-nft-services, so ask
+            # which installed packages provide each name and test those.
+            for v in iptables-services ufw; do
+              names=$(rpm -q --qf '%{NAME}\n' --whatprovides "$v" 2>/dev/null) || continue
+              for p in $names; do
+                case " $erase " in *" $p "*) ;; *) erase="$erase $p" ;; esac
+              done
             done
             while :; do
               set -- $erase
