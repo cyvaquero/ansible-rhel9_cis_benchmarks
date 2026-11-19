@@ -67,7 +67,7 @@
       - "{{ cis_ja_allow }}"
       - "{{ cis_ja_deny }}"
       - "{{ cis_ja_group }}"
-      - "{{ cis_ja_users | select('match', '^[A-Za-z_][A-Za-z0-9_.-]*$') | join(' ') }}"
+      - "{{ cis_ja_users | select('regex', '^[A-Za-z_][A-Za-z0-9_.-]*$', match_type='fullmatch') | join(' ') }}"
   register: cis_ja_check
   changed_when: false
   check_mode: false

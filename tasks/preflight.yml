@@ -124,7 +124,7 @@
     # dropped without a message later (tasks/lib/job_allow.yml).
     cis_rejected_users: >-
       {{ ((item.value | reject('string') | list)
-          + (item.value | select('string') | reject('match', '^[A-Za-z_][A-Za-z0-9_.-]*$') | list))
+          + (item.value | select('string') | reject('regex', '^[A-Za-z_][A-Za-z0-9_.-]*$', match_type='fullmatch') | list))
          if (item.value is sequence and item.value is not string and item.value is not mapping)
          else [] }}
   loop:

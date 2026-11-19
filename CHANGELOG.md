@@ -14,7 +14,7 @@ implements, then the role's own version.
 
 - Preflight now stops the run when `cis_cron_allow_users` or `cis_at_allow_users` is not a
   list, or has an item that is not a plain login name (a typo with a space, a leading digit,
-  an empty string, a number), and names the rejected items. Before, such items were dropped
+  a trailing newline, an empty string, a number), and names the rejected items. Before, such items were dropped
   without any message. #44
 
 ## [3.0.0_0.0.21]
