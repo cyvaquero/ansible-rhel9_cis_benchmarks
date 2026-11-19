@@ -4,7 +4,7 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.24).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.25).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and these controls are implemented:
 
 - kernel modules, 1.1.1.1 to 1.1.1.11;
@@ -21,7 +21,8 @@ selection, audit mode and lint CI exist, and these controls are implemented:
 - time synchronization, 2.3.1 to 2.3.3;
 - job schedulers, 2.4.1.1 to 2.4.2.1;
 - network devices and kernel modules, 3.1.1 to 3.2.6;
-- IPv4 kernel parameters, 3.3.1.1 to 3.3.1.20.
+- IPv4 kernel parameters, 3.3.1.1 to 3.3.1.20;
+- IPv6 kernel parameters, 3.3.2.1 to 3.3.2.8.
 
 Every other control is still planned. Do not run this against hosts you care about.
 
@@ -198,8 +199,8 @@ before running the role on such a host. To skip a control, list its ID in `cis_e
   `grubenv` and `user.cfg` (stricter modes stay) and, on UEFI hosts, makes sure the
   `/boot/efi` fstab entry has `uid=0`, `gid=0` and `umask=0077`. 1.4.3 and 1.4.4 (Level 2)
   add a drop-in to `rescue.service` or `emergency.service` only when their effective
-  command no longer asks for the root password. The sysctl controls (1.5.1 to 1.5.7 and
-  3.3.1) write `/etc/sysctl.d/99-zz-cis-benchmarks.conf`, named to sort after the vendor
+  command no longer asks for the root password. The sysctl controls (1.5.1 to 1.5.7,
+  3.3.1 and 3.3.2) write `/etc/sysctl.d/99-zz-cis-benchmarks.conf`, named to sort after the vendor
   and admin files, only when the configured value is not accepted, and also set the running
   value; a value that a later file still overrides is a finding. 1.5.8 writes
   `/etc/security/limits.d/99-zz-cis-benchmarks.conf` (`* hard core 0`); entries for other
@@ -299,6 +300,16 @@ before running the role on such a host. To skip a control, list its ID in `cis_e
   or runs rootful containers or libvirt NAT, needs forwarding: list 3.3.1.1, 3.3.1.2 and
   3.3.1.3 in `cis_exclusions`. Likewise a host that relies on `route_localnet` or
   asymmetric routing (`rp_filter`) excludes those IDs.
+- IPv6 kernel parameters (3.3.2): each control sets one parameter (forwarding, accept
+  redirects, accept source route, accept router advertisements, each for `all` and
+  `default`) to 0 through the shared sysctl logic described above. The controls are
+  skipped, with no finding, when IPv6 is disabled: when the `ipv6` module parameter
+  `disable` is missing or not 0, or when both the `all` and `default` `disable_ipv6`
+  sysctls are 1. 3.3.2.1 and 3.3.2.2 turn IPv6 forwarding off, so a host that routes IPv6,
+  or runs containers or libvirt with IPv6 networking, lists them in `cis_exclusions`. A host
+  that relies on the kernel's own router-advertisement handling for its IPv6 address or
+  default route (not NetworkManager, which processes router advertisements itself) lists
+  3.3.2.7 and 3.3.2.8 in `cis_exclusions`.
 - Time synchronization (2.3): 2.3.1 installs `chrony`. 2.3.2 looks for a `server` or `pool`
   line in `/etc/chrony.conf` and in the files its `include`, `confdir` and `sourcedir`
   directives pull in; `sourcedir /run/chrony-dhcp` is ignored because DHCP sources exist

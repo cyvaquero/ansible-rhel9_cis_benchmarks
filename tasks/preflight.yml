@@ -178,4 +178,32 @@
   tags:
     - always
     - preflight
+
+# IPv6 is treated as disabled when the ipv6 module parameter is missing or not 0, or when
+# both the all and default disable_ipv6 sysctls are 1. The 3.3.2 controls are skipped then.
+- name: "Preflight - Read the IPv6 disable settings"
+  ansible.builtin.command:
+    argv:
+      - /bin/bash
+      - -c
+      - |
+        for f in /sys/module/ipv6/parameters/disable /proc/sys/net/ipv6/conf/all/disable_ipv6 /proc/sys/net/ipv6/conf/default/disable_ipv6; do
+          printf '%s=%s\n' "$f" "$(tr -d ' \t\r\n' < "$f" 2>/dev/null)"
+        done
+  register: cis_ipv6_read
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Work out whether IPv6 is disabled"
+  ansible.builtin.set_fact:
+    cis_ipv6_disabled: >-
+      {{ (cis_ipv6_read.stdout_lines | default([]) | select('match', '^/sys/module/ipv6/parameters/disable=0$') | list | length == 0)
+      or (cis_ipv6_read.stdout_lines | default([]) | select('match', '^/proc/sys/net/ipv6/conf/(all|default)/disable_ipv6=1$') | list | length == 2) }}
+  tags:
+    - always
+    - preflight
 ...

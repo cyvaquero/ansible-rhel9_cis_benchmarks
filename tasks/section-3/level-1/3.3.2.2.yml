@@ -1,0 +1,21 @@
+---
+# 3.3.2.2 - net.ipv6.conf.default.forwarding is set to 0, both running and in the configuration.
+# Only when IPv6 is enabled (cis_ipv6_disabled from preflight); on a host with IPv6
+# disabled the control is skipped with no finding. The logic is shared in
+# tasks/lib/sysctl.yml.
+
+- name: "3.3.2.2 - Ensure net.ipv6.conf.default.forwarding is configured"
+  ansible.builtin.import_tasks: ../../lib/sysctl.yml
+  vars:
+    cis_sc_id: "3.3.2.2"
+    cis_sc_key: "net.ipv6.conf.default.forwarding"
+    cis_sc_ok: ["0"]
+    cis_sc_set: "0"
+  when: not (cis_ipv6_disabled | bool)
+  tags:
+    - "3.3.2.2"
+    - section-3
+    - level-1
+    - server
+    - workstation
+...
