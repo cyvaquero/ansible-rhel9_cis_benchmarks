@@ -8,6 +8,17 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.24]
+
+### Added
+
+- Section 3.3.1 controls, the IPv4 kernel parameters 3.3.1.1 to 3.3.1.20, using the same
+  sysctl logic as 1.5.1 to 1.5.7: the role writes a late-sorting file under
+  `/etc/sysctl.d/` and sets the running value, and a conflicting value in
+  `/etc/sysctl.conf` is a finding. IPv4 forwarding (3.3.1.1 to 3.3.1.3) is set to 0, so hosts
+  that route or run rootful containers or libvirt NAT must list those IDs in
+  `cis_exclusions`. 3.3.1.1 is Level 1 on a workstation and Level 2 on a server. Part of #7.
+
 ## [3.0.0_0.0.23]
 
 ### Added

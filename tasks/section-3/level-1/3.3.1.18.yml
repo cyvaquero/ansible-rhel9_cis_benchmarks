@@ -1,0 +1,17 @@
+---
+# 3.3.1.18 - net.ipv4.tcp_syncookies is set to 1, both running and in the configuration. The logic is shared in tasks/lib/sysctl.yml.
+
+- name: "3.3.1.18 - Ensure net.ipv4.tcp_syncookies is configured"
+  ansible.builtin.import_tasks: ../../lib/sysctl.yml
+  vars:
+    cis_sc_id: "3.3.1.18"
+    cis_sc_key: "net.ipv4.tcp_syncookies"
+    cis_sc_ok: ["1"]
+    cis_sc_set: "1"
+  tags:
+    - "3.3.1.18"
+    - section-3
+    - level-1
+    - server
+    - workstation
+...

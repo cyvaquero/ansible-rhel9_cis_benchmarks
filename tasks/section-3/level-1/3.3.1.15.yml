@@ -1,0 +1,17 @@
+---
+# 3.3.1.15 - net.ipv4.conf.default.accept_source_route is set to 0, both running and in the configuration. The logic is shared in tasks/lib/sysctl.yml.
+
+- name: "3.3.1.15 - Ensure net.ipv4.conf.default.accept_source_route is configured"
+  ansible.builtin.import_tasks: ../../lib/sysctl.yml
+  vars:
+    cis_sc_id: "3.3.1.15"
+    cis_sc_key: "net.ipv4.conf.default.accept_source_route"
+    cis_sc_ok: ["0"]
+    cis_sc_set: "0"
+  tags:
+    - "3.3.1.15"
+    - section-3
+    - level-1
+    - server
+    - workstation
+...

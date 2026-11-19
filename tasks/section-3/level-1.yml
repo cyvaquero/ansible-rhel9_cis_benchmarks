@@ -38,4 +38,84 @@
 - name: "3.2.6 - Ensure the can kernel module is not available"
   ansible.builtin.import_tasks: level-1/3.2.6.yml
   when: "'3.2.6' in cis_selected_controls"
+
+- name: "3.3.1.1 - Ensure net.ipv4.ip_forward is configured"
+  ansible.builtin.import_tasks: level-1/3.3.1.1.yml
+  when: "'3.3.1.1' in cis_selected_controls"
+
+- name: "3.3.1.2 - Ensure net.ipv4.conf.all.forwarding is configured"
+  ansible.builtin.import_tasks: level-1/3.3.1.2.yml
+  when: "'3.3.1.2' in cis_selected_controls"
+
+- name: "3.3.1.3 - Ensure net.ipv4.conf.default.forwarding is configured"
+  ansible.builtin.import_tasks: level-1/3.3.1.3.yml
+  when: "'3.3.1.3' in cis_selected_controls"
+
+- name: "3.3.1.4 - Ensure net.ipv4.conf.all.send_redirects is configured"
+  ansible.builtin.import_tasks: level-1/3.3.1.4.yml
+  when: "'3.3.1.4' in cis_selected_controls"
+
+- name: "3.3.1.5 - Ensure net.ipv4.conf.default.send_redirects is configured"
+  ansible.builtin.import_tasks: level-1/3.3.1.5.yml
+  when: "'3.3.1.5' in cis_selected_controls"
+
+- name: "3.3.1.6 - Ensure net.ipv4.icmp_ignore_bogus_error_responses is configured"
+  ansible.builtin.import_tasks: level-1/3.3.1.6.yml
+  when: "'3.3.1.6' in cis_selected_controls"
+
+- name: "3.3.1.7 - Ensure net.ipv4.icmp_echo_ignore_broadcasts is configured"
+  ansible.builtin.import_tasks: level-1/3.3.1.7.yml
+  when: "'3.3.1.7' in cis_selected_controls"
+
+- name: "3.3.1.8 - Ensure net.ipv4.conf.all.accept_redirects is configured"
+  ansible.builtin.import_tasks: level-1/3.3.1.8.yml
+  when: "'3.3.1.8' in cis_selected_controls"
+
+- name: "3.3.1.9 - Ensure net.ipv4.conf.default.accept_redirects is configured"
+  ansible.builtin.import_tasks: level-1/3.3.1.9.yml
+  when: "'3.3.1.9' in cis_selected_controls"
+
+- name: "3.3.1.10 - Ensure net.ipv4.conf.all.secure_redirects is configured"
+  ansible.builtin.import_tasks: level-1/3.3.1.10.yml
+  when: "'3.3.1.10' in cis_selected_controls"
+
+- name: "3.3.1.11 - Ensure net.ipv4.conf.default.secure_redirects is configured"
+  ansible.builtin.import_tasks: level-1/3.3.1.11.yml
+  when: "'3.3.1.11' in cis_selected_controls"
+
+- name: "3.3.1.12 - Ensure net.ipv4.conf.all.rp_filter is configured"
+  ansible.builtin.import_tasks: level-1/3.3.1.12.yml
+  when: "'3.3.1.12' in cis_selected_controls"
+
+- name: "3.3.1.13 - Ensure net.ipv4.conf.default.rp_filter is configured"
+  ansible.builtin.import_tasks: level-1/3.3.1.13.yml
+  when: "'3.3.1.13' in cis_selected_controls"
+
+- name: "3.3.1.14 - Ensure net.ipv4.conf.all.accept_source_route is configured"
+  ansible.builtin.import_tasks: level-1/3.3.1.14.yml
+  when: "'3.3.1.14' in cis_selected_controls"
+
+- name: "3.3.1.15 - Ensure net.ipv4.conf.default.accept_source_route is configured"
+  ansible.builtin.import_tasks: level-1/3.3.1.15.yml
+  when: "'3.3.1.15' in cis_selected_controls"
+
+- name: "3.3.1.16 - Ensure net.ipv4.conf.all.log_martians is configured"
+  ansible.builtin.import_tasks: level-1/3.3.1.16.yml
+  when: "'3.3.1.16' in cis_selected_controls"
+
+- name: "3.3.1.17 - Ensure net.ipv4.conf.default.log_martians is configured"
+  ansible.builtin.import_tasks: level-1/3.3.1.17.yml
+  when: "'3.3.1.17' in cis_selected_controls"
+
+- name: "3.3.1.18 - Ensure net.ipv4.tcp_syncookies is configured"
+  ansible.builtin.import_tasks: level-1/3.3.1.18.yml
+  when: "'3.3.1.18' in cis_selected_controls"
+
+- name: "3.3.1.19 - Ensure net.ipv4.conf.all.route_localnet is configured"
+  ansible.builtin.import_tasks: level-1/3.3.1.19.yml
+  when: "'3.3.1.19' in cis_selected_controls"
+
+- name: "3.3.1.20 - Ensure net.ipv4.conf.default.route_localnet is configured"
+  ansible.builtin.import_tasks: level-1/3.3.1.20.yml
+  when: "'3.3.1.20' in cis_selected_controls"
 ...
