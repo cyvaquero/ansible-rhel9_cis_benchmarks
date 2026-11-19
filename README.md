@@ -4,7 +4,7 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.20).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.21).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and these controls are implemented:
 
 - kernel modules, 1.1.1.1 to 1.1.1.11;
@@ -17,7 +17,9 @@ selection, audit mode and lint CI exist, and these controls are implemented:
 - command-line banners, 1.7.1 to 1.7.6;
 - GDM, 1.8.1 to 1.8.7;
 - services, 2.1.1 to 2.1.23;
-- service clients, 2.2.1 to 2.2.4.
+- service clients, 2.2.1 to 2.2.4;
+- time synchronization, 2.3.1 to 2.3.3;
+- job schedulers, 2.4.1.1 to 2.4.2.1.
 
 Every other control is still planned. Do not run this against hosts you care about.
 
@@ -134,6 +136,20 @@ ansible-playbook -i inventory site.yml -e target=webservers
 | Variable | Default | Meaning |
 |---|---|---|
 | `cis_services_keep` | `[]` | CIS IDs of service controls whose service the site needs, for example `["2.1.1", "2.1.10"]`. A listed control (2.1.1 to 2.1.22) is skipped with no change and no finding. |
+
+### Time synchronization and job schedulers (2.3, 2.4)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `cis_time_sources` | `[]` | 2.3.2: full chrony directive lines, for example `["server time.example.com iburst"]`, appended to `/etc/chrony.conf` only when chrony has no `server` or `pool` source at all. Existing lines are never edited or removed. Empty: a host with no source is a finding and nothing changes. |
+| `cis_cron_allow_users` | `[]` | 2.4.1.9: users added to `/etc/cron.allow` when missing from it. Users already in the file are never removed. |
+| `cis_at_allow_users` | `[]` | 2.4.2.1: users added to `/etc/at.allow`, with the same rules. |
+
+**Warning:** with the default empty lists, a host that had no `/etc/cron.allow` (or
+`/etc/at.allow`) gets an empty one, and from then on only root can use `crontab` (or `at`):
+once an allow file exists the deny file is ignored. List every account that needs them
+before running the role on such a host. To skip a control, list its ID in `cis_exclusions`;
+`cis_services_keep` applies only to the service controls (2.1.1 to 2.1.22).
 
 ### Audit vs remediate
 
@@ -260,6 +276,25 @@ ansible-playbook -i inventory site.yml -e target=webservers
 - Client controls (2.2.1 to 2.2.4: ftp, openldap-clients, telnet, tftp): the package is removed
   when no other installed package needs it (an `rpm -e --test` decides); one that is needed
   stays installed, dependents are never removed, and that is a finding.
+- Time synchronization (2.3): 2.3.1 installs `chrony`. 2.3.2 looks for a `server` or `pool`
+  line in `/etc/chrony.conf` and in the files its `include`, `confdir` and `sourcedir`
+  directives pull in; `sourcedir /run/chrony-dhcp` is ignored because DHCP sources exist
+  only at run time. With none, it appends `cis_time_sources` (when set) and restarts
+  `chronyd` only if it is running; with chrony not installed, or no sources configured, it
+  is a finding and nothing is installed or guessed. 2.3.3 removes only the `-u root` option
+  from the `OPTIONS` value in `/etc/sysconfig/chronyd` (restarting `chronyd` only if it is
+  running); a missing file is compliant.
+- Job schedulers (2.4): the controls apply only when `cronie` (2.4.1) or `at` (2.4.2.1) is
+  installed; otherwise they pass and nothing is installed. 2.4.1.1 unmasks, enables and
+  starts `crond`. 2.4.1.2 to 2.4.1.8 require `/etc/crontab` and the `/etc/cron.*`
+  directories to be root:root with no group or other permissions (`go-rwx`; owner bits stay).
+  A missing path is compliant and never created (RHEL 9 has no `/etc/cron.yearly`); a symlink
+  or a path of the wrong type is a finding and is never changed. 2.4.1.9 and 2.4.2.1 require
+  the allow file (`/etc/cron.allow`, `/etc/at.allow`) to exist, owned by root with group root
+  or `crontab` (`daemon` for `at`) and mode 0640 or stricter, and the deny file, if present,
+  the same; the fix creates a missing allow file empty, sets owner, group (the named group
+  when it exists, else root) and mode, and adds the users listed in `cis_cron_allow_users` or
+  `cis_at_allow_users`. It never removes a user or deletes a deny file.
 - The summary is tagged `summary` and `always`, and lists every selected audit-only and
   manual control even on a run limited by tags.
 

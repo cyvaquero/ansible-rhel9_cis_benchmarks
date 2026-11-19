@@ -8,6 +8,24 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.21]
+
+### Added
+
+- Section 2.3 and 2.4 controls. 2.3.1 installs chrony. 2.3.2 appends the new `cis_time_sources`
+  lines to `/etc/chrony.conf` when chrony has no `server` or `pool` source (included files
+  are followed; DHCP sources under `/run/chrony-dhcp` are ignored) and reports a finding when
+  none is configured and the list is empty. 2.3.3 removes only `-u root` from the
+  `OPTIONS` in `/etc/sysconfig/chronyd`. Both restart chronyd only when it is running.
+  2.4.1.1 unmasks, enables and starts crond. 2.4.1.2 to 2.4.1.8 set root:root and remove
+  group and other access on `/etc/crontab` and the `/etc/cron.*` directories, skipping
+  missing paths and reporting symlinks. 2.4.1.9 and 2.4.2.1 create the cron and at allow
+  files when missing, fix owner, group and mode of the allow and deny files, and add the
+  users in the new `cis_cron_allow_users` and `cis_at_allow_users` (never removing any).
+  With the empty defaults, a host that had no allow file ends up with an empty one, so only
+  root can use `crontab` or `at`. The cron and at controls pass when `cronie` or `at` is not
+  installed. Part of #6.
+
 ## [3.0.0_0.0.20]
 
 ### Fixed

@@ -1,0 +1,116 @@
+---
+# 2.3.3 - chronyd does not run as root: the last OPTIONS= assignment in
+# /etc/sysconfig/chronyd has no "-u root" option (also written "-uroot"). A missing file
+# is compliant: chronyd then runs as its built-in default user, chrony.
+#
+# The fix rewrites that assignment as OPTIONS="<value>" with just the "-u root" option
+# removed and every other option kept, then restarts chronyd only when it is running. The
+# check works out the new value itself and prints it, so the edit is the same in --check.
+# Nothing is read by sourcing the file. A control that still fails after the fix is a
+# finding; under --check nothing changes and nothing is recorded in remediate mode.
+#
+# The check prints state=ok or state=bad, new=<value> when bad, and active=yes when chronyd
+# is running; its exit status is 1 when state=bad.
+
+- name: "2.3.3 - Handle the chronyd options"
+  tags:
+    - "2.3.3"
+    - section-2
+    - level-1
+    - server
+    - workstation
+  block:
+    - name: "2.3.3 - Check chronyd does not run as root"
+      ansible.builtin.command:
+        argv: &cis_chrony_opt_argv
+          - /bin/bash
+          - -c
+          - |
+            set -u
+            f=$1
+            [ -f "$f" ] || { echo "state=ok"; exit 0; }
+            line=$(grep -E '^[[:space:]]*OPTIONS=' "$f" | tail -n 1)
+            [ -n "$line" ] || { echo "state=ok"; exit 0; }
+            val=${line#*OPTIONS=}
+            case "$val" in
+              \"*) val=${val#\"}; val=${val%%\"*} ;;
+              \'*) val=${val#\'}; val=${val%%\'*} ;;
+            esac
+            out=""
+            bad=0
+            skip=0
+            for t in $val; do
+              if [ "$skip" = 1 ]; then
+                skip=0
+                case "$t" in root|\"root\"|\'root\') bad=1; continue ;; esac
+                out="$out -u"
+              fi
+              case "$t" in
+                -u) skip=1; continue ;;
+                -uroot) bad=1; continue ;;
+              esac
+              out="$out $t"
+            done
+            # A trailing -u with no value stays as it was.
+            [ "$skip" = 1 ] && out="$out -u"
+            out=${out# }
+            systemctl is-active --quiet chronyd 2>/dev/null && echo "active=yes"
+            if [ "$bad" = 1 ]; then echo "new=$out"; echo "state=bad"; exit 1; fi
+            echo "state=ok"
+          - bash
+          - /etc/sysconfig/chronyd
+      register: cis_check_2_3_3
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    - name: "2.3.3 - Remove the root user option from the chronyd options"
+      ansible.builtin.lineinfile:
+        path: /etc/sysconfig/chronyd
+        regexp: '^\s*OPTIONS='
+        line: >-
+          OPTIONS="{{ cis_check_2_3_3.stdout_lines | select('match', '^new=') | first | regex_replace('^new=', '') }}"
+      register: cis_fix_2_3_3
+      when:
+        - not (cis_audit_only | bool)
+        - "'state=bad' in cis_check_2_3_3.stdout_lines"
+
+    # A running chronyd keeps its old user until it restarts.
+    - name: "2.3.3 - Restart chronyd when it is running"
+      ansible.builtin.systemd:
+        name: chronyd
+        state: restarted
+      when:
+        - cis_fix_2_3_3 is changed
+        - "'active=yes' in cis_check_2_3_3.stdout_lines"
+
+    - name: "2.3.3 - Check again after the fix"
+      ansible.builtin.command:
+        argv: *cis_chrony_opt_argv
+      register: cis_recheck_2_3_3
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_check_2_3_3.rc != 0
+
+    - name: "2.3.3 - Record the finding when the check fails in audit mode"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "2.3.3"
+      when:
+        - cis_audit_only | bool
+        - cis_check_2_3_3.rc != 0
+
+    # Under --check the fix does not happen, so the second check says nothing new.
+    - name: "2.3.3 - Record the finding when the fix did not take effect"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "2.3.3"
+      when:
+        - cis_recheck_2_3_3 is not skipped
+        - not ansible_check_mode
+        - cis_recheck_2_3_3.rc != 0
+...
