@@ -1,0 +1,17 @@
+---
+# 3.3.1.5 - net.ipv4.conf.default.send_redirects is set to 0, both running and in the configuration. The logic is shared in tasks/lib/sysctl.yml.
+
+- name: "3.3.1.5 - Ensure net.ipv4.conf.default.send_redirects is configured"
+  ansible.builtin.import_tasks: ../../lib/sysctl.yml
+  vars:
+    cis_sc_id: "3.3.1.5"
+    cis_sc_key: "net.ipv4.conf.default.send_redirects"
+    cis_sc_ok: ["0"]
+    cis_sc_set: "0"
+  tags:
+    - "3.3.1.5"
+    - section-3
+    - level-1
+    - server
+    - workstation
+...

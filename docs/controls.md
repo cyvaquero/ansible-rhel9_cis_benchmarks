@@ -181,26 +181,26 @@ yet. `implemented`: the control has its task file at
 | 3.2.4 | Ensure sctp kernel module is not available | L1 Server, L1 Workstation | Automated | implement | implemented |  |
 | 3.2.5 | Ensure atm kernel module is not available | L1 Server, L1 Workstation | Automated | implement | implemented |  |
 | 3.2.6 | Ensure can kernel module is not available | L1 Server, L1 Workstation | Automated | implement | implemented |  |
-| 3.3.1.1 | Ensure net.ipv4.ip_forward is configured | L1 Workstation, L2 Server | Automated | implement | planned | Profile differs: L1 Workstation, L2 Server |
-| 3.3.1.2 | Ensure net.ipv4.conf.all.forwarding is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.1.3 | Ensure net.ipv4.conf.default.forwarding is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.1.4 | Ensure net.ipv4.conf.all.send_redirects is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.1.5 | Ensure net.ipv4.conf.default.send_redirects is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.1.6 | Ensure net.ipv4.icmp_ignore_bogus_error_responses is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.1.7 | Ensure net.ipv4.icmp_echo_ignore_broadcasts is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.1.8 | Ensure net.ipv4.conf.all.accept_redirects is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.1.9 | Ensure net.ipv4.conf.default.accept_redirects is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.1.10 | Ensure net.ipv4.conf.all.secure_redirects is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.1.11 | Ensure net.ipv4.conf.default.secure_redirects is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.1.12 | Ensure net.ipv4.conf.all.rp_filter is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.1.13 | Ensure net.ipv4.conf.default.rp_filter is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.1.14 | Ensure net.ipv4.conf.all.accept_source_route is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.1.15 | Ensure net.ipv4.conf.default.accept_source_route is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.1.16 | Ensure net.ipv4.conf.all.log_martians is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.1.17 | Ensure net.ipv4.conf.default.log_martians is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.1.18 | Ensure net.ipv4.tcp_syncookies is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.1.19 | Ensure net.ipv4.conf.all.route_localnet is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.3.1.20 | Ensure net.ipv4.conf.default.route_localnet is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
+| 3.3.1.1 | Ensure net.ipv4.ip_forward is configured | L1 Workstation, L2 Server | Automated | implement | implemented | Profile differs: L1 Workstation, L2 Server |
+| 3.3.1.2 | Ensure net.ipv4.conf.all.forwarding is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.3.1.3 | Ensure net.ipv4.conf.default.forwarding is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.3.1.4 | Ensure net.ipv4.conf.all.send_redirects is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.3.1.5 | Ensure net.ipv4.conf.default.send_redirects is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.3.1.6 | Ensure net.ipv4.icmp_ignore_bogus_error_responses is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.3.1.7 | Ensure net.ipv4.icmp_echo_ignore_broadcasts is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.3.1.8 | Ensure net.ipv4.conf.all.accept_redirects is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.3.1.9 | Ensure net.ipv4.conf.default.accept_redirects is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.3.1.10 | Ensure net.ipv4.conf.all.secure_redirects is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.3.1.11 | Ensure net.ipv4.conf.default.secure_redirects is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.3.1.12 | Ensure net.ipv4.conf.all.rp_filter is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.3.1.13 | Ensure net.ipv4.conf.default.rp_filter is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.3.1.14 | Ensure net.ipv4.conf.all.accept_source_route is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.3.1.15 | Ensure net.ipv4.conf.default.accept_source_route is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.3.1.16 | Ensure net.ipv4.conf.all.log_martians is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.3.1.17 | Ensure net.ipv4.conf.default.log_martians is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.3.1.18 | Ensure net.ipv4.tcp_syncookies is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.3.1.19 | Ensure net.ipv4.conf.all.route_localnet is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.3.1.20 | Ensure net.ipv4.conf.default.route_localnet is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
 | 3.3.2.1 | Ensure net.ipv6.conf.all.forwarding is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 3.3.2.2 | Ensure net.ipv6.conf.default.forwarding is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 3.3.2.3 | Ensure net.ipv6.conf.all.accept_redirects is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
