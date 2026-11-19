@@ -1,5 +1,6 @@
 ---
-# Shared logic for the sysctl controls (1.5.1 to 1.5.7 and 3.3.1). A control file imports this with:
+# Shared logic for the sysctl controls (1.5.1 to 1.5.7 and 3.3.1). A control file imports
+# this with:
 #   cis_sc_id    the CIS ID, for the task names and the finding
 #   cis_sc_key   the kernel parameter
 #   cis_sc_ok    accepted values, as strings

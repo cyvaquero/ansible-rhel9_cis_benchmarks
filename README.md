@@ -20,7 +20,8 @@ selection, audit mode and lint CI exist, and these controls are implemented:
 - service clients, 2.2.1 to 2.2.4;
 - time synchronization, 2.3.1 to 2.3.3;
 - job schedulers, 2.4.1.1 to 2.4.2.1;
-- network devices and kernel modules, 3.1.1 to 3.2.6, and 3.3.1.1 to 3.3.1.20.
+- network devices and kernel modules, 3.1.1 to 3.2.6;
+- IPv4 kernel parameters, 3.3.1.1 to 3.3.1.20.
 
 Every other control is still planned. Do not run this against hosts you care about.
 
@@ -197,10 +198,10 @@ before running the role on such a host. To skip a control, list its ID in `cis_e
   `grubenv` and `user.cfg` (stricter modes stay) and, on UEFI hosts, makes sure the
   `/boot/efi` fstab entry has `uid=0`, `gid=0` and `umask=0077`. 1.4.3 and 1.4.4 (Level 2)
   add a drop-in to `rescue.service` or `emergency.service` only when their effective
-  command no longer asks for the root password. The sysctl controls (1.5.1 to 1.5.7 and 3.3.1) write
-  `/etc/sysctl.d/99-zz-cis-benchmarks.conf`, named to sort after the vendor and admin
-  files, only when the configured value is not accepted, and also set the running value;
-  a value that a later file still overrides is a finding. 1.5.8 writes
+  command no longer asks for the root password. The sysctl controls (1.5.1 to 1.5.7 and
+  3.3.1) write `/etc/sysctl.d/99-zz-cis-benchmarks.conf`, named to sort after the vendor
+  and admin files, only when the configured value is not accepted, and also set the running
+  value; a value that a later file still overrides is a finding. 1.5.8 writes
   `/etc/security/limits.d/99-zz-cis-benchmarks.conf` (`* hard core 0`); entries for other
   users or groups are a finding. 1.5.9 and 1.5.10 write
   `/etc/systemd/coredump.conf.d/99-zz-cis-benchmarks.conf`.
