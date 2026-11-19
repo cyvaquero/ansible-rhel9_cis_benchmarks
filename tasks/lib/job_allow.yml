@@ -15,8 +15,9 @@
 # creates a missing allow file (empty, 0640), sets owner, group and mode on either file
 # (the named group when it exists, else root; stricter modes stay), and adds every listed
 # user that is not yet in the allow file. Users are only ever added, never removed. A
-# symlink or a file of another type is never changed; it is a finding. A user name that is
-# not a plain login name is ignored. Remediate mode records a finding when something is
+# symlink or a file of another type is never changed; it is a finding. Preflight rejects a
+# user list with an item that is not a plain login name, so the filter on the last argument
+# below is only a guard. Remediate mode records a finding when something is
 # still not compliant after the fix; under --check nothing is fixed, so nothing is recorded.
 #
 # The check prints group=<name> (the group the fix uses), allow=<state> and deny=<state>

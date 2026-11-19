@@ -4,7 +4,7 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.21).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.22).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and these controls are implemented:
 
 - kernel modules, 1.1.1.1 to 1.1.1.11;
@@ -142,8 +142,8 @@ ansible-playbook -i inventory site.yml -e target=webservers
 | Variable | Default | Meaning |
 |---|---|---|
 | `cis_time_sources` | `[]` | 2.3.2: full chrony directive lines, for example `["server time.example.com iburst"]`, appended to `/etc/chrony.conf` only when chrony has no `server` or `pool` source at all. Existing lines are never edited or removed. Empty: a host with no source is a finding and nothing changes. |
-| `cis_cron_allow_users` | `[]` | 2.4.1.9: users added to `/etc/cron.allow` when missing from it. Users already in the file are never removed. |
-| `cis_at_allow_users` | `[]` | 2.4.2.1: users added to `/etc/at.allow`, with the same rules. |
+| `cis_cron_allow_users` | `[]` | 2.4.1.9: users added to `/etc/cron.allow` when missing from it. Users already in the file are never removed. Must be a list of plain login names; anything else stops the run at preflight. |
+| `cis_at_allow_users` | `[]` | 2.4.2.1: users added to `/etc/at.allow`, with the same rules; invalid names stop the run at preflight. |
 
 **Warning:** with the default empty lists, a host that had no `/etc/cron.allow` (or
 `/etc/at.allow`) gets an empty one, and from then on only root can use `crontab` (or `at`):
