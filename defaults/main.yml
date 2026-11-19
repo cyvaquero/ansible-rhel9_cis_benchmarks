@@ -80,11 +80,13 @@ cis_time_sources: []
 # Users already in the file are never removed. IMPORTANT: with the default empty list, a host
 # that had no /etc/cron.allow gets an empty one, and from then on only root can use crontab
 # (the deny file is ignored once the allow file exists). List every account that needs cron,
-# for example ["backup", "appuser"]; only plain login names are accepted.
+# for example ["backup", "appuser"]. Must be a list of plain login names; preflight stops
+# the run on anything else.
 cis_cron_allow_users: []
 
 # Job schedulers (2.4.2.1): users to add to /etc/at.allow, with the same rules as
 # cis_cron_allow_users. IMPORTANT: with the default empty list, a host that had no
-# /etc/at.allow gets an empty one, and from then on only root can use at.
+# /etc/at.allow gets an empty one, and from then on only root can use at. Invalid names stop
+# the run at preflight.
 cis_at_allow_users: []
 ...

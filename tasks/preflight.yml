@@ -108,6 +108,36 @@
     - always
     - preflight
 
+- name: "Preflight - Validate the cron and at allow-user lists"
+  ansible.builtin.assert:
+    that:
+      - item.value is sequence and item.value is not string and item.value is not mapping
+      - cis_rejected_users | length == 0
+    fail_msg: >-
+      {{ item.key }} must be a list of plain login names (letters, digits, underscore, dot
+      and hyphen, not starting with a digit or hyphen){{
+      (' - rejected items: ' ~ (cis_rejected_users | map('to_json') | join(', ')))
+      if cis_rejected_users | length > 0 else '' }}.
+    quiet: true
+  vars:
+    # Items that are not strings, then strings that are not login names, so nothing is
+    # dropped without a message later (tasks/lib/job_allow.yml).
+    cis_rejected_users: >-
+      {{ ((item.value | reject('string') | list)
+          + (item.value | select('string') | reject('regex', '^[A-Za-z_][A-Za-z0-9_.-]*$', match_type='fullmatch') | list))
+         if (item.value is sequence and item.value is not string and item.value is not mapping)
+         else [] }}
+  loop:
+    - key: cis_cron_allow_users
+      value: "{{ cis_cron_allow_users }}"
+    - key: cis_at_allow_users
+      value: "{{ cis_at_allow_users }}"
+  loop_control:
+    label: "{{ item.key }}"
+  tags:
+    - always
+    - preflight
+
 - name: "Preflight - Compute the selected controls"
   ansible.builtin.set_fact:
     # The single list every control task or include tests with
