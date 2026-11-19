@@ -7,6 +7,7 @@
 # An interface whose driver module cannot be found (built into the kernel, or no device
 # link) cannot be made unavailable by the role and is a finding. A driver that cannot be
 # unloaded, for example because another module uses it, is a finding from the shared logic.
+# As elsewhere, remediate mode under --check records no finding.
 
 - name: "3.1.2 - Find the wireless interface driver modules"
   ansible.builtin.command:
@@ -53,6 +54,8 @@
       tags: *cis_tags_3_1_2
   vars:
     cis_finding_id: "3.1.2"
-  when: cis_check_3_1_2.stdout_lines | default([]) | select('match', '^nomodule:') | list | length > 0
+  when:
+    - cis_check_3_1_2.stdout_lines | default([]) | select('match', '^nomodule:') | list | length > 0
+    - (cis_audit_only | bool) or not ansible_check_mode
   tags: *cis_tags_3_1_2
 ...

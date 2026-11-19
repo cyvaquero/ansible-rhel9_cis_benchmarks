@@ -63,9 +63,10 @@ cis_gdm_idle_delay: 900
 # when the configured one is not accepted.
 cis_gdm_lock_delay: 5
 
-# Services (2.1.1 to 2.1.22 and 3.1.3, bluetooth): CIS IDs of the service controls whose service the site needs.
-# A listed control is skipped completely: nothing is removed, stopped or masked, and no
-# finding is recorded. Example: ["2.1.1", "2.1.10"] keeps autofs and the NFS server; "3.1.3" keeps bluetooth.
+# Services (2.1.1 to 2.1.22, and 3.1.3 for bluetooth): CIS IDs of the service controls whose
+# service the site needs. A listed control is skipped completely: nothing is removed, stopped
+# or masked, and no finding is recorded. Example: ["2.1.1", "2.1.10"] keeps autofs and the
+# NFS server; "3.1.3" keeps bluetooth.
 cis_services_keep: []
 
 # Time synchronization (2.3.2): chrony directive lines to add to /etc/chrony.conf when chrony
