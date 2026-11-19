@@ -8,6 +8,18 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.23]
+
+### Added
+
+- Section 3.1 and 3.2 controls. 3.1.1 prints whether IPv6 is disabled for review. 3.1.2
+  (Level 1 Server) finds the driver module of every wireless interface and blocks,
+  blacklists and unloads it; a host with no wireless interface passes, and a driver that
+  cannot be unloaded or found is a finding. 3.1.3 removes `bluez` when nothing else needs
+  it, otherwise stops and masks `bluetooth.service` (Level 1 Server, Level 2 Workstation;
+  `cis_services_keep` skips it). 3.2.1 to 3.2.6 block, blacklist and unload the `dccp`,
+  `tipc`, `rds`, `sctp`, `atm` and `can` kernel modules. Part of #7.
+
 ## [3.0.0_0.0.22]
 
 ### Fixed

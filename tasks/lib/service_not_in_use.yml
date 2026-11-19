@@ -1,6 +1,6 @@
 ---
-# Shared logic for the "service not in use" controls (2.1.1 to 2.1.18). A control file
-# imports this with:
+# Shared logic for the "service not in use" controls (2.1.1 to 2.1.18, 3.1.3). A control
+# file imports this with:
 #   cis_svc_id        the CIS ID, for the task names and the finding
 #   cis_svc_name      a short service label for the task names
 #   cis_svc_packages  the packages that provide the service

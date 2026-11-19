@@ -172,15 +172,15 @@ yet. `implemented`: the control has its task file at
 
 | CIS ID | Title | Profile | Type | Disposition | Status | Notes |
 |---|---|---|---|---|---|---|
-| 3.1.1 | Ensure IPv6 status is identified | L1 Server, L1 Workstation | Manual | manual | planned | Report IPv6 state for review |
-| 3.1.2 | Ensure wireless interfaces are not available | L1 Server | Automated | implement | planned |  |
-| 3.1.3 | Ensure bluetooth services are not in use | L1 Server, L2 Workstation | Automated | implement | planned |  |
-| 3.2.1 | Ensure dccp kernel module is not available | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.2.2 | Ensure tipc kernel module is not available | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.2.3 | Ensure rds kernel module is not available | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.2.4 | Ensure sctp kernel module is not available | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.2.5 | Ensure atm kernel module is not available | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 3.2.6 | Ensure can kernel module is not available | L1 Server, L1 Workstation | Automated | implement | planned |  |
+| 3.1.1 | Ensure IPv6 status is identified | L1 Server, L1 Workstation | Manual | manual | implemented | Report IPv6 state for review |
+| 3.1.2 | Ensure wireless interfaces are not available | L1 Server | Automated | implement | implemented |  |
+| 3.1.3 | Ensure bluetooth services are not in use | L1 Server, L2 Workstation | Automated | implement | implemented | Profile differs: L1 Server, L2 Workstation |
+| 3.2.1 | Ensure dccp kernel module is not available | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.2.2 | Ensure tipc kernel module is not available | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.2.3 | Ensure rds kernel module is not available | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.2.4 | Ensure sctp kernel module is not available | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.2.5 | Ensure atm kernel module is not available | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 3.2.6 | Ensure can kernel module is not available | L1 Server, L1 Workstation | Automated | implement | implemented |  |
 | 3.3.1.1 | Ensure net.ipv4.ip_forward is configured | L1 Workstation, L2 Server | Automated | implement | planned | Profile differs: L1 Workstation, L2 Server |
 | 3.3.1.2 | Ensure net.ipv4.conf.all.forwarding is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 3.3.1.3 | Ensure net.ipv4.conf.default.forwarding is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
