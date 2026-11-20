@@ -35,4 +35,13 @@ cis_sudoers_dropin: /etc/sudoers.d/zz-cis-rhel9
 # Section 5.2: the Python the sudo controls run their read-only scanner with
 # (files/sudoers_scan.py): the interpreter Ansible found on the managed node.
 cis_sudo_python: "{{ ansible_facts.python.executable | default('/usr/bin/python3') }}"
+
+# Section 5.3 (PAM): the pwquality drop-in the role owns. libpwquality reads pwquality.conf and
+# then the files of pwquality.conf.d in name order and the last value of a key wins, so the name
+# sorts after the usual ones; a file that sorts after it would win and the controls report it.
+cis_pwquality_dropin: /etc/security/pwquality.conf.d/zz-cis-rhel9.conf
+
+# Section 5.3: the Python the PAM controls run their read-only scanner with
+# (files/pam_scan.py): the interpreter Ansible found on the managed node.
+cis_pam_python: "{{ ansible_facts.python.executable | default('/usr/bin/python3') }}"
 ...

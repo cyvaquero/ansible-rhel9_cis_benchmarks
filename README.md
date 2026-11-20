@@ -4,7 +4,7 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.29).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.30).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and these controls are implemented:
 
 - kernel modules, 1.1.1.1 to 1.1.1.11;
@@ -25,7 +25,8 @@ selection, audit mode and lint CI exist, and these controls are implemented:
 - IPv6 kernel parameters, 3.3.2.1 to 3.3.2.8;
 - firewalld, 4.1.1 to 4.1.11 (section 4 is complete);
 - SSH server, 5.1.1 to 5.1.23;
-- sudo and su, 5.2.1 to 5.2.12.
+- sudo and su, 5.2.1 to 5.2.12;
+- PAM and authselect, 5.3.1.1 to 5.3.3.4.4.
 
 Every other control is still planned. Do not run this against hosts you care about.
 
@@ -187,6 +188,20 @@ wherever it comes from, is never changed.
 | `cis_sudo_logfile` | `/var/log/sudo.log` | 5.2.5: the path written as `Defaults logfile=` when no sudo log file is set. An absolute path of letters, digits, underscore, dot, hyphen and slash; anything else stops the run at preflight. A log file the site already set is kept. Rotate the file (logrotate) to keep it from filling the disk. |
 | `cis_sudo_timestamp_timeout` | `15` | 5.2.10: minutes, from 1 to 15, written when the effective timeout is above 15 or disabled (negative). No line (sudo's own default of 5) and any value from 0 to 15 are compliant and never changed. |
 | `cis_su_group` | `sugroup` | 5.2.12: the group `pam_wheel` allows to use `su`. A plain group name (lowercase letters, digits, underscore, hyphen); anything else stops the run at preflight. The role creates it empty when missing and never adds or removes members. A group that has members is a finding. |
+
+### PAM and authselect (5.3)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `cis_authselect_profile` | `cis-rhel9` | 5.3.2.1: the name of the custom authselect profile the role creates (based on `sssd`) and selects on a host authselect does not manage. Lowercase letters, digits, underscore and hyphen, starting with a letter, at most 32 characters, and not `minimal`, `sssd`, `winbind` or `nis`; anything else stops the run at preflight. A host already on an authselect profile keeps it. |
+| `cis_faillock_deny` | `5` | 5.3.3.1.1: `deny` in `/etc/security/faillock.conf`, from 1 to 5, written when the value there is not from 1 to 5. A lower value already set is kept. |
+| `cis_faillock_unlock_time` | `900` | 5.3.3.1.2: `unlock_time` in `faillock.conf`, in seconds: 0 (never unlocked automatically) or 900 to 604800. Written when the value there is not 0 or at least 900; a longer time already set is kept. |
+| `cis_faillock_root_unlock_time` | `60` | 5.3.3.1.3 (Level 2): seconds, 60 to 604800, used only to replace a `root_unlock_time` below 60 that is already in `faillock.conf`. The role itself adds `even_deny_root`. |
+| `cis_pwquality_difok`, `cis_pwquality_minlen` | `2`, `14` | 5.3.3.2.1, 5.3.3.2.2: the values written to the role's pwquality drop-in when the value in effect is below 2 and below 14. A higher value already set anywhere is kept. |
+| `cis_pwquality_maxrepeat`, `cis_pwquality_maxsequence` | `3`, `3` | 5.3.3.2.4, 5.3.3.2.5: from 1 to 3, written when the value in effect is unset, 0 or above 3. |
+| `cis_pwhistory_remember` | `24` | 5.3.3.3.1: `remember` in `/etc/security/pwhistory.conf`, from 24 to 400, written when the value there is below 24. |
+
+Values outside these ranges stop the run at preflight.
 
 ### Audit vs remediate
 
@@ -471,6 +486,48 @@ wherever it comes from, is never changed.
   managed by authselect. Members of the group are reported (a finding), never removed. The
   scanner is `files/sudoers_scan.py`, run with the managed node's Python. See
   [docs/review-controls.md](docs/review-controls.md).
+- PAM and authselect (5.3): the role changes PAM only through authselect, never by editing
+  `/etc/pam.d`. 5.3.1.1 to 5.3.1.3 check `pam`, `authselect` and `libpwquality` against the
+  minimum version-release the benchmark names (1.5.1-14, 1.2.6-1, 1.4.4-8; rpm's own comparison)
+  and upgrade a package with dnf only when it is missing or below that; a newer one is left
+  alone and audit mode never upgrades. 5.3.2.1: on a host authselect does not manage (RHEL 9's
+  default install, whose `system-auth` and `password-auth` are plain files) the role creates a
+  custom profile, `cis_authselect_profile`, as a copy of `sssd` and selects it with
+  `authselect select custom/<name> <features> --force --backup=<name>-pre-<time>`, enabling
+  `with-faillock` (5.3.2.2), `with-pwhistory` (5.3.2.4) and `without-nullok` (5.3.3.4.1) for the
+  selected controls. The `sssd` profile lets local accounts through before `pam_sss`, so sssd
+  need not be configured. `--force` is needed because the files were not made by authselect;
+  authselect backs up what it replaces. **To go back:** `authselect backup-list` shows the
+  backups and `authselect backup-restore <name>` restores the earlier `system-auth`,
+  `password-auth`, `postlogin`, `smartcard-auth`, `fingerprint-auth` and `nsswitch.conf`. A host
+  already on a valid authselect profile keeps its profile (stock or the site's own) and the
+  role only enables the features it needs (`authselect enable-feature`); a profile authselect
+  finds not valid is selected again, the same way. **Lockout guard:** a broken PAM stack cuts
+  off SSH logins and become, so before anything is selected the role renders what authselect
+  would write (`authselect test`, which writes nothing) and refuses, with a message and a
+  finding, when a line of `system-auth` or `password-auth` names a PAM module that is not
+  installed, when `nsswitch.conf` would use a name service whose library is missing, when
+  the stacks or `nsswitch.conf` in place now use a module or name service the profile would
+  drop (a site's `pam_krb5`, `pam_ldap`, `pam_tally2`, `ldap`), or when authselect cannot render
+  it. After a change it runs `authselect check` and `authselect current`, opens a new
+  connection and runs a become task, so a stack that does not work fails the run at once.
+  The settings go in the module configuration files, not on the PAM lines: `deny`,
+  `unlock_time` (and for Level 2 `even_deny_root`) in `/etc/security/faillock.conf`;
+  `difok`, `minlen`, `maxrepeat`, `maxsequence`, `dictcheck` and `enforce_for_root` in the
+  role's own `/etc/security/pwquality.conf.d/zz-cis-rhel9.conf`; `remember` and
+  `enforce_for_root` in `/etc/security/pwhistory.conf`. A setting that is already compliant,
+  wherever it comes from, is never touched, so a stricter value is kept. libpwquality reads
+  `pwquality.conf` and then `pwquality.conf.d/*.conf` in name order and the last value wins, so
+  compliance is judged on the value in effect; a non-compliant value in a file the role does
+  not own that still wins (one that sorts after `zz-cis-rhel9.conf`) is a finding with its file
+  and line, and the role edits no such file. An argument on a PAM line (`deny=`, `minlen=`,
+  `remember=`, `nullok`, a weak hash, a missing `use_authtok`) overrides the files and is
+  judged from the active `system-auth` and `password-auth`. On the role's own profile it is
+  removed or added in the templates in `/etc/authselect/custom/<name>/` and applied with
+  `authselect apply-changes`; on any other profile only the features can fix it and the rest is
+  a finding. The password hash is `sha512` (also accepted: `yescrypt`). 5.3.3.2.3 only
+  reports the complexity settings in effect. The scanner is `files/pam_scan.py`, run with the
+  managed node's Python. See [docs/review-controls.md](docs/review-controls.md).
 - The summary is tagged `summary` and `always`, and lists every selected audit-only and
   manual control even on a run limited by tags.
 
@@ -479,8 +536,8 @@ wherever it comes from, is never changed.
 Every push and pull request runs [ansible-lint](https://ansible.readthedocs.io/projects/lint/)
 (`production` profile, configured in `.ansible-lint`) and an
 `ansible-playbook --syntax-check` of `tests/syntax.yml`, plus the consistency checks
-`tests/check_controls.py` and `tests/check_benchmark_version.py` and the sudoers scanner test
-`tests/check_sudoers_scan.py`, on Python 3.9 with Ansible 8.7
+`tests/check_controls.py` and `tests/check_benchmark_version.py` and the scanner tests
+`tests/check_sudoers_scan.py` and `tests/check_pam_scan.py`, on Python 3.9 with Ansible 8.7
 (ansible-core 2.15), the supported control node. To run the same locally:
 
 ```sh
@@ -493,6 +550,7 @@ ansible-playbook -i localhost, -e target=localhost --syntax-check tests/syntax.y
 python3 tests/check_controls.py
 python3 tests/check_benchmark_version.py
 python3 tests/check_sudoers_scan.py
+python3 tests/check_pam_scan.py
 ```
 
 `tests/requirements.txt` pins ansible-lint 6.22.2, the newest release that installs with

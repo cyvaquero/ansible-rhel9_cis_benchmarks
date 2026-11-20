@@ -1,0 +1,27 @@
+---
+# 5.3.3.2.4 - maxrepeat is from 1 to 3 in the pwquality configuration (the role's drop-in gets
+# cis_pwquality_maxrepeat, 3 by default, when it is not); a maxrepeat= argument on a pam_pwquality
+# line outside that range overrides the files and is removed from the templates of the role's own
+# profile.
+# The logic is in tasks/lib/pam_setting.yml.
+
+- name: "5.3.3.2.4 - Ensure password same consecutive characters is configured"
+  ansible.builtin.import_tasks: ../../lib/pam_setting.yml
+  vars:
+    cis_ps_id: "5.3.3.2.4"
+    cis_ps_conf:
+      - path: '{{ cis_pwquality_dropin }}'
+        regexp: '^\s*maxrepeat\s*='
+        line: 'maxrepeat = {{ cis_pwquality_maxrepeat }}'
+    cis_ps_header: '{{ cis_pwquality_dropin }}'
+    cis_ps_tmpl:
+      - re: '(^[ \t]*[a-z]+[ \t]+[^\n#]*?\bpam_pwquality\.so\b[^\n#]*?)[ \t]+maxrepeat=\S*'
+        to: '\1'
+    cis_ps_feature: ''
+  tags:
+    - "5.3.3.2.4"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

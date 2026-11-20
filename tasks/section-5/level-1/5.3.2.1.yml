@@ -1,0 +1,192 @@
+---
+# 5.3.2.1 - PAM is managed by an active authselect profile and authselect finds the
+# configuration valid (authselect current and authselect check).
+#
+# A host that authselect does not manage (the stock RHEL 9 install, whose system-auth and
+# password-auth are plain files) is converted in remediate mode. The role creates a custom
+# profile of its own, named by cis_authselect_profile (cis-rhel9), based on sssd
+# (authselect create-profile), and selects it with the features the selected controls need
+# (with-faillock for 5.3.2.2, with-pwhistory for 5.3.2.4, without-nullok for 5.3.3.4.1):
+# authselect select custom/<name> <features> --force --backup=<name>-pre-<time>. --force is
+# needed because the files were not made by authselect; it backs up the files it replaces
+# first. A host that already has a valid authselect profile keeps it: the later controls
+# only enable the features they need. A host whose profile authselect finds not valid (files
+# edited by hand) is selected again, with its own profile and features, the same way.
+#
+# Lockout guard. A PAM stack that does not work locks out SSH logins and become for good, so
+# before anything is selected the role renders what authselect would write (authselect test,
+# which writes nothing) and refuses, with a message and a finding, when
+#  - a line of system-auth or password-auth names a PAM module that is not installed, or
+#    nsswitch.conf would use a name service whose library is not installed;
+#  - the stacks or nsswitch.conf now in place use a module or a name service the new profile
+#    would drop (a site's pam_krb5, pam_ldap, pam_tally2, or ldap in nsswitch.conf), so the
+#    conversion would silently remove it; or
+#  - authselect cannot render the profile.
+# Optional lines (a leading minus) are not counted. A host with sssd configured is fine: the
+# sssd profile lets local accounts through before pam_sss. After the change the role checks
+# authselect check and current, opens a new connection and runs a become task, so a broken
+# stack fails the run loudly (pam_verify.yml). The backup is restored with
+# authselect backup-restore <backup>. Under --check nothing changes; a refusal is still a
+# finding, since it does not depend on the change.
+
+- name: "5.3.2.1 - Handle the authselect profile"
+  tags:
+    - "5.3.2.1"
+    - section-5
+    - level-1
+    - server
+    - workstation
+  vars:
+    cis_as_wanted: >-
+      {{ (['with-faillock'] if '5.3.2.2' in cis_selected_controls else [])
+         + (['with-pwhistory'] if '5.3.2.4' in cis_selected_controls else [])
+         + (['without-nullok'] if '5.3.3.4.1' in cis_selected_controls else []) }}
+  block:
+    # authselect may have been installed or upgraded by 5.3.1.2 just now.
+    - name: "5.3.2.1 - Read the PAM and authselect configuration"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/lib/pam_state.yml"
+
+    - name: "5.3.2.1 - Work out what the authselect profile needs"
+      ansible.builtin.set_fact:
+        cis_as_mode: >-
+          {{ 'none' if not (cis_pam.authselect.present | bool)
+             else ('ok' if (cis_pam.authselect.managed | bool and cis_pam.authselect.check_ok | bool)
+                   else ('repair' if cis_pam.authselect.managed | bool else 'convert')) }}
+        cis_as_target: >-
+          {{ cis_pam.authselect.profile if cis_pam.authselect.managed | bool else 'custom/' ~ cis_authselect_profile }}
+        cis_as_features: >-
+          {{ ((cis_pam.authselect.features | default([])) + cis_as_wanted) | unique | list
+             if cis_pam.authselect.managed | bool else cis_as_wanted }}
+        cis_as_backup: "{{ cis_authselect_profile }}-pre-{{ ansible_facts.date_time.epoch | default('run') }}"
+        cis_as_pending: false
+
+    - name: "5.3.2.1 - Report that authselect is not installed"
+      ansible.builtin.debug:
+        msg: >-
+          authselect is not installed, so PAM cannot be managed by a profile. 5.3.1.2 installs it
+          in remediate mode.
+      when: cis_as_mode == 'none'
+
+    # The converted host is guarded against the sssd profile the role's own is a copy of; a
+    # host to repair is guarded against its own profile.
+    - name: "5.3.2.1 - Check what authselect would write before it is selected"
+      ansible.builtin.command:
+        argv: "{{ [cis_pam_python, '-c', lookup('ansible.builtin.file', role_path ~ '/files/pam_scan.py'), 'guard',
+                   ('sssd' if cis_as_mode == 'convert' else cis_pam.authselect.profile)] + cis_as_features }}"
+      register: cis_as_guard_read
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when: cis_as_mode in ['convert', 'repair']
+
+    - name: "5.3.2.1 - Record whether the new profile is safe"
+      ansible.builtin.set_fact:
+        cis_as_guard: >-
+          {{ (cis_as_guard_read.stdout | from_json)
+             if (cis_as_guard_read.rc | default(1) == 0 and cis_as_guard_read.stdout | default('') | length > 0)
+             else {'ok': false, 'problems': ['the lockout guard could not run']} }}
+      when: cis_as_mode in ['convert', 'repair']
+
+    # Under --check the conversion does not happen. The controls after this one see the stack as
+    # it is now; this tells them it will be replaced, so they do not record findings the
+    # conversion is going to fix (tasks/lib/pam_setting.yml).
+    - name: "5.3.2.1 - Note that a conversion is pending under --check"
+      ansible.builtin.set_fact:
+        cis_as_pending: true
+      when:
+        - ansible_check_mode
+        - not (cis_audit_only | bool)
+        - cis_as_mode in ['convert', 'repair']
+        - cis_as_guard.ok | bool
+
+    - name: "5.3.2.1 - Report why the profile is not selected"
+      ansible.builtin.debug:
+        msg: >-
+          The authselect profile is not selected, so PAM is left as it is: {{ cis_as_guard.problems | join('; ') }}.
+          Selecting it would replace the PAM stacks with ones that could lock out SSH logins or
+          become. Fix the cause (install the module, or move the site's module into an authselect
+          profile you maintain), then run the role again.
+      when:
+        - cis_as_mode in ['convert', 'repair']
+        - not (cis_as_guard.ok | bool)
+
+    - name: "5.3.2.1 - Create the role's authselect profile"
+      ansible.builtin.command:
+        argv:
+          - authselect
+          - create-profile
+          - "{{ cis_authselect_profile }}"
+          - -b
+          - sssd
+        creates: "/etc/authselect/custom/{{ cis_authselect_profile }}"
+      register: cis_as_create
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - cis_as_mode == 'convert'
+        - cis_as_guard.ok | bool
+        - not ansible_check_mode
+
+    - name: "5.3.2.1 - Select the profile with a backup of the files it replaces"
+      ansible.builtin.command:
+        argv: "{{ ['authselect', 'select', cis_as_target] + cis_as_features + ['--force', '--backup=' ~ cis_as_backup] }}"
+      register: cis_as_select
+      changed_when: cis_as_select.rc == 0
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - cis_as_mode in ['convert', 'repair']
+        - cis_as_guard.ok | bool
+        - not ansible_check_mode
+        - cis_as_create.rc | default(0) == 0
+
+    - name: "5.3.2.1 - Report that the profile could not be created or selected"
+      ansible.builtin.debug:
+        msg: >-
+          authselect could not set up the profile {{ cis_as_target }}:
+          {{ ((cis_as_create.stderr | default('')) ~ ' ' ~ (cis_as_select.stderr | default('')))
+             | trim | default('see authselect output', true) }}
+      when:
+        - cis_as_select is not skipped or cis_as_create is not skipped
+        - cis_as_create.rc | default(0) != 0 or cis_as_select.rc | default(0) != 0
+
+    - name: "5.3.2.1 - Say where the backup is"
+      ansible.builtin.debug:
+        msg: >-
+          PAM is now managed by authselect profile {{ cis_as_target }} with {{ cis_as_features | join(' ') | default('no features', true) }}.
+          The previous files are in the authselect backup {{ cis_as_backup }}; to go back run
+          `authselect backup-restore {{ cis_as_backup }}` (authselect backup-list shows them).
+      when:
+        - cis_as_select is not skipped
+        - cis_as_select.rc | default(1) == 0
+
+    - name: "5.3.2.1 - Check the stack after the change"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/lib/pam_verify.yml"
+      vars:
+        cis_pv_id: "5.3.2.1"
+      when:
+        - cis_as_select is not skipped
+        - cis_as_select.rc | default(1) == 0
+
+    - name: "5.3.2.1 - Read the PAM and authselect configuration again after the change"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/lib/pam_state.yml"
+      when:
+        - cis_as_select is not skipped
+        - cis_as_select.rc | default(1) == 0
+
+    # A refusal, a failed selection and a configuration still not valid are findings; audit
+    # mode records every host that is not managed. Under --check the conversion does not
+    # happen, so a pending one is not recorded in remediate mode.
+    - name: "5.3.2.1 - Record the finding"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "5.3.2.1"
+      when:
+        - cis_as_mode != 'ok'
+        - >-
+          (cis_as_mode == 'none' and not (ansible_check_mode and '5.3.1.2' in cis_selected_controls))
+          or (cis_audit_only | bool)
+          or (cis_as_mode in ['convert', 'repair'] and not (cis_as_guard.ok | bool))
+          or (not ansible_check_mode and cis_as_mode in ['convert', 'repair']
+              and cis_pam.verdict['5.3.2.1'].state | default('bad') != 'ok')
+...

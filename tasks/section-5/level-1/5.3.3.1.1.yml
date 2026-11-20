@@ -1,0 +1,26 @@
+---
+# 5.3.3.1.1 - deny is set in /etc/security/faillock.conf to a value from 1 to 5 (the role writes cis_faillock_deny, 5 by
+# default, when it is not); a deny= argument on a pam_faillock line with another value overrides the file and
+# is removed from the templates of the role's own authselect profile.
+# The logic is in tasks/lib/pam_setting.yml.
+
+- name: "5.3.3.1.1 - Ensure password failed attempts lockout is configured"
+  ansible.builtin.import_tasks: ../../lib/pam_setting.yml
+  vars:
+    cis_ps_id: "5.3.3.1.1"
+    cis_ps_conf:
+      - path: /etc/security/faillock.conf
+        regexp: '^\s*deny\s*='
+        line: 'deny = {{ cis_faillock_deny }}'
+    cis_ps_header: ''
+    cis_ps_tmpl:
+      - re: '(^[ \t]*[a-z]+[ \t]+[^\n#]*?\bpam_faillock\.so\b[^\n#]*?)[ \t]+deny=\S*'
+        to: '\1'
+    cis_ps_feature: ''
+  tags:
+    - "5.3.3.1.1"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

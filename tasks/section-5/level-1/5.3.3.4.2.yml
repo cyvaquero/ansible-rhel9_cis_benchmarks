@@ -1,0 +1,23 @@
+---
+# 5.3.3.4.2 - No pam_unix password line has a remember= argument (history is pam_pwhistory's job). It is
+# removed from the templates of the role's own authselect profile; on any other profile it is a
+# finding.
+# The logic is in tasks/lib/pam_setting.yml.
+
+- name: "5.3.3.4.2 - Ensure pam_unix does not include remember"
+  ansible.builtin.import_tasks: ../../lib/pam_setting.yml
+  vars:
+    cis_ps_id: "5.3.3.4.2"
+    cis_ps_conf: []
+    cis_ps_header: ''
+    cis_ps_tmpl:
+      - re: '(^[ \t]*password[ \t]+[^\n#]*?\bpam_unix\.so\b[^\n#]*?)[ \t]+remember=\S*'
+        to: '\1'
+    cis_ps_feature: ''
+  tags:
+    - "5.3.3.4.2"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

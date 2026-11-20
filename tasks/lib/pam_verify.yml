@@ -1,0 +1,76 @@
+---
+# After a change to the PAM stack (authselect select, enable-feature or apply-changes): check
+# that authselect still finds a valid configuration, print the profile in force, then end the
+# SSH connection and run a become task. sshd with UsePAM runs the account and session phases of
+# password-auth for every new login and sudo runs those of system-auth, so a stack that does not
+# work fails the run here, loudly, instead of silently locking the host out later. Not run
+# under --check, which changes nothing. A control file includes this (include_tasks, so the
+# meta task, which ignores `when`, runs only when it is wanted) with
+#   cis_pv_id   the CIS ID
+# Every task carries the always tag, as finding.yml does. The finding for a
+# configuration authselect reports as not valid is recorded here.
+
+- name: "{{ cis_pv_id ~ ' - Check the authselect configuration after the change' }}"
+  ansible.builtin.command:
+    argv:
+      - authselect
+      - check
+  register: cis_pv_check
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when: not ansible_check_mode
+  tags:
+    - always
+
+- name: "{{ cis_pv_id ~ ' - Read the authselect profile now in force' }}"
+  ansible.builtin.command:
+    argv:
+      - authselect
+      - current
+  register: cis_pv_current
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when: not ansible_check_mode
+  tags:
+    - always
+
+- name: "{{ cis_pv_id ~ ' - Report the authselect state after the change' }}"
+  ansible.builtin.debug:
+    msg: >-
+      authselect after the change: {{ cis_pv_current.stdout_lines | default([]) | join('; ') }}.
+      authselect check: {{ (cis_pv_check.stdout_lines | default([]) + cis_pv_check.stderr_lines | default([])) | join('; ') }}
+  when: not ansible_check_mode
+  tags:
+    - always
+
+- name: "{{ cis_pv_id ~ ' - Record the finding when authselect does not find the configuration valid' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "{{ cis_pv_id }}"
+  when:
+    - not ansible_check_mode
+    - cis_pv_check.rc | default(0) != 0
+  tags:
+    - always
+
+- name: "{{ cis_pv_id ~ ' - Open a new connection after the PAM change' }}"
+  ansible.builtin.meta: reset_connection
+  when: not ansible_check_mode
+  tags:
+    - always
+
+# A new login through sshd (account and session phases) and sudo (all phases but auth with
+# NOPASSWD). If either is broken this task fails and so does the run.
+- name: "{{ cis_pv_id ~ ' - Check that a new login and become still work after the PAM change' }}"
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/id
+      - -u
+  changed_when: false
+  check_mode: false
+  when: not ansible_check_mode
+  tags:
+    - always
+...

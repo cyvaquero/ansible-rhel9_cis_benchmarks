@@ -216,4 +216,116 @@
 - name: "5.2.12 - Ensure access to the su command is restricted"
   ansible.builtin.import_tasks: level-1/5.2.12.yml
   when: "'5.2.12' in cis_selected_controls"
+
+# 5.3 (PAM and authselect). PAM is changed only through authselect. A host that authselect does not
+# manage is moved to a custom profile of the role's own (cis_authselect_profile, based on sssd) by
+# 5.3.2.1, behind a lockout guard (see that file); the settings go in the configuration files of
+# the modules (faillock.conf, a pwquality drop-in, pwhistory.conf), not on the PAM lines. The
+# verdicts come from files/pam_scan.py, read once here and again after each change
+# (tasks/lib/pam_state.yml). 5.3.3.1.3 (Level 2) is in level-2.yml, and runs after the Level 1
+# controls here.
+
+# One read of the host before the controls of 5.3.2 and 5.3.3. It only reads, so it runs in
+# audit mode too, and it carries the always tag so a run limited to one control still has it.
+- name: "5.3 - Read the PAM and authselect configuration"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/lib/pam_state.yml"
+  when: "cis_selected_controls | select('match', '^5\\.3\\.[23]\\.') | list | length > 0"
+  tags:
+    - always
+
+- name: "5.3.1.1 - Ensure latest version of pam is installed"
+  ansible.builtin.import_tasks: level-1/5.3.1.1.yml
+  when: "'5.3.1.1' in cis_selected_controls"
+
+- name: "5.3.1.2 - Ensure latest version of authselect is installed"
+  ansible.builtin.import_tasks: level-1/5.3.1.2.yml
+  when: "'5.3.1.2' in cis_selected_controls"
+
+- name: "5.3.1.3 - Ensure latest version of libpwquality is installed"
+  ansible.builtin.import_tasks: level-1/5.3.1.3.yml
+  when: "'5.3.1.3' in cis_selected_controls"
+
+- name: "5.3.2.1 - Ensure PAM is managed by an active authselect profile"
+  ansible.builtin.import_tasks: level-1/5.3.2.1.yml
+  when: "'5.3.2.1' in cis_selected_controls"
+
+- name: "5.3.2.2 - Ensure pam_faillock module is enabled"
+  ansible.builtin.import_tasks: level-1/5.3.2.2.yml
+  when: "'5.3.2.2' in cis_selected_controls"
+
+- name: "5.3.2.3 - Ensure pam_pwquality module is enabled"
+  ansible.builtin.import_tasks: level-1/5.3.2.3.yml
+  when: "'5.3.2.3' in cis_selected_controls"
+
+- name: "5.3.2.4 - Ensure pam_pwhistory module is enabled"
+  ansible.builtin.import_tasks: level-1/5.3.2.4.yml
+  when: "'5.3.2.4' in cis_selected_controls"
+
+- name: "5.3.2.5 - Ensure pam_unix module is enabled"
+  ansible.builtin.import_tasks: level-1/5.3.2.5.yml
+  when: "'5.3.2.5' in cis_selected_controls"
+
+- name: "5.3.3.1.1 - Ensure password failed attempts lockout is configured"
+  ansible.builtin.import_tasks: level-1/5.3.3.1.1.yml
+  when: "'5.3.3.1.1' in cis_selected_controls"
+
+- name: "5.3.3.1.2 - Ensure password unlock time is configured"
+  ansible.builtin.import_tasks: level-1/5.3.3.1.2.yml
+  when: "'5.3.3.1.2' in cis_selected_controls"
+
+- name: "5.3.3.2.1 - Ensure password number of changed characters is configured"
+  ansible.builtin.import_tasks: level-1/5.3.3.2.1.yml
+  when: "'5.3.3.2.1' in cis_selected_controls"
+
+- name: "5.3.3.2.2 - Ensure password length is configured"
+  ansible.builtin.import_tasks: level-1/5.3.3.2.2.yml
+  when: "'5.3.3.2.2' in cis_selected_controls"
+
+- name: "5.3.3.2.3 - Ensure password complexity is configured"
+  ansible.builtin.import_tasks: level-1/5.3.3.2.3.yml
+  when: "'5.3.3.2.3' in cis_selected_controls"
+
+- name: "5.3.3.2.4 - Ensure password same consecutive characters is configured"
+  ansible.builtin.import_tasks: level-1/5.3.3.2.4.yml
+  when: "'5.3.3.2.4' in cis_selected_controls"
+
+- name: "5.3.3.2.5 - Ensure password maximum sequential characters is configured"
+  ansible.builtin.import_tasks: level-1/5.3.3.2.5.yml
+  when: "'5.3.3.2.5' in cis_selected_controls"
+
+- name: "5.3.3.2.6 - Ensure password dictionary check is enabled"
+  ansible.builtin.import_tasks: level-1/5.3.3.2.6.yml
+  when: "'5.3.3.2.6' in cis_selected_controls"
+
+- name: "5.3.3.2.7 - Ensure password quality is enforced for the root user"
+  ansible.builtin.import_tasks: level-1/5.3.3.2.7.yml
+  when: "'5.3.3.2.7' in cis_selected_controls"
+
+- name: "5.3.3.3.1 - Ensure password history remember is configured"
+  ansible.builtin.import_tasks: level-1/5.3.3.3.1.yml
+  when: "'5.3.3.3.1' in cis_selected_controls"
+
+- name: "5.3.3.3.2 - Ensure password history is enforced for the root user"
+  ansible.builtin.import_tasks: level-1/5.3.3.3.2.yml
+  when: "'5.3.3.3.2' in cis_selected_controls"
+
+- name: "5.3.3.3.3 - Ensure pam_pwhistory includes use_authtok"
+  ansible.builtin.import_tasks: level-1/5.3.3.3.3.yml
+  when: "'5.3.3.3.3' in cis_selected_controls"
+
+- name: "5.3.3.4.1 - Ensure pam_unix does not include nullok"
+  ansible.builtin.import_tasks: level-1/5.3.3.4.1.yml
+  when: "'5.3.3.4.1' in cis_selected_controls"
+
+- name: "5.3.3.4.2 - Ensure pam_unix does not include remember"
+  ansible.builtin.import_tasks: level-1/5.3.3.4.2.yml
+  when: "'5.3.3.4.2' in cis_selected_controls"
+
+- name: "5.3.3.4.3 - Ensure pam_unix includes a strong password hashing algorithm"
+  ansible.builtin.import_tasks: level-1/5.3.3.4.3.yml
+  when: "'5.3.3.4.3' in cis_selected_controls"
+
+- name: "5.3.3.4.4 - Ensure pam_unix includes use_authtok"
+  ansible.builtin.import_tasks: level-1/5.3.3.4.4.yml
+  when: "'5.3.3.4.4' in cis_selected_controls"
 ...

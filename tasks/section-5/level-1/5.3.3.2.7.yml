@@ -1,0 +1,23 @@
+---
+# 5.3.3.2.7 - enforce_for_root is set in the pwquality configuration (the role's drop-in gets it
+# when it is not); the option is a flag, so one file setting it is enough.
+# The logic is in tasks/lib/pam_setting.yml.
+
+- name: "5.3.3.2.7 - Ensure password quality is enforced for the root user"
+  ansible.builtin.import_tasks: ../../lib/pam_setting.yml
+  vars:
+    cis_ps_id: "5.3.3.2.7"
+    cis_ps_conf:
+      - path: '{{ cis_pwquality_dropin }}'
+        regexp: '^\s*enforce_for_root\b'
+        line: 'enforce_for_root'
+    cis_ps_header: '{{ cis_pwquality_dropin }}'
+    cis_ps_tmpl: []
+    cis_ps_feature: ''
+  tags:
+    - "5.3.3.2.7"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

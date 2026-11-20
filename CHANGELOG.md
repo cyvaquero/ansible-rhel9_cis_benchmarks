@@ -8,6 +8,39 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.30]
+
+### Added
+
+- Section 5.3, PAM and authselect, 5.3.1.1 to 5.3.3.4.4. The role changes PAM only through
+  authselect, never by editing `/etc/pam.d`. 5.3.1.1 to 5.3.1.3 check `pam`, `authselect` and
+  `libpwquality` against the minimum version the benchmark names (1.5.1-14, 1.2.6-1, 1.4.4-8)
+  and upgrade a package only when it is missing or below that. 5.3.2.1 moves a host authselect
+  does not manage to a custom profile of its own, `cis-rhel9` (variable `cis_authselect_profile`,
+  a copy of `sssd`), selected with `--force` and a backup (`authselect backup-restore` undoes it),
+  with `with-faillock`, `with-pwhistory` and `without-nullok` enabled for the selected controls;
+  a host already on an authselect profile keeps it and only gets the features enabled.
+  A lockout guard renders what authselect would write before anything is selected and refuses,
+  with a finding, when it names a PAM module or name service library that is not installed,
+  would drop a module or name service the host uses now, or cannot be rendered; after a change
+  the role checks `authselect check`, opens a new connection and runs a become task. 5.3.2.2 to
+  5.3.2.5 check the modules in `system-auth` and `password-auth` (5.3.2.2 and 5.3.2.4 enable the
+  feature). 5.3.3.x write the settings to the module configuration files: `deny` and
+  `unlock_time` (and for Level 2 5.3.3.1.3 `even_deny_root`) to `/etc/security/faillock.conf`;
+  `difok`, `minlen`, `maxrepeat`, `maxsequence`, `dictcheck` and `enforce_for_root` to the role's
+  own `/etc/security/pwquality.conf.d/zz-cis-rhel9.conf`; `remember` and `enforce_for_root` to
+  `/etc/security/pwhistory.conf`. Compliance is judged on the value in effect (libpwquality's
+  last-file-wins order), a stricter value is never loosened, and a value in a file the role does
+  not own that still wins is a finding with its file and line. Arguments on PAM lines that
+  override the files are judged from the active stacks and fixed through the templates of the
+  role's own profile (`authselect apply-changes`); on another profile only the features
+  (`without-nullok`) can fix them and the rest is a finding. 5.3.3.2.3 (manual) reports the
+  complexity settings in effect. New variables `cis_authselect_profile`, `cis_faillock_deny` (5),
+  `cis_faillock_unlock_time` (900), `cis_faillock_root_unlock_time` (60), `cis_pwquality_difok`
+  (2), `cis_pwquality_minlen` (14), `cis_pwquality_maxrepeat` (3), `cis_pwquality_maxsequence`
+  (3) and `cis_pwhistory_remember` (24), validated at preflight. New `tests/check_pam_scan.py`,
+  run in CI. Part of #9.
+
 ## [3.0.0_0.0.29]
 
 ### Added

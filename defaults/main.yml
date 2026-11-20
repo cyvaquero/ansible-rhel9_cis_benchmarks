@@ -158,4 +158,36 @@ cis_sudo_timestamp_timeout: 15
 # group name (lowercase letters, digits, underscore and hyphen, starting with a letter or
 # underscore); preflight stops the run on anything else.
 cis_su_group: sugroup
+
+# PAM (5.3.2.1): the name of the authselect profile the role creates, based on sssd, and
+# selects on a host authselect does not manage yet (the profile is /etc/authselect/custom/<name>).
+# A host already managed by an authselect profile keeps it. Lowercase letters, digits, underscore
+# and hyphen, starting with a letter, at most 32 characters, and not the name of a stock profile
+# (minimal, sssd, winbind, nis); preflight stops the run on anything else.
+cis_authselect_profile: cis-rhel9
+
+# pam_faillock (5.3.3.1.1 to 5.3.3.1.3), written to /etc/security/faillock.conf when the value
+# there is not compliant. cis_faillock_deny: from 1 to 5. cis_faillock_unlock_time: seconds, 0
+# (never unlocked automatically) or from 900 to 604800. cis_faillock_root_unlock_time (Level 2):
+# seconds, from 60 to 604800, used only to replace a root_unlock_time below 60 that is already
+# set; the role adds even_deny_root, which locks root like any account. A stricter value that
+# is already set (a lower deny, a longer unlock_time) is never loosened. Preflight stops the run
+# on anything else.
+cis_faillock_deny: 5
+cis_faillock_unlock_time: 900
+cis_faillock_root_unlock_time: 60
+
+# pam_pwquality (5.3.3.2.1, 5.3.3.2.2, 5.3.3.2.4, 5.3.3.2.5), written to the role's own file
+# in /etc/security/pwquality.conf.d when the value in effect is not compliant. cis_pwquality_difok:
+# at least 2. cis_pwquality_minlen: at least 14. cis_pwquality_maxrepeat and
+# cis_pwquality_maxsequence: from 1 to 3. A stricter value already set anywhere is never
+# loosened. Preflight stops the run on anything else.
+cis_pwquality_difok: 2
+cis_pwquality_minlen: 14
+cis_pwquality_maxrepeat: 3
+cis_pwquality_maxsequence: 3
+
+# pam_pwhistory (5.3.3.3.1): the number of passwords remembered, written to
+# /etc/security/pwhistory.conf when the value there is below 24. A whole number from 24 to 400.
+cis_pwhistory_remember: 24
 ...

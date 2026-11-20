@@ -265,31 +265,31 @@ yet. `implemented`: the control has its task file at
 | 5.2.10 | Ensure sudo timestamp_timeout is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Value from `cis_sudo_timestamp_timeout`; a stricter value is kept |
 | 5.2.11 | Ensure sudo timestamp_type is configured | L1 Server | Automated | implement | implemented | |
 | 5.2.12 | Ensure access to the su command is restricted | L1 Server, L1 Workstation | Automated | implement | implemented | Group from `cis_su_group`; reports members, never removes them |
-| 5.3.1.1 | Ensure latest version of pam is installed | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.3.1.2 | Ensure latest version of authselect is installed | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.3.1.3 | Ensure latest version of libpwquality is installed | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.3.2.1 | Ensure PAM is managed by an active authselect profile | L1 Server, L1 Workstation | Automated | implement | planned | Uses a custom authselect profile |
-| 5.3.2.2 | Ensure pam_faillock module is enabled | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.3.2.3 | Ensure pam_pwquality module is enabled | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.3.2.4 | Ensure pam_pwhistory module is enabled | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.3.2.5 | Ensure pam_unix module is enabled | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.3.3.1.1 | Ensure password failed attempts lockout is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.3.3.1.2 | Ensure password unlock time is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.3.3.1.3 | Ensure password failed attempts lockout includes root account | L2 Server, L2 Workstation | Automated | implement | planned |  |
-| 5.3.3.2.1 | Ensure password number of changed characters is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.3.3.2.2 | Ensure password length is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.3.3.2.3 | Ensure password complexity is configured | L1 Server, L1 Workstation | Manual | manual | planned |  |
-| 5.3.3.2.4 | Ensure password same consecutive characters is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.3.3.2.5 | Ensure password maximum sequential characters is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.3.3.2.6 | Ensure password dictionary check is enabled | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.3.3.2.7 | Ensure password quality is enforced for the root user | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.3.3.3.1 | Ensure password history remember is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.3.3.3.2 | Ensure password history is enforced for the root user | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.3.3.3.3 | Ensure pam_pwhistory includes use_authtok | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.3.3.4.1 | Ensure pam_unix does not include nullok | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.3.3.4.2 | Ensure pam_unix does not include remember | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.3.3.4.3 | Ensure pam_unix includes a strong password hashing algorithm | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.3.3.4.4 | Ensure pam_unix includes use_authtok | L1 Server, L1 Workstation | Automated | implement | planned |  |
+| 5.3.1.1 | Ensure latest version of pam is installed | L1 Server, L1 Workstation | Automated | implement | implemented | Upgraded with dnf only when below the benchmark's minimum version |
+| 5.3.1.2 | Ensure latest version of authselect is installed | L1 Server, L1 Workstation | Automated | implement | implemented | Upgraded with dnf only when below the benchmark's minimum version |
+| 5.3.1.3 | Ensure latest version of libpwquality is installed | L1 Server, L1 Workstation | Automated | implement | implemented | Upgraded with dnf only when below the benchmark's minimum version |
+| 5.3.2.1 | Ensure PAM is managed by an active authselect profile | L1 Server, L1 Workstation | Automated | implement | implemented | Converts a host without authselect to a role-owned custom profile based on sssd (`cis_authselect_profile`), with a backup; lockout guard |
+| 5.3.2.2 | Ensure pam_faillock module is enabled | L1 Server, L1 Workstation | Automated | implement | implemented | Enables the `with-faillock` feature on an authselect-managed host |
+| 5.3.2.3 | Ensure pam_pwquality module is enabled | L1 Server, L1 Workstation | Automated | implement | implemented | Reports a stack without it; no feature to enable |
+| 5.3.2.4 | Ensure pam_pwhistory module is enabled | L1 Server, L1 Workstation | Automated | implement | implemented | Enables the `with-pwhistory` feature on an authselect-managed host |
+| 5.3.2.5 | Ensure pam_unix module is enabled | L1 Server, L1 Workstation | Automated | implement | implemented | Reports a stack without it; no feature to enable |
+| 5.3.3.1.1 | Ensure password failed attempts lockout is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Value from `cis_faillock_deny` in `faillock.conf` |
+| 5.3.3.1.2 | Ensure password unlock time is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Value from `cis_faillock_unlock_time` in `faillock.conf` |
+| 5.3.3.1.3 | Ensure password failed attempts lockout includes root account | L2 Server, L2 Workstation | Automated | implement | implemented | Adds `even_deny_root` to `faillock.conf`; root can be locked out of password logins |
+| 5.3.3.2.1 | Ensure password number of changed characters is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Value from `cis_pwquality_difok` in the role's pwquality drop-in |
+| 5.3.3.2.2 | Ensure password length is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Value from `cis_pwquality_minlen` in the role's pwquality drop-in |
+| 5.3.3.2.3 | Ensure password complexity is configured | L1 Server, L1 Workstation | Manual | manual | implemented | Reports `minclass` and the credit settings in effect; the role never sets them |
+| 5.3.3.2.4 | Ensure password same consecutive characters is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Value from `cis_pwquality_maxrepeat` in the role's pwquality drop-in |
+| 5.3.3.2.5 | Ensure password maximum sequential characters is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Value from `cis_pwquality_maxsequence` in the role's pwquality drop-in |
+| 5.3.3.2.6 | Ensure password dictionary check is enabled | L1 Server, L1 Workstation | Automated | implement | implemented | Overrides a `dictcheck = 0` in the role's pwquality drop-in |
+| 5.3.3.2.7 | Ensure password quality is enforced for the root user | L1 Server, L1 Workstation | Automated | implement | implemented | Adds `enforce_for_root` to the role's pwquality drop-in |
+| 5.3.3.3.1 | Ensure password history remember is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Value from `cis_pwhistory_remember` in `pwhistory.conf` |
+| 5.3.3.3.2 | Ensure password history is enforced for the root user | L1 Server, L1 Workstation | Automated | implement | implemented | Adds `enforce_for_root` to `pwhistory.conf` |
+| 5.3.3.3.3 | Ensure pam_pwhistory includes use_authtok | L1 Server, L1 Workstation | Automated | implement | implemented | Fixed in the templates of the role's own authselect profile; a finding on another profile |
+| 5.3.3.4.1 | Ensure pam_unix does not include nullok | L1 Server, L1 Workstation | Automated | implement | implemented | Enables the `without-nullok` feature; a finding where a profile the role does not own hard-codes it |
+| 5.3.3.4.2 | Ensure pam_unix does not include remember | L1 Server, L1 Workstation | Automated | implement | implemented | Fixed in the templates of the role's own authselect profile; a finding on another profile |
+| 5.3.3.4.3 | Ensure pam_unix includes a strong password hashing algorithm | L1 Server, L1 Workstation | Automated | implement | implemented | Adds `sha512` in the templates of the role's own authselect profile; a finding on another profile |
+| 5.3.3.4.4 | Ensure pam_unix includes use_authtok | L1 Server, L1 Workstation | Automated | implement | implemented | Fixed in the templates of the role's own authselect profile; a finding on another profile |
 | 5.4.1.1 | Ensure password expiration is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 5.4.1.2 | Ensure minimum password days is configured | L2 Server, L2 Workstation | Manual | manual | planned |  |
 | 5.4.1.3 | Ensure password expiration warning days is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |

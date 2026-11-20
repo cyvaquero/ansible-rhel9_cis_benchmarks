@@ -1,0 +1,22 @@
+---
+# 5.3.2.2 - pam_faillock is on the auth (preauth and authfail) and account lines of system-auth and password-auth. On an
+# authselect-managed profile without the with-faillock feature the role enables it (authselect
+# enable-feature); 5.3.2.1 already selects it when it converts the host. A profile that has the
+# feature but no lines (a site's custom profile) is a finding.
+# The logic is in tasks/lib/pam_setting.yml.
+
+- name: "5.3.2.2 - Ensure pam_faillock module is enabled"
+  ansible.builtin.import_tasks: ../../lib/pam_setting.yml
+  vars:
+    cis_ps_id: "5.3.2.2"
+    cis_ps_conf: []
+    cis_ps_header: ''
+    cis_ps_tmpl: []
+    cis_ps_feature: 'with-faillock'
+  tags:
+    - "5.3.2.2"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

@@ -1,0 +1,201 @@
+---
+# Shared logic for the controls of 5.3.3 that judge a setting kept in a configuration file
+# (faillock.conf, pwquality, pwhistory.conf) and the arguments of a PAM module line. A control
+# file imports this with:
+#   cis_ps_id       the CIS ID
+#   cis_ps_conf     the lines the fix writes: a list of {path, regexp, line} (an item may add
+#                   `skip: true` to be left out), written when the configuration file part of
+#                   the verdict is bad
+#   cis_ps_header   the file, when it is one the role owns (the pwquality drop-in), so its
+#                   folder and a header line are created first; empty otherwise
+#   cis_ps_tmpl     for a PAM argument that makes the control fail: a list of {re, to}
+#                   substitutions for the two stack templates of the role's own authselect
+#                   profile; empty when only a feature (or nothing) can fix it
+#   cis_ps_feature  the authselect feature that fixes the argument (without-nullok), or empty
+# and puts the tags, which every task here inherits, on the import.
+#
+# The verdict comes from files/pam_scan.py, which judges the files PAM reads at run time: the
+# configuration file value in effect (for pwquality the last of pwquality.conf and then
+# pwquality.conf.d/*.conf in name order, as libpwquality applies them) and every argument on the
+# module lines of system-auth and password-auth, which override the files. A setting that is
+# already compliant, wherever it comes from, is never touched, so a stricter value is never
+# loosened. The fix writes the configuration file value (the role's own pwquality drop-in, or the
+# one file of faillock and pwhistory). A bad PAM argument is fixed only through authselect, never
+# in /etc/pam.d: by the feature on any profile, or by editing the templates of the role's own
+# profile and applying them (authselect apply-changes, and authselect select --force when the
+# profile will not apply). On a profile the role does not own, what the features cannot fix is a
+# finding. A value that still wins after the fix (a later pwquality file, say) is a finding with
+# its file and line. After a change to the stack the lockout checks of pam_verify.yml run. Audit
+# mode changes nothing. Under --check nothing is fixed and, in remediate mode, nothing is
+# recorded for a fix that is still to be made, nor for what a pending conversion (5.3.2.1)
+# will replace.
+
+- name: "{{ cis_ps_id ~ ' - Take the PAM verdict before any change' }}"
+  ansible.builtin.set_fact:
+    cis_ps_v0: >-
+      {{ cis_pam.verdict[cis_ps_id] | default({'state': 'unreadable', 'conf_bad': false, 'pam_bad': false,
+         'detail': ['the PAM configuration could not be read']}) }}
+    cis_ps_managed: "{{ cis_pam.authselect.managed | bool and cis_pam.authselect.check_ok | bool }}"
+    cis_ps_template_ok: "{{ cis_pam.owned | bool and cis_pam.owned_dir_exists | bool and cis_pam.authselect.check_ok | bool }}"
+
+- name: "{{ cis_ps_id ~ ' - Work out how a PAM argument can be fixed' }}"
+  ansible.builtin.set_fact:
+    cis_ps_feature_todo: >-
+      {{ cis_ps_feature | length > 0 and cis_ps_managed | bool and cis_ps_feature not in cis_pam.authselect.features }}
+    cis_ps_pam_fixable: >-
+      {{ (cis_ps_tmpl | length > 0 and cis_ps_template_ok | bool)
+         or (cis_ps_feature | length > 0 and cis_ps_managed | bool and cis_ps_feature not in cis_pam.authselect.features)
+         or (cis_as_pending | default(false) | bool) }}
+
+- name: "{{ cis_ps_id ~ ' - Create the folder of the role file' }}"
+  ansible.builtin.file:
+    path: "{{ cis_ps_header | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - not (cis_audit_only | bool)
+    - cis_ps_header | length > 0
+    - cis_ps_v0.conf_bad | bool
+
+- name: "{{ cis_ps_id ~ ' - Write the header of the role file' }}"
+  ansible.builtin.lineinfile:
+    path: "{{ cis_ps_header }}"
+    regexp: '^# Managed by the CIS RHEL 9 role'
+    line: "# Managed by the CIS RHEL 9 role. libpwquality applies the files of this folder in name order, so this one is named to be read last."
+    insertbefore: BOF
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - not (cis_audit_only | bool)
+    - cis_ps_header | length > 0
+    - cis_ps_v0.conf_bad | bool
+
+- name: "{{ cis_ps_id ~ ' - Set the value in the configuration file' }}"
+  ansible.builtin.lineinfile:
+    path: "{{ item.path }}"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ cis_ps_conf }}"
+  loop_control:
+    label: "{{ item.path }}: {{ item.line }}"
+  register: cis_ps_conf_res
+  when:
+    - not (cis_audit_only | bool)
+    - cis_ps_v0.conf_bad | bool
+    - not (item.skip | default(false) | bool)
+
+- name: "{{ cis_ps_id ~ ' - Enable the authselect feature' }}"
+  ansible.builtin.command:
+    argv:
+      - authselect
+      - enable-feature
+      - "{{ cis_ps_feature }}"
+  register: cis_ps_feature_res
+  changed_when: cis_ps_feature_res.rc == 0
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - cis_ps_v0.pam_bad | bool
+    - cis_ps_feature_todo | bool
+    - not ansible_check_mode
+
+- name: "{{ cis_ps_id ~ ' - Fix the argument in the templates of the role profile' }}"
+  ansible.builtin.replace:
+    path: "/etc/authselect/custom/{{ cis_authselect_profile }}/{{ item.1 }}"
+    regexp: "{{ item.0.re }}"
+    replace: "{{ item.0.to }}"
+  loop: "{{ cis_ps_tmpl | product(['system-auth', 'password-auth']) | list }}"
+  loop_control:
+    label: "{{ item.1 }}: {{ item.0.re }}"
+  register: cis_ps_tmpl_res
+  when:
+    - not (cis_audit_only | bool)
+    - cis_ps_v0.pam_bad | bool
+    - cis_ps_template_ok | bool
+
+- name: "{{ cis_ps_id ~ ' - Apply the changed templates' }}"
+  ansible.builtin.command:
+    argv:
+      - authselect
+      - apply-changes
+  register: cis_ps_apply
+  changed_when: cis_ps_apply.rc == 0
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+    - cis_ps_tmpl_res.results | default([]) | selectattr('changed', 'defined') | selectattr('changed') | list | length > 0
+
+# apply-changes refuses a configuration it does not consider its own valid output. The role's
+# profile and its templates are valid, so select it again with its current features, keeping a
+# backup.
+- name: "{{ cis_ps_id ~ ' - Select the profile again when it did not apply' }}"
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - 'authselect select $(authselect current --raw) --force --backup="$1"'
+      - sh
+      - "{{ cis_authselect_profile }}-apply-{{ ansible_facts.date_time.epoch | default('run') }}"
+  register: cis_ps_reselect
+  changed_when: cis_ps_reselect.rc == 0
+  failed_when: false
+  when:
+    - cis_ps_apply is not skipped
+    - cis_ps_apply.rc | default(0) != 0
+
+- name: "{{ cis_ps_id ~ ' - Check the stack after the change' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/lib/pam_verify.yml"
+  vars:
+    cis_pv_id: "{{ cis_ps_id }}"
+  when:
+    - not ansible_check_mode
+    - >-
+      (cis_ps_feature_res is not skipped and cis_ps_feature_res.rc | default(1) == 0)
+      or (cis_ps_apply is not skipped and (cis_ps_apply.rc | default(1) == 0 or cis_ps_reselect.rc | default(1) == 0))
+
+- name: "{{ cis_ps_id ~ ' - Read the PAM configuration again after the fix' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/lib/pam_state.yml"
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+    - cis_ps_v0.state | default('bad') != 'ok'
+
+- name: "{{ cis_ps_id ~ ' - Report what still fails' }}"
+  ansible.builtin.debug:
+    msg: >-
+      Not compliant{{ ' (after the fix)' if not (cis_audit_only | bool) else '' }}:
+      {{ cis_pam.verdict[cis_ps_id].detail | default(cis_ps_v0.detail) | join('; ') }}.
+      {{ 'A value set by a file or PAM line the role does not own, which still wins, is not edited: change it by hand.'
+         if (cis_ps_v0.conf_bad | bool or cis_ps_v0.pam_bad | bool) and not (cis_audit_only | bool) else '' }}
+      {{ 'The PAM lines can be fixed only through authselect, by a feature or by the templates of a profile the role owns, and the active profile ('
+         ~ (cis_pam.authselect.profile | default('none', true)) ~ ') offers neither here.'
+         if cis_ps_v0.pam_bad | bool and not cis_ps_pam_fixable | bool else '' }}
+  when:
+    - >-
+      (cis_audit_only | bool and cis_ps_v0.state | default('bad') != 'ok')
+      or (not (cis_audit_only | bool) and not ansible_check_mode
+          and cis_pam.verdict[cis_ps_id].state | default('bad') != 'ok')
+
+# Audit mode and an unreadable configuration are findings; so is a setting that is still not
+# compliant after the fix. Under --check the fix does not happen, so only what could not be
+# fixed anyway is recorded.
+- name: "{{ cis_ps_id ~ ' - Record the finding' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "{{ cis_ps_id }}"
+  when:
+    - >-
+      (cis_audit_only | bool and cis_ps_v0.state | default('bad') != 'ok')
+      or (not (cis_audit_only | bool) and not ansible_check_mode and cis_pam.verdict[cis_ps_id].state | default('bad') != 'ok')
+      or (not (cis_audit_only | bool) and ansible_check_mode and (cis_ps_v0.state | default('bad') == 'unreadable'
+          or (cis_ps_v0.pam_bad | bool and not cis_ps_pam_fixable | bool)))
+...
