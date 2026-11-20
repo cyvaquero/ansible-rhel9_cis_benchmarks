@@ -1,0 +1,30 @@
+---
+# 4.1.7 (manual) - lists the services, ports and rich rules of each active zone, for
+# review. It only reads, in both modes, and records no finding: summary.yml lists manual
+# controls. Output is empty when the tool it reads is not available.
+
+- name: "4.1.7 - Find the services and ports allowed in the active zones"
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - |
+        for z in $(firewall-cmd --get-active-zones 2>/dev/null | grep -v '^[[:space:]]'); do
+          firewall-cmd --zone="$z" --list-all 2>/dev/null
+        done
+  register: cis_check_4_1_7
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: &cis_tags_4_1_7
+    - "4.1.7"
+    - section-4
+    - level-1
+    - server
+    - workstation
+
+- name: "4.1.7 - Report the allowed services and ports for review"
+  ansible.builtin.debug:
+    msg: "{{ ['Active firewalld zones (firewall-cmd --zone=<zone> --list-all):'] + (cis_check_4_1_7.stdout_lines | default([])) }}"
+  tags: *cis_tags_4_1_7
+...

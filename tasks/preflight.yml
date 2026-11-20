@@ -150,6 +150,18 @@
     - always
     - preflight
 
+- name: "Preflight - Validate the firewalld denied packet logging value"
+  ansible.builtin.assert:
+    that:
+      - cis_firewalld_log_denied in ['all', 'unicast', 'broadcast', 'multicast']
+    fail_msg: >-
+      cis_firewalld_log_denied must be one of all, unicast, broadcast or multicast (off is
+      what 4.1.10 replaces). Got {{ cis_firewalld_log_denied | to_json }}.
+    quiet: true
+  tags:
+    - always
+    - preflight
+
 - name: "Preflight - Compute the selected controls"
   ansible.builtin.set_fact:
     # The single list every control task or include tests with

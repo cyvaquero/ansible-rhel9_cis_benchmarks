@@ -4,7 +4,7 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.26).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.27).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and these controls are implemented:
 
 - kernel modules, 1.1.1.1 to 1.1.1.11;
@@ -23,7 +23,7 @@ selection, audit mode and lint CI exist, and these controls are implemented:
 - network devices and kernel modules, 3.1.1 to 3.2.6;
 - IPv4 kernel parameters, 3.3.1.1 to 3.3.1.20;
 - IPv6 kernel parameters, 3.3.2.1 to 3.3.2.8;
-- firewalld basics, 4.1.1 to 4.1.4 and 4.1.9.
+- firewalld, 4.1.1 to 4.1.11 (section 4 is complete).
 
 Every other control is still planned. Do not run this against hosts you care about.
 
@@ -161,6 +161,7 @@ before running the role on such a host. To skip a control, list its ID in `cis_e
 | Variable | Default | Meaning |
 |---|---|---|
 | `cis_firewalld_zone_target` | `default` | 4.1.4: the permanent target set on an active zone whose target is `ACCEPT` or empty. One of `default`, `REJECT` or `DROP`; anything else stops the run at preflight. A target that is already acceptable is never changed. |
+| `cis_firewalld_log_denied` | `unicast` | 4.1.10 (Level 2): the `LogDenied` value set when it is `off`. One of `all`, `unicast`, `broadcast` or `multicast`; anything else stops the run at preflight. A value other than `off` is never changed. |
 
 ### Audit vs remediate
 
@@ -333,6 +334,23 @@ before running the role on such a host. To skip a control, list its ID in `cis_e
   stops, disables and masks the service and removes each package that nothing else needs,
   keeping the `nftables` package itself, then reloads `firewalld` if it is running. A package
   something else needs is kept and the control is a finding.
+- Firewall, Level 2 (4.1.10, 4.1.11): 4.1.10 fails only when `LogDenied` is `off`, read with
+  `firewall-cmd --get-log-denied` when `firewalld` runs and from
+  `/etc/firewalld/firewalld.conf` otherwise (a missing line means `off`). It sets
+  `cis_firewalld_log_denied` with `firewall-cmd --set-log-denied` when `firewalld` runs, else in
+  `firewalld.conf`; any other value is kept. 4.1.11 applies to each active zone bound to an
+  interface other than `lo` or `virbr*` whose target is `default`; zones with an `ACCEPT`,
+  `DROP` or `REJECT` target are not applicable. For such a zone the ICMP types
+  `timestamp-request` and `timestamp-reply` must be blocked in the permanent and the runtime
+  configuration: listed as ICMP blocks when icmp-block-inversion is off, not listed when it
+  is on. The fix adds (or, with inversion on, removes) the blocks permanently and reloads
+  `firewalld` once; a runtime-only difference is fixed by the reload alone. `firewalld` not
+  running is a finding with nothing to change; no applicable zone passes. Neither control
+  restricts SSH, so neither uses the SSH guard. 4.1.5 to 4.1.7 and 4.1.8 (Level 2) are manual:
+  the role prints the loopback interface rules, the loopback address rules, the zones'
+  services and ports, and the default zone, and changes nothing. Review them as described in
+  [docs/review-controls.md](docs/review-controls.md); setting the default zone to `drop`
+  (4.1.8) can lock you out, so allow SSH in the zone that carries your connection first.
 - SSH guard (4.1.3, 4.1.4): starting `firewalld` and replacing an `ACCEPT` target can begin
   filtering and cut the role's own SSH connection, so the role makes these two changes only
   when SSH is already allowed in the zone that applies to that connection. The role reads

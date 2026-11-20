@@ -1,0 +1,102 @@
+---
+# 4.1.10 - firewalld logs denied packets. Non-compliant when LogDenied is off; any other
+# value (all, unicast, broadcast, multicast) passes and is never changed. The value is read
+# with firewall-cmd --get-log-denied when firewalld is running, else from LogDenied in
+# /etc/firewalld/firewalld.conf (a missing line means off, firewalld's default). The fix, made
+# only when the value is off, sets it to cis_firewalld_log_denied (default: unicast):
+# --set-log-denied when firewalld is running (it writes the configuration and reloads), else
+# lineinfile on firewalld.conf. A host with no firewalld.conf (firewalld not installed) is a
+# finding with nothing to fix. This does not restrict SSH, so there is no SSH guard. A
+# control that still fails after the fix is a finding; under --check nothing changes and
+# nothing is recorded in remediate mode.
+#
+# The check prints running=yes or running=no, then value=<setting>, or state=noconf; its exit
+# status is 1 when the value is off or there is no configuration to read.
+- name: "4.1.10 - Handle firewalld logging of denied packets"
+  tags:
+    - "4.1.10"
+    - section-4
+    - level-2
+    - server
+    - workstation
+  block:
+    - name: "4.1.10 - Check the state"
+      ansible.builtin.command:
+        argv: &cis_fw_4_1_10_argv
+          - /bin/sh
+          - -c
+          - |
+            if systemctl is-active --quiet firewalld.service 2>/dev/null; then
+              echo "running=yes"
+              v=$(firewall-cmd --get-log-denied 2>/dev/null | tr -d '[:space:]')
+            else
+              echo "running=no"
+              if [ ! -f /etc/firewalld/firewalld.conf ]; then
+                echo "state=noconf"
+                exit 1
+              fi
+              v=$(sed -n 's/^[[:space:]]*LogDenied[[:space:]]*=[[:space:]]*//p' /etc/firewalld/firewalld.conf | tail -n 1 | tr -d '[:space:]')
+              [ -n "$v" ] || v=off
+            fi
+            v=$(echo "$v" | tr 'A-Z' 'a-z')
+            [ -n "$v" ] || v=off
+            echo "value=$v"
+            [ "$v" != off ]
+      register: cis_check_4_1_10
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    - name: "4.1.10 - Set the setting with firewall-cmd while firewalld is running"
+      ansible.builtin.command:
+        argv:
+          - firewall-cmd
+          - "--set-log-denied={{ cis_firewalld_log_denied }}"
+      changed_when: true
+      when:
+        - not (cis_audit_only | bool)
+        - cis_check_4_1_10.rc != 0
+        - "'running=yes' in cis_check_4_1_10.stdout_lines"
+
+    - name: "4.1.10 - Set the setting in firewalld.conf while firewalld is not running"
+      ansible.builtin.lineinfile:
+        path: /etc/firewalld/firewalld.conf
+        regexp: '^\s*LogDenied\s*='
+        line: "LogDenied={{ cis_firewalld_log_denied }}"
+        create: false
+      when:
+        - not (cis_audit_only | bool)
+        - cis_check_4_1_10.rc != 0
+        - "'running=no' in cis_check_4_1_10.stdout_lines"
+        - "'state=noconf' not in cis_check_4_1_10.stdout_lines"
+
+    - name: "4.1.10 - Check again after the fix"
+      ansible.builtin.command:
+        argv: *cis_fw_4_1_10_argv
+      register: cis_recheck_4_1_10
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_check_4_1_10.rc != 0
+
+    - name: "4.1.10 - Record the finding when the check fails in audit mode"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "4.1.10"
+      when:
+        - cis_audit_only | bool
+        - cis_check_4_1_10.rc != 0
+
+    # Under --check the fix does not happen, so the second check says nothing new.
+    - name: "4.1.10 - Record the finding when the fix did not take effect"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "4.1.10"
+      when:
+        - cis_recheck_4_1_10 is not skipped
+        - not ansible_check_mode
+        - cis_recheck_4_1_10.rc != 0
+...

@@ -34,6 +34,10 @@ so with `cis_fail_on_findings: true` they always count. Leave one out with
 | 1.6.6 | manual | How the effective crypto policy treats encrypt-then-MAC for SSH | Whether that is acceptable; if not, add a policy module for it |
 | 2.1.23 | manual | The listening TCP and UDP sockets with their processes (`ss -plntu`) | Whether each listener is approved for the host; stop or remove the rest |
 | 3.1.1 | manual | Whether IPv6 is disabled: the `ipv6` module parameter and the `all` and `default` `disable_ipv6` sysctls | Whether the host should use IPv6; disable it only if no service needs it |
+| 4.1.5 | manual | The nftables rules that match the loopback interface | Whether loopback traffic is accepted and traffic to loopback addresses from other interfaces is denied, the way your policy requires |
+| 4.1.6 | manual | The nftables rules that match the loopback addresses | Whether traffic from the loopback addresses is accepted only on the loopback interface and denied elsewhere |
+| 4.1.7 | manual | The full configuration of each active zone, with its services, ports and rich rules | Whether each allowed service and port is needed on the host; remove the rest |
+| 4.1.8 | manual | The firewalld default zone | Whether it should be `drop`. Lockout risk: `drop` blocks SSH unless SSH is allowed in the zone that carries your connection, so allow SSH there first and change the zone by hand |
 
 ## Excluded by default
 
