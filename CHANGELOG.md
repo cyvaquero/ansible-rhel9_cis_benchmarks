@@ -30,8 +30,8 @@ implements, then the role's own version.
   `auth required pam_wheel.so use_uid group=sugroup` to `/etc/pam.d/su` after `pam_rootok`
   and creates the group empty; members found in it are a finding and are never removed. New
   variables `cis_sudo_logfile` (`/var/log/sudo.log`), `cis_sudo_timestamp_timeout` (15) and
-  `cis_su_group` (`sugroup`), validated at preflight. New `tests/check_sudoers_scan.py`.
-  Part of #9.
+  `cis_su_group` (`sugroup`), validated at preflight. New `tests/check_sudoers_scan.py`,
+  run in CI. Part of #9.
 
 ## [3.0.0_0.0.28]
 

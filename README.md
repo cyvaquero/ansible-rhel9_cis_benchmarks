@@ -479,7 +479,8 @@ wherever it comes from, is never changed.
 Every push and pull request runs [ansible-lint](https://ansible.readthedocs.io/projects/lint/)
 (`production` profile, configured in `.ansible-lint`) and an
 `ansible-playbook --syntax-check` of `tests/syntax.yml`, plus the consistency checks
-`tests/check_controls.py` and `tests/check_benchmark_version.py`, on Python 3.9 with Ansible 8.7
+`tests/check_controls.py` and `tests/check_benchmark_version.py` and the sudoers scanner test
+`tests/check_sudoers_scan.py`, on Python 3.9 with Ansible 8.7
 (ansible-core 2.15), the supported control node. To run the same locally:
 
 ```sh
