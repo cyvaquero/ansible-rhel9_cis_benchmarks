@@ -1,0 +1,118 @@
+---
+# Shared logic for the sshd file access controls (5.1.1 to 5.1.4). A control file imports
+# this with:
+#   cis_sf_id    the CIS ID
+#   cis_sf_kind  config (sshd_config and the .conf drop-ins), dir (the drop-in folder),
+#                private (host private keys) or public (host public keys)
+# and puts the tags, which every task here inherits, on the import.
+#
+# The check prints one `bad=<path>|<owner>|<group>|<mode>` line per offender: the owner,
+# group and mode (a symbolic or octal string) the fix gives it. Compliant files are never
+# touched. Host keys are the files `sshd -T` lists as hostkey plus a glob of
+# /etc/ssh/ssh_host_*_key; a file that ssh-keygen cannot read as a key is ignored. A
+# private key may be root:root with no group or other access, or owned by the ssh_keys
+# group (when the host has it) with group read at most; a public key may also be in
+# ssh_keys and must not be writable by group or other. The fix keeps ssh_keys on a private
+# key that already has it. Only the default drop-in folder is read; folders named by an
+# Include line elsewhere are not. Remediate mode records a finding when something is still
+# wrong after the fix; under --check nothing is fixed, so nothing is recorded then.
+
+- name: "{{ cis_sf_id ~ ' - Check ownership and mode' }}"
+  ansible.builtin.command:
+    argv: &cis_sf_argv
+      - /bin/sh
+      - -c
+      - |
+        set -u
+        export LC_ALL=C
+        kind=$1
+        sshgrp=""
+        getent group ssh_keys >/dev/null 2>&1 && sshgrp=ssh_keys
+        out=""
+        add() { out="$out
+        bad=$1|$2|$3|$4"; }
+        case $kind in
+          config)
+            for f in $(find /etc/ssh/sshd_config -maxdepth 0 -type f \( -perm /177 -o ! -user root -o ! -group root \) 2>/dev/null) \
+                     $(find /etc/ssh/sshd_config.d -maxdepth 1 -type f -name '*.conf' \( -perm /177 -o ! -user root -o ! -group root \) 2>/dev/null); do
+              add "$f" root root "u-x,og-rwx"
+            done ;;
+          dir)
+            for f in $(find /etc/ssh/sshd_config.d -maxdepth 0 -type d \( ! -user root -o ! -group root -o -perm /077 \) 2>/dev/null); do
+              add "$f" root root 0700
+            done ;;
+          private|public)
+            keys=$( { [ -x /usr/sbin/sshd ] && /usr/sbin/sshd -T 2>/dev/null | awk '$1 == "hostkey" { print $2 }'
+                      for k in /etc/ssh/ssh_host_*_key; do [ -e "$k" ] && echo "$k"; done; } | sort -u)
+            for k in $keys; do
+              f=$k
+              [ "$kind" = public ] && f="$k.pub"
+              [ -e "$f" ] || continue
+              ssh-keygen -lf "$f" >/dev/null 2>&1 || continue
+              set -- $(stat -Lc '%a %U %G' "$f")
+              mode=$1
+              owner=$2
+              grp=$3
+              if [ "$kind" = private ]; then
+                mask=0177
+                [ -n "$sshgrp" ] && [ "$grp" = "$sshgrp" ] && mask=0137
+                if [ $(( 0$mode & mask )) -gt 0 ] || [ "$owner" != root ] || { [ "$grp" != root ] && [ "$grp" != "$sshgrp" ]; }; then
+                  if [ -n "$sshgrp" ] && [ "$grp" = "$sshgrp" ]; then
+                    add "$f" root "$sshgrp" "u-x,g-wx,o-rwx"
+                  else
+                    add "$f" root root "u-x,go-rwx"
+                  fi
+                fi
+              else
+                if [ $(( 0$mode & 0133 )) -gt 0 ] || [ "$owner" != root ] || { [ "$grp" != root ] && [ "$grp" != "$sshgrp" ]; }; then
+                  add "$f" root root "u-x,go-wx"
+                fi
+              fi
+            done ;;
+        esac
+        out=$(printf '%s\n' "$out" | sed '/^$/d')
+        if [ -n "$out" ]; then
+          printf '%s\n' "$out"
+          echo "state=bad"
+          exit 1
+        fi
+        echo "state=ok"
+      - sh
+      - "{{ cis_sf_kind }}"
+  register: cis_sf_check
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: "{{ cis_sf_id ~ ' - Set ownership and mode' }}"
+  ansible.builtin.file:
+    path: "{{ item.split('|')[0] }}"
+    owner: "{{ item.split('|')[1] }}"
+    group: "{{ item.split('|')[2] }}"
+    mode: "{{ item.split('|')[3] }}"
+  loop: "{{ cis_sf_check.stdout_lines | select('match', '^bad=') | map('regex_replace', '^bad=', '') | list }}"
+  when:
+    - not (cis_audit_only | bool)
+    - cis_sf_check.rc != 0
+
+- name: "{{ cis_sf_id ~ ' - Check ownership and mode again after the fix' }}"
+  ansible.builtin.command:
+    argv: *cis_sf_argv
+  register: cis_sf_recheck
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+    - cis_sf_check.rc != 0
+
+- name: "{{ cis_sf_id ~ ' - Record the finding' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "{{ cis_sf_id }}"
+  when:
+    - >-
+      (cis_audit_only | bool and cis_sf_check.rc != 0)
+      or (cis_sf_recheck is not skipped and cis_sf_recheck.rc != 0)
+...

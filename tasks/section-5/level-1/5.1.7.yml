@@ -1,0 +1,26 @@
+---
+# 5.1.7 - sshd must not offer a weak MAC. Fixed through the crypto policy with the role's own
+# CIS-NO-WEAKMAC module, the same one 1.6.3 adds (keep the two module texts identical).
+# hmac-sha1 itself is not weak under this control; 1.6.6 (manual) covers EtM.
+
+- name: "5.1.7 - Ensure sshd MACs are configured"
+  ansible.builtin.import_tasks: ../../lib/sshd_crypto.yml
+  vars:
+    cis_sc_id: "5.1.7"
+    cis_sc_key: "macs"
+    cis_sc_weak: >-
+      hmac-md5 hmac-md5-96 hmac-ripemd160 hmac-sha1-96 umac-64@openssh.com
+      hmac-md5-etm@openssh.com hmac-md5-96-etm@openssh.com hmac-ripemd160-etm@openssh.com
+      hmac-sha1-96-etm@openssh.com umac-64-etm@openssh.com
+    cis_sc_kind: "mac"
+    cis_sc_module: "CIS-NO-WEAKMAC"
+    cis_sc_body: |
+      # Added by the CIS RHEL 9 role: drop 64-bit tag and MD5 MACs.
+      mac = -*-64 -*-MD5
+  tags:
+    - "5.1.7"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

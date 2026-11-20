@@ -39,4 +39,17 @@
 - name: Reload sysctl
   ansible.builtin.command: /usr/sbin/sysctl --system
   changed_when: true
+
+# Checks the whole sshd configuration with sshd -t first, so a bad configuration never
+# reaches a reload, then reloads sshd only when it is running (try-reload-or-restart leaves a
+# stopped unit alone and reloads, never restarts, a unit that has ExecReload, as sshd does).
+# A host without sshd has nothing to reload. The systemd module has no such state, so the
+# command-instead-of-module rule is waived.
+- name: Reload sshd when running
+  ansible.builtin.command:  # noqa: command-instead-of-module
+    argv:
+      - /bin/sh
+      - -c
+      - '[ ! -x /usr/sbin/sshd ] || { /usr/sbin/sshd -t && /usr/bin/systemctl try-reload-or-restart sshd.service; }'
+  changed_when: true
 ...

@@ -1,8 +1,139 @@
 ---
-# Section 5, Level 1 controls. Placeholder: controls are added per section.
+# Section 5, Level 1 controls, one file per control in level-1/. The Level 2 controls of
+# section 5 are in level-2.yml.
+#
+# import_tasks, not include_tasks: see tasks/section-1/level-1.yml.
+#
+# 5.1 (SSH server). The role's own sshd settings go in one drop-in (cis_sshd_dropin) whose
+# name sorts before 50-redhat.conf, because sshd uses the first value it reads; the
+# controls judge the effective configuration with `sshd -T`, never one file, and a handler
+# validates it with `sshd -t` and reloads sshd only when it is running (never a restart).
+#
+# 5.1.11 and 5.1.12 are Level 1 on a workstation and Level 2 on a server, so they sit here
+# and preflight's selection decides.
 
-- name: "Section 5 Level 1 - No controls yet"
-  ansible.builtin.debug:
-    msg: "No controls in this file yet"
-    verbosity: 1
+# The account the role is connected as, for the lockout guards of 5.1.8 and 5.1.21 and for
+# `sshd -T -C`, which evaluates Match blocks for that account. Read with become off (sudo
+# drops SSH_CONNECTION). It only reads the host, so it runs in audit mode too, and it
+# carries the always tag so a run limited to one control still has it.
+- name: "5.1 - Read the SSH connection of this run"
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - 'printf "%s\n%s\n" "$(id -un 2>/dev/null)" "${SSH_CONNECTION:-}"'
+  register: cis_sshd_conn_read
+  become: false
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when: "cis_selected_controls | select('match', '^5\\.1\\.') | list | length > 0"
+  tags:
+    - always
+
+- name: "5.1 - Record the SSH connection of this run"
+  ansible.builtin.set_fact:
+    cis_sshd_conn_user: "{{ cis_sshd_conn_read.stdout_lines[0] | default('') }}"
+    cis_sshd_over_ssh: "{{ (ansible_connection | default('ssh')) is search('ssh|paramiko|smart') }}"
+    cis_sshd_ctx: >-
+      {{ ('user=' ~ cis_sshd_conn_read.stdout_lines[0] ~ ',host=' ~ cis_sshd_conn_read.stdout_lines[1].split()[0]
+          ~ ',addr=' ~ cis_sshd_conn_read.stdout_lines[1].split()[0])
+         if (cis_sshd_conn_read.stdout_lines | length > 1 and cis_sshd_conn_read.stdout_lines[0] | length > 0
+             and cis_sshd_conn_read.stdout_lines[1] | length > 0)
+         else '' }}
+  when: "cis_selected_controls | select('match', '^5\\.1\\.') | list | length > 0"
+  tags:
+    - always
+
+- name: "5.1.1 - Ensure access to /etc/ssh/sshd_config is configured"
+  ansible.builtin.import_tasks: level-1/5.1.1.yml
+  when: "'5.1.1' in cis_selected_controls"
+
+- name: "5.1.2 - Ensure access to /etc/ssh/sshd_config.d/ directory is configured"
+  ansible.builtin.import_tasks: level-1/5.1.2.yml
+  when: "'5.1.2' in cis_selected_controls"
+
+- name: "5.1.3 - Ensure access to SSH private host key files is configured"
+  ansible.builtin.import_tasks: level-1/5.1.3.yml
+  when: "'5.1.3' in cis_selected_controls"
+
+- name: "5.1.4 - Ensure access to SSH public host key files is configured"
+  ansible.builtin.import_tasks: level-1/5.1.4.yml
+  when: "'5.1.4' in cis_selected_controls"
+
+- name: "5.1.5 - Ensure sshd Ciphers are configured"
+  ansible.builtin.import_tasks: level-1/5.1.5.yml
+  when: "'5.1.5' in cis_selected_controls"
+
+- name: "5.1.6 - Ensure sshd KexAlgorithms is configured"
+  ansible.builtin.import_tasks: level-1/5.1.6.yml
+  when: "'5.1.6' in cis_selected_controls"
+
+- name: "5.1.7 - Ensure sshd MACs are configured"
+  ansible.builtin.import_tasks: level-1/5.1.7.yml
+  when: "'5.1.7' in cis_selected_controls"
+
+- name: "5.1.8 - Ensure sshd access is configured"
+  ansible.builtin.import_tasks: level-1/5.1.8.yml
+  when: "'5.1.8' in cis_selected_controls"
+
+- name: "5.1.9 - Ensure sshd Banner is configured"
+  ansible.builtin.import_tasks: level-1/5.1.9.yml
+  when: "'5.1.9' in cis_selected_controls"
+
+- name: "5.1.10 - Ensure sshd ClientAliveInterval and ClientAliveCountMax are configured"
+  ansible.builtin.import_tasks: level-1/5.1.10.yml
+  when: "'5.1.10' in cis_selected_controls"
+
+- name: "5.1.11 - Ensure sshd DisableForwarding is enabled"
+  ansible.builtin.import_tasks: level-1/5.1.11.yml
+  when: "'5.1.11' in cis_selected_controls"
+
+- name: "5.1.12 - Ensure sshd GSSAPIAuthentication is disabled"
+  ansible.builtin.import_tasks: level-1/5.1.12.yml
+  when: "'5.1.12' in cis_selected_controls"
+
+- name: "5.1.13 - Ensure sshd HostbasedAuthentication is disabled"
+  ansible.builtin.import_tasks: level-1/5.1.13.yml
+  when: "'5.1.13' in cis_selected_controls"
+
+- name: "5.1.14 - Ensure sshd IgnoreRhosts is enabled"
+  ansible.builtin.import_tasks: level-1/5.1.14.yml
+  when: "'5.1.14' in cis_selected_controls"
+
+- name: "5.1.15 - Ensure sshd LoginGraceTime is configured"
+  ansible.builtin.import_tasks: level-1/5.1.15.yml
+  when: "'5.1.15' in cis_selected_controls"
+
+- name: "5.1.16 - Ensure sshd LogLevel is configured"
+  ansible.builtin.import_tasks: level-1/5.1.16.yml
+  when: "'5.1.16' in cis_selected_controls"
+
+- name: "5.1.17 - Ensure sshd MaxAuthTries is configured"
+  ansible.builtin.import_tasks: level-1/5.1.17.yml
+  when: "'5.1.17' in cis_selected_controls"
+
+- name: "5.1.18 - Ensure sshd MaxStartups is configured"
+  ansible.builtin.import_tasks: level-1/5.1.18.yml
+  when: "'5.1.18' in cis_selected_controls"
+
+- name: "5.1.19 - Ensure sshd MaxSessions is configured"
+  ansible.builtin.import_tasks: level-1/5.1.19.yml
+  when: "'5.1.19' in cis_selected_controls"
+
+- name: "5.1.20 - Ensure sshd PermitEmptyPasswords is disabled"
+  ansible.builtin.import_tasks: level-1/5.1.20.yml
+  when: "'5.1.20' in cis_selected_controls"
+
+- name: "5.1.21 - Ensure sshd PermitRootLogin is disabled"
+  ansible.builtin.import_tasks: level-1/5.1.21.yml
+  when: "'5.1.21' in cis_selected_controls"
+
+- name: "5.1.22 - Ensure sshd PermitUserEnvironment is disabled"
+  ansible.builtin.import_tasks: level-1/5.1.22.yml
+  when: "'5.1.22' in cis_selected_controls"
+
+- name: "5.1.23 - Ensure sshd UsePAM is enabled"
+  ansible.builtin.import_tasks: level-1/5.1.23.yml
+  when: "'5.1.23' in cis_selected_controls"
 ...

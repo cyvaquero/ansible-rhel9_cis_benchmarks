@@ -1,0 +1,220 @@
+---
+# 5.1.8 - sshd limits who may log in: at least one of AllowUsers, AllowGroups, DenyUsers or
+# DenyGroups is in effect (read from `sshd -T`). The role has no list of its own to
+# choose, so the lists come from cis_sshd_allow_users, cis_sshd_allow_groups,
+# cis_sshd_deny_users and cis_sshd_deny_groups (all empty by default, validated at
+# preflight).
+#
+# - All four empty: nothing is written. When no such line is in effect the control is a
+#   finding, in both modes; when one is, it passes.
+# - Any set (remediate mode): each non-empty list is written to the role's sshd drop-in
+#   (cis_sshd_dropin), an empty list is left alone, and sshd is reloaded through the
+#   handler. Lockout guard: the account the role is connected as (the SSH login, read from
+#   `id -un` with become off, as the firewalld guard reads SSH_CONNECTION) must still be
+#   allowed by the result: the lists as set here, and for each list not set here the
+#   effective one. An allow list the account is not in, a deny list it is in, or an entry
+#   the guard cannot evaluate (user@host, a negation) stops the change, a message says so
+#   and the control is a finding when nothing was in effect. A connection that is not SSH
+#   (for example local) passes the guard.
+# - Under --check nothing is fixed and, in remediate mode, nothing is recorded for a fix.
+#
+# The check prints state=ok|bad|nosshd|unreadable, eff=yes|no (a list is in effect) and
+# allowed=yes|no|unknown (the guard).
+
+- name: "5.1.8 - Handle the sshd access lists"
+  tags:
+    - "5.1.8"
+    - section-5
+    - level-1
+    - server
+    - workstation
+  vars:
+    cis_sshd_lists_set: >-
+      {{ (cis_sshd_allow_users + cis_sshd_allow_groups + cis_sshd_deny_users + cis_sshd_deny_groups) | length > 0 }}
+  block:
+    - name: "5.1.8 - Check the access lists sshd uses"
+      ansible.builtin.command:
+        argv: &cis_sshd_5_1_8_argv
+          - /bin/sh
+          - -c
+          - |
+            set -u
+            export LC_ALL=C
+            if [ ! -x /usr/sbin/sshd ]; then
+              echo "state=nosshd"
+              exit 0
+            fi
+            out=$(/usr/sbin/sshd -T 2>/dev/null) || { echo "state=unreadable"; exit 1; }
+            user=$1
+            list() {
+              # $1 keyword, $2 the list set by the role (empty: use the effective one)
+              if [ -n "$2" ]; then
+                printf '%s' "$2"
+              else
+                printf '%s\n' "$out" | awk -v n="$1" '$1 == n { for (i = 2; i <= NF; i++) printf "%s ", $i }'
+              fi
+            }
+            eff=no
+            if printf '%s\n' "$out" | grep -Eqi '^(allowusers|allowgroups|denyusers|denygroups)[[:space:]]+[^[:space:]]'; then
+              eff=yes
+            fi
+            echo "eff=$eff"
+            allowed=unknown
+            if [ -n "$user" ]; then
+              groups=$(id -Gn "$user" 2>/dev/null) || groups=""
+              au=$(list allowusers "$2")
+              ag=$(list allowgroups "$3")
+              du=$(list denyusers "$4")
+              dg=$(list denygroups "$5")
+              unk=0
+              hit() {
+                # $1 pattern list, $2 name: 0 when a pattern matches
+                for p in $1; do
+                  case $p in *[@!]*) unk=1 ;; esac
+                  case $2 in $p) return 0 ;; esac
+                done
+                return 1
+              }
+              if [ -z "$groups" ]; then
+                allowed=unknown
+              else
+                allowed=yes
+                if [ -n "$du" ] && hit "$du" "$user"; then allowed=no; fi
+                if [ -n "$au" ] && ! hit "$au" "$user"; then allowed=no; fi
+                for g in $groups; do
+                  if [ -n "$dg" ] && hit "$dg" "$g"; then allowed=no; fi
+                done
+                if [ -n "$ag" ]; then
+                  m=no
+                  for g in $groups; do hit "$ag" "$g" && m=yes; done
+                  [ "$m" = yes ] || allowed=no
+                fi
+                [ "$unk" -eq 0 ] || allowed=unknown
+              fi
+            fi
+            echo "allowed=$allowed"
+            if [ "$eff" = yes ]; then
+              echo "state=ok"
+              exit 0
+            fi
+            echo "state=bad"
+            exit 1
+          - sh
+          - "{{ cis_sshd_conn_user | default('') }}"
+          - "{{ cis_sshd_allow_users | join(' ') }}"
+          - "{{ cis_sshd_allow_groups | join(' ') }}"
+          - "{{ cis_sshd_deny_users | join(' ') }}"
+          - "{{ cis_sshd_deny_groups | join(' ') }}"
+      register: cis_check_5_1_8
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    - name: "5.1.8 - Work out whether the access lists may be written"
+      ansible.builtin.set_fact:
+        cis_sshd_acc_eff: "{{ 'eff=yes' in cis_check_5_1_8.stdout_lines }}"
+        cis_sshd_acc_nosshd: "{{ 'state=nosshd' in cis_check_5_1_8.stdout_lines }}"
+        cis_sshd_acc_unreadable: "{{ 'state=unreadable' in cis_check_5_1_8.stdout_lines }}"
+        cis_sshd_acc_guard_ok: >-
+          {{ ('allowed=yes' in cis_check_5_1_8.stdout_lines)
+             or not (cis_sshd_over_ssh | default(true) | bool) }}
+
+    - name: "5.1.8 - Report that no access list is set"
+      ansible.builtin.debug:
+        msg: >-
+          No AllowUsers, AllowGroups, DenyUsers or DenyGroups is in effect and the role has none
+          to write: set cis_sshd_allow_users, cis_sshd_allow_groups, cis_sshd_deny_users or
+          cis_sshd_deny_groups. Make sure every account that needs SSH is allowed first.
+      when:
+        - not cis_sshd_acc_nosshd | bool
+        - not cis_sshd_acc_eff | bool
+        - not cis_sshd_lists_set | bool
+
+    - name: "5.1.8 - Report that the access lists are not written because they could lock the role out"
+      ansible.builtin.debug:
+        msg: >-
+          The access lists are not written: the account the role is connected as
+          ({{ cis_sshd_conn_user | default('unknown') }}) would not be allowed by the result, or the
+          result could not be worked out (a user@host or negated entry). Add the account to
+          cis_sshd_allow_users or an allowed group in cis_sshd_allow_groups, or remove it from
+          the deny lists, then run the role again.
+      when:
+        - not (cis_audit_only | bool)
+        - not cis_sshd_acc_nosshd | bool
+        - cis_sshd_lists_set | bool
+        - not cis_sshd_acc_guard_ok | bool
+
+    - name: "5.1.8 - Write the header of the sshd drop-in"
+      ansible.builtin.lineinfile:
+        path: "{{ cis_sshd_dropin }}"
+        regexp: '^# Managed by the CIS RHEL 9 role'
+        line: "# Managed by the CIS RHEL 9 role. Settings here win over later files: sshd uses the first value it reads."
+        insertbefore: BOF
+        create: true
+        owner: root
+        group: root
+        mode: "0600"
+      when:
+        - not (cis_audit_only | bool)
+        - not cis_sshd_acc_nosshd | bool
+        - not cis_sshd_acc_unreadable | bool
+        - cis_sshd_lists_set | bool
+        - cis_sshd_acc_guard_ok | bool
+
+    - name: "5.1.8 - Write the access lists to the sshd drop-in"
+      ansible.builtin.lineinfile:
+        path: "{{ cis_sshd_dropin }}"
+        regexp: '(?i)^\s*{{ item.directive }}\s'
+        line: "{{ item.directive }} {{ item.list | join(' ') }}"
+        create: true
+        owner: root
+        group: root
+        mode: "0600"
+        validate: /usr/sbin/sshd -t -f %s
+      loop:
+        - {directive: AllowUsers, list: "{{ cis_sshd_allow_users }}"}
+        - {directive: AllowGroups, list: "{{ cis_sshd_allow_groups }}"}
+        - {directive: DenyUsers, list: "{{ cis_sshd_deny_users }}"}
+        - {directive: DenyGroups, list: "{{ cis_sshd_deny_groups }}"}
+      loop_control:
+        label: "{{ item.directive }}"
+      notify: Reload sshd when running
+      when:
+        - not (cis_audit_only | bool)
+        - not cis_sshd_acc_nosshd | bool
+        - not cis_sshd_acc_unreadable | bool
+        - cis_sshd_lists_set | bool
+        - cis_sshd_acc_guard_ok | bool
+        - item.list | length > 0
+
+    - name: "5.1.8 - Check the access lists again after the fix"
+      ansible.builtin.command:
+        argv: *cis_sshd_5_1_8_argv
+      register: cis_recheck_5_1_8
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - not cis_sshd_acc_nosshd | bool
+        - not cis_sshd_acc_eff | bool
+        - cis_sshd_lists_set | bool
+        - cis_sshd_acc_guard_ok | bool
+
+    # No list in effect and nothing was written (or it did not take effect) is a finding.
+    # Under --check a pending write is not recorded in remediate mode.
+    - name: "5.1.8 - Record the finding"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "5.1.8"
+      when:
+        - not cis_sshd_acc_nosshd | bool
+        - >-
+          cis_sshd_acc_unreadable | bool
+          or (not cis_sshd_acc_eff | bool
+              and (cis_audit_only | bool
+                   or not cis_sshd_lists_set | bool
+                   or not cis_sshd_acc_guard_ok | bool
+                   or (cis_recheck_5_1_8 is not skipped and 'state=ok' not in cis_recheck_5_1_8.stdout_lines)))
+...

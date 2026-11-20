@@ -4,7 +4,7 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.27).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.28).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and these controls are implemented:
 
 - kernel modules, 1.1.1.1 to 1.1.1.11;
@@ -23,7 +23,8 @@ selection, audit mode and lint CI exist, and these controls are implemented:
 - network devices and kernel modules, 3.1.1 to 3.2.6;
 - IPv4 kernel parameters, 3.3.1.1 to 3.3.1.20;
 - IPv6 kernel parameters, 3.3.2.1 to 3.3.2.8;
-- firewalld, 4.1.1 to 4.1.11 (section 4 is complete).
+- firewalld, 4.1.1 to 4.1.11 (section 4 is complete);
+- SSH server, 5.1.1 to 5.1.23.
 
 Every other control is still planned. Do not run this against hosts you care about.
 
@@ -163,6 +164,21 @@ before running the role on such a host. To skip a control, list its ID in `cis_e
 | `cis_firewalld_zone_target` | `default` | 4.1.4: the permanent target set on an active zone whose target is `ACCEPT` or empty. One of `default`, `REJECT` or `DROP`; anything else stops the run at preflight. A target that is already acceptable is never changed. |
 | `cis_firewalld_log_denied` | `unicast` | 4.1.10 (Level 2): the `LogDenied` value set when it is `off`. One of `all`, `unicast`, `broadcast` or `multicast`; anything else stops the run at preflight. A value other than `off` is never changed. |
 
+### SSH server (5.1)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `cis_sshd_allow_users`, `cis_sshd_allow_groups`, `cis_sshd_deny_users`, `cis_sshd_deny_groups` | `[]` | 5.1.8: users and groups written to `AllowUsers`, `AllowGroups`, `DenyUsers` and `DenyGroups` in the role's sshd drop-in. A non-empty list is written; an empty one leaves that directive alone. All empty: nothing is written, and 5.1.8 is a finding unless a list is already in effect. Plain names only (letters, digits, underscore, dot, hyphen); anything else stops the run at preflight. **Lockout risk:** an allow list locks out every account not in it, and a deny list every account in it. The role writes the lists only when the account it is connected as is still allowed by the result; otherwise it changes nothing and says why. List every account that needs SSH, including the one Ansible uses. |
+| `cis_sshd_client_alive_interval`, `cis_sshd_client_alive_count_max` | `15`, `3` | 5.1.10: the values written when the effective ones are not both above zero. Whole numbers of 1 or more. |
+| `cis_sshd_login_grace_time` | `60` | 5.1.15: seconds, from 1 to 60, written when the effective value is 0 or above 60. |
+| `cis_sshd_log_level` | `INFO` | 5.1.16: `INFO` or `VERBOSE`, written when the effective level is neither. |
+| `cis_sshd_max_auth_tries` | `4` | 5.1.17: from 1 to 4, written when the effective value is higher. |
+| `cis_sshd_max_startups` | `10:30:60` | 5.1.18: `start:rate:full`, each at least 1 and at most 10, 30 and 60, written when any effective number is higher. |
+| `cis_sshd_max_sessions` | `10` | 5.1.19: from 1 to 10, written when the effective value is higher. |
+
+Values outside these ranges stop the run at preflight. A setting that is already compliant,
+wherever it comes from, is never changed.
+
 ### Audit vs remediate
 
 | Variable | Default | Meaning |
@@ -191,8 +207,8 @@ before running the role on such a host. To skip a control, list its ID in `cis_e
   running kernel still has it; 1.3.1.4 and 1.3.1.5 configure SELinux on a host that is not
   running it; 1.3.1.3 changes the policy type while another policy is loaded; 1.4.2
   changes the `/boot/efi` mount options and the live mount keeps the old ones; 1.4.5
-  removes `systemd.confirm_spawn` while the running kernel still has it; 1.6.1 to 1.6.4 and
-  1.6.7 change the crypto policy, which a service reads only when it starts; 1.8.6 and
+  removes `systemd.confirm_spawn` while the running kernel still has it; 1.6.1 to 1.6.4, 1.6.7 and
+  5.1.5 to 5.1.7 change the crypto policy, which a service reads only when it starts; 1.8.6 and
   1.8.7 change `/etc/gdm/custom.conf`, which a running GDM reads only when it starts) sets
   `cis_reboot_required` to `true`, reports that a reboot is pending, and the
   summary prints `Reboot required`. The variable defaults to `false` and is an output:
@@ -385,6 +401,36 @@ before running the role on such a host. To skip a control, list its ID in `cis_e
   the same; the fix creates a missing allow file empty, sets owner, group (the named group
   when it exists, else root) and mode, and adds the users listed in `cis_cron_allow_users` or
   `cis_at_allow_users`. It never removes a user or deletes a deny file.
+- SSH server (5.1): the role writes its settings to one drop-in,
+  `/etc/ssh/sshd_config.d/00-cis-rhel9.conf` (mode 0600), whose name sorts before
+  `50-redhat.conf` because sshd uses the first value it reads. Every control judges the
+  effective configuration with `sshd -T` (and `sshd -T -C` for the account the role is
+  connected as, so a Match block for it is seen), never one file, and writes a line only
+  when the effective value is not compliant. A line is validated with `sshd -t -f` before
+  it is written; after any change a handler checks the whole configuration with `sshd -t`
+  and reloads (never restarts) sshd, only when it is running. A value set before the drop-in
+  is read (a file that sorts earlier, or the main file above its `Include`) still wins: the
+  control is a finding, and the role edits no file it does not own. A host without
+  `openssh-server` passes. 5.1.1 to 5.1.4 set owner and mode on `sshd_config`, the `.conf`
+  drop-ins, the drop-in folder (0700) and the host keys (found from `sshd -T` and a glob; a
+  private key keeps the `ssh_keys` group it has); only the default drop-in folder is read, not
+  one named by another `Include`. 5.1.5 to 5.1.7 are fixed through the crypto policy, the
+  route of 1.6, not through `Ciphers`, `KexAlgorithms` or `MACs` lines: on RHEL 9 sshd takes
+  those lists from the policy, so the role removes only the weak algorithms (CBC and arcfour
+  ciphers, SHA-1 key exchange, 64-bit and MD5 MACs) and cannot leave a client with none in
+  common; chacha20 and EtM are the manual 1.6.5 and 1.6.6. 5.1.9 sets `Banner /etc/issue.net`
+  (1.7.3 manages the text). 5.1.11 (`DisableForwarding`, Level 1 Workstation and Level 2
+  Server) turns off all forwarding, so a host used as an SSH jump host or tunnel endpoint
+  lists it in `cis_exclusions`. 5.1.12 turns off GSSAPI, which Kerberos single sign-on over
+  SSH needs. 5.1.21 sets `PermitRootLogin no`, except when the role is itself connected as
+  root over SSH (a message says so and the control is a finding). 5.1.8 writes the lists
+  in `cis_sshd_allow_users`, `cis_sshd_allow_groups`, `cis_sshd_deny_users` and
+  `cis_sshd_deny_groups` only when the account the role is connected as (read with
+  `id -un`, become off) is still allowed by the result, counting the effective lists for any
+  list not set here; an entry it cannot evaluate (`user@host`, a negation) counts as not
+  allowed. A connection that is not SSH (for example `local`) passes the guard. An empty
+  list is left alone, and a line written by an earlier run stays when its variable is later
+  emptied. See [docs/review-controls.md](docs/review-controls.md).
 - The summary is tagged `summary` and `always`, and lists every selected audit-only and
   manual control even on a run limited by tags.
 

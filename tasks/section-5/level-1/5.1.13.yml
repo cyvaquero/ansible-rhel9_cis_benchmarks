@@ -1,0 +1,19 @@
+---
+# 5.1.13 - HostbasedAuthentication is no.
+# The logic is shared in tasks/lib/sshd_option.yml.
+
+- name: "5.1.13 - Ensure sshd HostbasedAuthentication is disabled"
+  ansible.builtin.import_tasks: ../../lib/sshd_option.yml
+  vars:
+    cis_sd_id: "5.1.13"
+    cis_sd_options:
+      - spec: "hostbasedauthentication|eq|no"
+        directive: "HostbasedAuthentication"
+        value: "no"
+  tags:
+    - "5.1.13"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

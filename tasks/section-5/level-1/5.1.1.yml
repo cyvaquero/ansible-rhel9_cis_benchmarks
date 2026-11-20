@@ -1,0 +1,16 @@
+---
+# 5.1.1 - /etc/ssh/sshd_config and the .conf files in /etc/ssh/sshd_config.d are owned by root:root
+# with no group or other access and no execute bit. The logic is shared in tasks/lib/sshd_files.yml.
+
+- name: "5.1.1 - Ensure access to /etc/ssh/sshd_config is configured"
+  ansible.builtin.import_tasks: ../../lib/sshd_files.yml
+  vars:
+    cis_sf_id: "5.1.1"
+    cis_sf_kind: "config"
+  tags:
+    - "5.1.1"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

@@ -1,0 +1,20 @@
+---
+# 5.1.18 - MaxStartups is 10:30:60 or more restrictive in each of its three numbers. The fix
+# writes cis_sshd_max_startups.
+# The logic is shared in tasks/lib/sshd_option.yml.
+
+- name: "5.1.18 - Ensure sshd MaxStartups is configured"
+  ansible.builtin.import_tasks: ../../lib/sshd_option.yml
+  vars:
+    cis_sd_id: "5.1.18"
+    cis_sd_options:
+      - spec: "maxstartups|startups|10:30:60"
+        directive: "MaxStartups"
+        value: "{{ cis_sshd_max_startups }}"
+  tags:
+    - "5.1.18"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

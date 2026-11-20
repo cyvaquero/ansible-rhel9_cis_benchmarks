@@ -1,0 +1,20 @@
+---
+# 5.1.23 - UsePAM is yes. RHEL 9 sets it in 50-redhat.conf; the role writes it only when the
+# effective value is something else.
+# The logic is shared in tasks/lib/sshd_option.yml.
+
+- name: "5.1.23 - Ensure sshd UsePAM is enabled"
+  ansible.builtin.import_tasks: ../../lib/sshd_option.yml
+  vars:
+    cis_sd_id: "5.1.23"
+    cis_sd_options:
+      - spec: "usepam|eq|yes"
+        directive: "UsePAM"
+        value: "yes"
+  tags:
+    - "5.1.23"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

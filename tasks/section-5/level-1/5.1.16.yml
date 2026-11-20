@@ -1,0 +1,19 @@
+---
+# 5.1.16 - LogLevel is VERBOSE or INFO. The fix writes cis_sshd_log_level.
+# The logic is shared in tasks/lib/sshd_option.yml.
+
+- name: "5.1.16 - Ensure sshd LogLevel is configured"
+  ansible.builtin.import_tasks: ../../lib/sshd_option.yml
+  vars:
+    cis_sd_id: "5.1.16"
+    cis_sd_options:
+      - spec: "loglevel|oneof|verbose,info"
+        directive: "LogLevel"
+        value: "{{ cis_sshd_log_level }}"
+  tags:
+    - "5.1.16"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

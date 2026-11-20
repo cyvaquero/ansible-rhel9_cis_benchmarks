@@ -1,0 +1,23 @@
+---
+# 5.1.10 - ClientAliveInterval and ClientAliveCountMax are both above zero. The fix writes
+# cis_sshd_client_alive_interval and cis_sshd_client_alive_count_max.
+# The logic is shared in tasks/lib/sshd_option.yml.
+
+- name: "5.1.10 - Ensure sshd ClientAliveInterval and ClientAliveCountMax are configured"
+  ansible.builtin.import_tasks: ../../lib/sshd_option.yml
+  vars:
+    cis_sd_id: "5.1.10"
+    cis_sd_options:
+      - spec: "clientaliveinterval|pos|"
+        directive: "ClientAliveInterval"
+        value: "{{ cis_sshd_client_alive_interval }}"
+      - spec: "clientalivecountmax|pos|"
+        directive: "ClientAliveCountMax"
+        value: "{{ cis_sshd_client_alive_count_max }}"
+  tags:
+    - "5.1.10"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...
