@@ -1,0 +1,17 @@
+---
+# 5.3.1.2 - authselect is at version-release 1.2.6-1 or later, the minimum the benchmark names; a newer
+# one is fine and is left alone. The logic is in tasks/lib/package_min_version.yml.
+
+- name: "5.3.1.2 - Ensure latest version of authselect is installed"
+  ansible.builtin.import_tasks: ../../lib/package_min_version.yml
+  vars:
+    cis_pm_id: "5.3.1.2"
+    cis_pm_package: authselect
+    cis_pm_min: "1.2.6-1"
+  tags:
+    - "5.3.1.2"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

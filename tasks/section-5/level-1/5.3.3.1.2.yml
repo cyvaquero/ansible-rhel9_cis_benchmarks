@@ -1,0 +1,28 @@
+---
+# 5.3.3.1.2 - unlock_time is set in /etc/security/faillock.conf to 0 or at least 900 seconds
+# (the role writes cis_faillock_unlock_time, 900 by
+# default, when it is not); an unlock_time= argument on a
+# pam_faillock line with another value overrides the file and is removed from the templates of
+# the role's own authselect profile.
+# The logic is in tasks/lib/pam_setting.yml.
+
+- name: "5.3.3.1.2 - Ensure password unlock time is configured"
+  ansible.builtin.import_tasks: ../../lib/pam_setting.yml
+  vars:
+    cis_ps_id: "5.3.3.1.2"
+    cis_ps_conf:
+      - path: /etc/security/faillock.conf
+        regexp: '^\s*unlock_time\s*='
+        line: 'unlock_time = {{ cis_faillock_unlock_time }}'
+    cis_ps_header: ''
+    cis_ps_tmpl:
+      - re: '(^[ \t]*[a-z]+[ \t]+[^\n#]*?\bpam_faillock\.so\b[^\n#]*?)[ \t]+unlock_time=\S*'
+        to: '\1'
+    cis_ps_feature: ''
+  tags:
+    - "5.3.3.1.2"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

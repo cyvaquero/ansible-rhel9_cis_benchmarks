@@ -259,6 +259,38 @@
     - always
     - preflight
 
+- name: "Preflight - Validate the PAM settings"
+  ansible.builtin.assert:
+    that:
+      - cis_authselect_profile is string
+      - cis_authselect_profile is match('^[a-z][a-z0-9_-]{0,31}$')
+      - cis_authselect_profile not in ['minimal', 'sssd', 'winbind', 'nis']
+      - item.value | string is match('^[0-9]+$')
+      - item.value | int >= item.min
+      - item.value | int <= item.max
+      - item.key != 'cis_faillock_unlock_time' or (item.value | int == 0 or item.value | int >= 900)
+    fail_msg: >-
+      cis_authselect_profile must be a name of lowercase letters, digits, underscore and hyphen
+      that starts with a letter, is at most 32 characters and is not a stock profile name (got
+      {{ cis_authselect_profile | to_json }}), and {{ item.key }} must be a whole number from
+      {{ item.min }} to {{ item.max }}{{ ' that is 0 or at least 900' if item.key == 'cis_faillock_unlock_time' else '' }}
+      (got {{ item.value | to_json }}).
+    quiet: true
+  loop:
+    - {key: cis_faillock_deny, value: "{{ cis_faillock_deny }}", min: 1, max: 5}
+    - {key: cis_faillock_unlock_time, value: "{{ cis_faillock_unlock_time }}", min: 0, max: 604800}
+    - {key: cis_faillock_root_unlock_time, value: "{{ cis_faillock_root_unlock_time }}", min: 60, max: 604800}
+    - {key: cis_pwquality_difok, value: "{{ cis_pwquality_difok }}", min: 2, max: 128}
+    - {key: cis_pwquality_minlen, value: "{{ cis_pwquality_minlen }}", min: 14, max: 256}
+    - {key: cis_pwquality_maxrepeat, value: "{{ cis_pwquality_maxrepeat }}", min: 1, max: 3}
+    - {key: cis_pwquality_maxsequence, value: "{{ cis_pwquality_maxsequence }}", min: 1, max: 3}
+    - {key: cis_pwhistory_remember, value: "{{ cis_pwhistory_remember }}", min: 24, max: 400}
+  loop_control:
+    label: "{{ item.key }}"
+  tags:
+    - always
+    - preflight
+
 - name: "Preflight - Compute the selected controls"
   ansible.builtin.set_fact:
     # The single list every control task or include tests with

@@ -1,0 +1,23 @@
+---
+# 5.3.3.4.1 - No pam_unix line of system-auth or password-auth has nullok. The authselect feature
+# without-nullok removes it on any profile; a nullok written into the templates of the role's own
+# profile is removed there.
+# The logic is in tasks/lib/pam_setting.yml.
+
+- name: "5.3.3.4.1 - Ensure pam_unix does not include nullok"
+  ansible.builtin.import_tasks: ../../lib/pam_setting.yml
+  vars:
+    cis_ps_id: "5.3.3.4.1"
+    cis_ps_conf: []
+    cis_ps_header: ''
+    cis_ps_tmpl:
+      - re: '(^[ \t]*[a-z]+[ \t]+[^\n#]*?\bpam_unix\.so\b[^\n#]*?)[ \t]+nullok\b'
+        to: '\1'
+    cis_ps_feature: 'without-nullok'
+  tags:
+    - "5.3.3.4.1"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

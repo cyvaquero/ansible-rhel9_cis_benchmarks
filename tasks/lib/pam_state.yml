@@ -1,0 +1,34 @@
+---
+# Reads the PAM configuration of the host (files/pam_scan.py state, read-only) into the fact
+# cis_pam: authselect (present, managed, profile, features, check_ok), owned (the active profile
+# is the role's own), stacks_present and verdict, one entry per 5.3.2 and 5.3.3 control with
+# state ok|bad, conf_bad, pam_bad and detail. Include it again after a change to see the result.
+# It carries the always tag, as finding.yml does, so a run limited to one control still has it.
+
+- name: "5.3 - Read the PAM and authselect configuration"
+  ansible.builtin.command:
+    argv:
+      - "{{ cis_pam_python }}"
+      - -c
+      - "{{ lookup('ansible.builtin.file', role_path ~ '/files/pam_scan.py') }}"
+      - state
+      - "{{ cis_authselect_profile }}"
+  register: cis_pam_read
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags:
+    - always
+
+- name: "5.3 - Record the PAM and authselect configuration"
+  ansible.builtin.set_fact:
+    cis_pam: >-
+      {{ (cis_pam_read.stdout | from_json)
+         if (cis_pam_read.rc | default(1) == 0 and cis_pam_read.stdout | default('') | length > 0)
+         else {'unreadable': true, 'owned': false, 'owned_dir_exists': false, 'stacks_present': false,
+               'authselect': {'present': false, 'managed': false, 'profile': '', 'features': [],
+                              'check_ok': false, 'check_message': '', 'current_message': ''},
+               'verdict': {}} }}
+  tags:
+    - always
+...

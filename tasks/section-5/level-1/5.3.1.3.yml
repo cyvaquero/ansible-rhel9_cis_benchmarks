@@ -1,0 +1,17 @@
+---
+# 5.3.1.3 - libpwquality is at version-release 1.4.4-8 or later, the minimum the benchmark names; a newer
+# one is fine and is left alone. The logic is in tasks/lib/package_min_version.yml.
+
+- name: "5.3.1.3 - Ensure latest version of libpwquality is installed"
+  ansible.builtin.import_tasks: ../../lib/package_min_version.yml
+  vars:
+    cis_pm_id: "5.3.1.3"
+    cis_pm_package: libpwquality
+    cis_pm_min: "1.4.4-8"
+  tags:
+    - "5.3.1.3"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

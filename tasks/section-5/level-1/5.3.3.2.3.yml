@@ -1,0 +1,25 @@
+---
+# 5.3.3.2.3 (manual) - reports the password complexity settings in effect for review: minclass
+# and the four credit options (dcredit, ucredit, lcredit, ocredit) from the pwquality
+# configuration (pwquality.conf, then pwquality.conf.d/*.conf, the last value of a key
+# wins) and from arguments on the pam_pwquality lines of system-auth and password-auth, which
+# override the files. It only reads, in both modes, and records no finding: summary.yml lists
+# manual controls. What complexity a site needs is its policy, so the role never sets it.
+
+- name: "5.3.3.2.3 - Report the password complexity settings for review"
+  ansible.builtin.debug:
+    msg: >-
+      Password complexity settings to review, as the pwquality files set them and as the
+      pam_pwquality lines of system-auth and password-auth override them:
+      {% for item in (cis_pam.verdict['5.3.3.2.3']['values'] | default({}) | dict2items) -%}
+      {{ item.key }} = {{ item.value.conf | default('not set', true) }}{{
+      (' (PAM: ' ~ (item.value.pam | join(', ')) ~ ')') if item.value.pam | length > 0 else '' }}{{ '; ' if not loop.last else '.' }}
+      {% endfor %}
+  when: cis_pam.verdict['5.3.3.2.3'] is defined
+  tags:
+    - "5.3.3.2.3"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

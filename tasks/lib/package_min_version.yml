@@ -1,0 +1,87 @@
+---
+# Shared logic for the package controls that want a minimum version (5.3.1.1 to 5.3.1.3). A
+# control file imports this with:
+#   cis_pm_id       the CIS ID
+#   cis_pm_package  the package
+#   cis_pm_min      the least version-release that is compliant (for example 1.5.1-14)
+# and puts the tags, which every task here inherits, on the import.
+#
+# The benchmark asks for the package at that version or later, not for the newest one, so the
+# check compares the installed version-release with the minimum (rpm's own comparison, the
+# vercmp of rpm's Lua) and leaves a package at or above it alone. Remediate mode upgrades the
+# package with dnf only when it is missing or below the minimum, and checks again; a package that
+# is still below (no newer build in the enabled repositories) is a finding. Audit mode only
+# checks. Under --check nothing is installed and, in remediate mode, nothing is recorded.
+#
+# The check prints state=ok|old|missing|unreadable and installed=<version-release> per
+# installed copy.
+
+- name: "{{ cis_pm_id ~ ' - Check the version of ' ~ cis_pm_package }}"
+  ansible.builtin.command:
+    argv: &cis_pm_argv
+      - /bin/sh
+      - -c
+      - |
+        export LC_ALL=C
+        inst=$(rpm -q --qf '%{VERSION}-%{RELEASE}\n' "$1" 2>/dev/null) || { echo "state=missing"; exit 1; }
+        state=ok
+        for v in $inst; do
+          echo "installed=$v"
+          r=$(rpm --eval "%{lua: print(rpm.vercmp(\"$v\", \"$2\"))}" 2>/dev/null)
+          case $r in
+            -1) [ "$state" = unreadable ] || state=old ;;
+            0|1) ;;
+            *) state=unreadable ;;
+          esac
+        done
+        echo "state=$state"
+        [ "$state" = ok ]
+      - sh
+      - "{{ cis_pm_package }}"
+      - "{{ cis_pm_min }}"
+  register: cis_pm_check
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: "{{ cis_pm_id ~ ' - Upgrade ' ~ cis_pm_package ~ ' to the minimum version or later' }}"
+  ansible.builtin.dnf:
+    name: "{{ cis_pm_package }}"
+    state: latest  # noqa: package-latest
+  when:
+    - not (cis_audit_only | bool)
+    - "'state=old' in cis_pm_check.stdout_lines or 'state=missing' in cis_pm_check.stdout_lines"
+
+- name: "{{ cis_pm_id ~ ' - Check the version of ' ~ cis_pm_package ~ ' again after the fix' }}"
+  ansible.builtin.command:
+    argv: *cis_pm_argv
+  register: cis_pm_recheck
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+    - "'state=ok' not in cis_pm_check.stdout_lines"
+
+- name: "{{ cis_pm_id ~ ' - Report a package below the minimum version' }}"
+  ansible.builtin.debug:
+    msg: >-
+      {{ cis_pm_package }} is not at {{ cis_pm_min }} or later (installed:
+      {{ (cis_pm_recheck.stdout_lines if cis_pm_recheck is not skipped else cis_pm_check.stdout_lines)
+         | select('match', '^(installed|state)=') | join(', ') }}).
+      {{ 'The enabled repositories have no newer build.' if cis_pm_recheck is not skipped else '' }}
+  when:
+    - >-
+      (cis_audit_only | bool and 'state=ok' not in cis_pm_check.stdout_lines)
+      or (cis_pm_recheck is not skipped and 'state=ok' not in cis_pm_recheck.stdout_lines)
+
+- name: "{{ cis_pm_id ~ ' - Record the finding' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "{{ cis_pm_id }}"
+  when:
+    - >-
+      (cis_audit_only | bool and 'state=ok' not in cis_pm_check.stdout_lines)
+      or (cis_pm_recheck is not skipped and 'state=ok' not in cis_pm_recheck.stdout_lines)
+...

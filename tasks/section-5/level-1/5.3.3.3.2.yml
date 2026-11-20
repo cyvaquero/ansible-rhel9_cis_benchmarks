@@ -1,0 +1,22 @@
+---
+# 5.3.3.3.2 - enforce_for_root is set in /etc/security/pwhistory.conf (added when it is not).
+# The logic is in tasks/lib/pam_setting.yml.
+
+- name: "5.3.3.3.2 - Ensure password history is enforced for the root user"
+  ansible.builtin.import_tasks: ../../lib/pam_setting.yml
+  vars:
+    cis_ps_id: "5.3.3.3.2"
+    cis_ps_conf:
+      - path: /etc/security/pwhistory.conf
+        regexp: '^\s*enforce_for_root\b'
+        line: 'enforce_for_root'
+    cis_ps_header: ''
+    cis_ps_tmpl: []
+    cis_ps_feature: ''
+  tags:
+    - "5.3.3.3.2"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

@@ -1,0 +1,23 @@
+---
+# 5.3.3.4.4 - Every pam_unix password line of system-auth and password-auth has use_authtok. It is
+# added to the templates of the role's own authselect profile; on any other profile it is a
+# finding.
+# The logic is in tasks/lib/pam_setting.yml.
+
+- name: "5.3.3.4.4 - Ensure pam_unix includes use_authtok"
+  ansible.builtin.import_tasks: ../../lib/pam_setting.yml
+  vars:
+    cis_ps_id: "5.3.3.4.4"
+    cis_ps_conf: []
+    cis_ps_header: ''
+    cis_ps_tmpl:
+      - re: '^([ \t]*password[ \t]+\S+[ \t]+\S*pam_unix\.so)\b(?![^\n#]*[ \t]use_authtok\b)'
+        to: '\1 use_authtok'
+    cis_ps_feature: ''
+  tags:
+    - "5.3.3.4.4"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

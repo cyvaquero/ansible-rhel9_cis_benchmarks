@@ -1,0 +1,23 @@
+---
+# 5.3.3.3.3 - Every pam_pwhistory password line of system-auth and password-auth has use_authtok. The
+# argument is a PAM line argument, so it is added to the templates of the role's own authselect
+# profile; on any other profile it is a finding.
+# The logic is in tasks/lib/pam_setting.yml.
+
+- name: "5.3.3.3.3 - Ensure pam_pwhistory includes use_authtok"
+  ansible.builtin.import_tasks: ../../lib/pam_setting.yml
+  vars:
+    cis_ps_id: "5.3.3.3.3"
+    cis_ps_conf: []
+    cis_ps_header: ''
+    cis_ps_tmpl:
+      - re: '^([ \t]*password[ \t]+\S+[ \t]+\S*pam_pwhistory\.so)\b(?![^\n#]*[ \t]use_authtok\b)'
+        to: '\1 use_authtok'
+    cis_ps_feature: ''
+  tags:
+    - "5.3.3.3.3"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

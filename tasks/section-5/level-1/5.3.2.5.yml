@@ -1,0 +1,21 @@
+---
+# 5.3.2.5 - pam_unix is on an auth, account, password and session line of system-auth and password-auth. It is part of
+# every stock authselect profile, there is no feature for it, and the role does not add lines to a
+# profile it did not write: a stack without it is a finding.
+# The logic is in tasks/lib/pam_setting.yml.
+
+- name: "5.3.2.5 - Ensure pam_unix module is enabled"
+  ansible.builtin.import_tasks: ../../lib/pam_setting.yml
+  vars:
+    cis_ps_id: "5.3.2.5"
+    cis_ps_conf: []
+    cis_ps_header: ''
+    cis_ps_tmpl: []
+    cis_ps_feature: ''
+  tags:
+    - "5.3.2.5"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

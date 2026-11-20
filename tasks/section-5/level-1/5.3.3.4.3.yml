@@ -1,0 +1,32 @@
+---
+# 5.3.3.4.3 - The pam_unix password line of system-auth and password-auth names sha512 or yescrypt. In
+# the templates of the role's own authselect profile the weak algorithms (md5, bigcrypt, sha256,
+# blowfish) are removed and sha512 is added when no strong one is named (sha512, which FIPS mode
+# allows, is the RHEL 9 default); on any other profile it is a finding.
+# The logic is in tasks/lib/pam_setting.yml.
+
+- name: "5.3.3.4.3 - Ensure pam_unix includes a strong password hashing algorithm"
+  ansible.builtin.import_tasks: ../../lib/pam_setting.yml
+  vars:
+    cis_ps_id: "5.3.3.4.3"
+    cis_ps_conf: []
+    cis_ps_header: ''
+    cis_ps_tmpl:
+      - re: '(^[ \t]*password[ \t]+[^\n#]*?\bpam_unix\.so\b[^\n#]*?)[ \t]+md5\b'
+        to: '\1'
+      - re: '(^[ \t]*password[ \t]+[^\n#]*?\bpam_unix\.so\b[^\n#]*?)[ \t]+bigcrypt\b'
+        to: '\1'
+      - re: '(^[ \t]*password[ \t]+[^\n#]*?\bpam_unix\.so\b[^\n#]*?)[ \t]+sha256\b'
+        to: '\1'
+      - re: '(^[ \t]*password[ \t]+[^\n#]*?\bpam_unix\.so\b[^\n#]*?)[ \t]+blowfish\b'
+        to: '\1'
+      - re: '^([ \t]*password[ \t]+\S+[ \t]+\S*pam_unix\.so)\b(?![^\n#]*[ \t](?:sha512|yescrypt)\b)'
+        to: '\1 sha512'
+    cis_ps_feature: ''
+  tags:
+    - "5.3.3.4.3"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...
