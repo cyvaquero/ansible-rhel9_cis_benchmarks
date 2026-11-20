@@ -24,4 +24,15 @@ cis_valid_profiles:
 # 50-redhat.conf, because sshd uses the first value it reads for most keywords (MaxStartups
 # takes the last value, so a later file can override it).
 cis_sshd_dropin: /etc/ssh/sshd_config.d/00-cis-rhel9.conf
+
+# Section 5.2 (sudo): the one sudoers drop-in the role owns. sudo applies the last Defaults
+# line it reads and reads /etc/sudoers.d in name order (names with a dot or a trailing ~ are
+# skipped), so the name sorts after the usual ones and the role's Defaults win over those of
+# the files that sort before it. A Defaults line after the #includedir line in /etc/sudoers
+# is read later still and would win; the controls report it.
+cis_sudoers_dropin: /etc/sudoers.d/zz-cis-rhel9
+
+# Section 5.2: the Python the sudo controls run their read-only scanner with
+# (files/sudoers_scan.py): the interpreter Ansible found on the managed node.
+cis_sudo_python: "{{ ansible_facts.python.executable | default('/usr/bin/python3') }}"
 ...

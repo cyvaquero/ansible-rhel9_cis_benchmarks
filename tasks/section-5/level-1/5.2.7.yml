@@ -1,0 +1,16 @@
+---
+# 5.2.7 - no sudoers line disables re-authentication with `!authenticate`. The logic, the edit
+# and the lockout guard for the account the role is connected as are in tasks/lib/sudo_rules.yml.
+
+- name: "5.2.7 - Ensure re-authentication for privilege escalation is not disabled globally"
+  ansible.builtin.import_tasks: ../../lib/sudo_rules.yml
+  vars:
+    cis_sr_id: "5.2.7"
+    cis_sr_tag: "!authenticate"
+  tags:
+    - "5.2.7"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

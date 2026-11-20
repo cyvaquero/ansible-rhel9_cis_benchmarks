@@ -253,18 +253,18 @@ yet. `implemented`: the control has its task file at
 | 5.1.21 | Ensure sshd PermitRootLogin is disabled | L1 Server, L1 Workstation | Automated | implement | implemented | Lockout risk: confirm another admin login first; not changed while the role is connected as root |
 | 5.1.22 | Ensure sshd PermitUserEnvironment is disabled | L1 Server, L1 Workstation | Automated | implement | implemented |  |
 | 5.1.23 | Ensure sshd UsePAM is enabled | L1 Server, L1 Workstation | Automated | implement | implemented |  |
-| 5.2.1 | Ensure sudo is installed | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.2.2 | Ensure access on sudoers configuration files is configured | L1 Server | Automated | implement | planned |  |
-| 5.2.3 | Ensure access on the /etc/sudoers.d directory is configured | L1 Server | Automated | implement | planned |  |
-| 5.2.4 | Ensure sudo commands use pty | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.2.5 | Ensure sudo log file exists | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.2.6 | Ensure users must provide password for escalation | L2 Server, L2 Workstation | Automated | implement | planned | Excluded by default: breaks passwordless become for Ansible |
-| 5.2.7 | Ensure re-authentication for privilege escalation is not disabled globally | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.2.8 | Ensure sudo pwfeedback is configured | L1 Server | Automated | implement | planned |  |
-| 5.2.9 | Ensure sudo visiblepw is configured | L1 Server | Automated | implement | planned |  |
-| 5.2.10 | Ensure sudo timestamp_timeout is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.2.11 | Ensure sudo timestamp_type is configured | L1 Server | Automated | implement | planned |  |
-| 5.2.12 | Ensure access to the su command is restricted | L1 Server, L1 Workstation | Automated | implement | planned |  |
+| 5.2.1 | Ensure sudo is installed | L1 Server, L1 Workstation | Automated | implement | implemented | |
+| 5.2.2 | Ensure access on sudoers configuration files is configured | L1 Server | Automated | implement | implemented | |
+| 5.2.3 | Ensure access on the /etc/sudoers.d directory is configured | L1 Server | Automated | implement | implemented | |
+| 5.2.4 | Ensure sudo commands use pty | L1 Server, L1 Workstation | Automated | implement | implemented | Writes `Defaults use_pty` to the role's sudoers file; last Defaults line wins |
+| 5.2.5 | Ensure sudo log file exists | L1 Server, L1 Workstation | Automated | implement | implemented | Path from `cis_sudo_logfile`; a log file the site set is kept |
+| 5.2.6 | Ensure users must provide password for escalation | L2 Server, L2 Workstation | Automated | implement | implemented | Excluded by default: breaks passwordless become for Ansible; lockout guard on the role's own account |
+| 5.2.7 | Ensure re-authentication for privilege escalation is not disabled globally | L1 Server, L1 Workstation | Automated | implement | implemented | Lockout guard on the role's own account |
+| 5.2.8 | Ensure sudo pwfeedback is configured | L1 Server | Automated | implement | implemented | |
+| 5.2.9 | Ensure sudo visiblepw is configured | L1 Server | Automated | implement | implemented | |
+| 5.2.10 | Ensure sudo timestamp_timeout is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Value from `cis_sudo_timestamp_timeout`; a stricter value is kept |
+| 5.2.11 | Ensure sudo timestamp_type is configured | L1 Server | Automated | implement | implemented | |
+| 5.2.12 | Ensure access to the su command is restricted | L1 Server, L1 Workstation | Automated | implement | implemented | Group from `cis_su_group`; reports members, never removes them |
 | 5.3.1.1 | Ensure latest version of pam is installed | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 5.3.1.2 | Ensure latest version of authselect is installed | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 5.3.1.3 | Ensure latest version of libpwquality is installed | L1 Server, L1 Workstation | Automated | implement | planned |  |

@@ -1,0 +1,61 @@
+---
+# 5.2.3 - /etc/sudoers.d is owned by root:root with mode 0750 or stricter (no write for the
+# group, nothing for others). A host without the folder passes. The fix sets only owner,
+# group and the bits that are too open, so a stricter mode is never loosened. Under --check
+# nothing changes and, in remediate mode, nothing is recorded.
+
+- name: "5.2.3 - Handle the access on the sudoers.d directory"
+  tags:
+    - "5.2.3"
+    - section-5
+    - level-1
+    - server
+  block:
+    - name: "5.2.3 - Check the owner and mode of the sudoers.d directory"
+      ansible.builtin.command:
+        argv: &cis_sudo_5_2_3_argv
+          - /bin/sh
+          - -c
+          - |
+            export LC_ALL=C
+            [ -d /etc/sudoers.d ] || exit 0
+            find /etc/sudoers.d -maxdepth 0 -type d \( -perm /0027 -o ! -user root -o ! -group root \) -print 2>/dev/null
+      register: cis_check_5_2_3
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    - name: "5.2.3 - Set the owner and mode of the sudoers.d directory"
+      ansible.builtin.file:
+        path: /etc/sudoers.d
+        state: directory
+        owner: root
+        group: root
+        mode: "g-w,o-rwx"
+      when:
+        - not (cis_audit_only | bool)
+        - cis_check_5_2_3.rc == 0
+        - cis_check_5_2_3.stdout_lines | length > 0
+
+    - name: "5.2.3 - Check the owner and mode of the sudoers.d directory again after the fix"
+      ansible.builtin.command:
+        argv: *cis_sudo_5_2_3_argv
+      register: cis_recheck_5_2_3
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_check_5_2_3.stdout_lines | length > 0
+
+    - name: "5.2.3 - Record the finding"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "5.2.3"
+      when:
+        - >-
+          (cis_audit_only | bool and cis_check_5_2_3.stdout_lines | length > 0)
+          or (cis_recheck_5_2_3 is not skipped and cis_recheck_5_2_3.stdout_lines | length > 0)
+          or cis_check_5_2_3.rc | default(1) != 0
+...

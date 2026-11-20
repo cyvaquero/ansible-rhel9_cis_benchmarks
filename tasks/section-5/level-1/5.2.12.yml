@@ -1,0 +1,143 @@
+---
+# 5.2.12 - su is limited to the members of a group through pam_wheel. Judged on the active
+# auth line of /etc/pam.d/su that names pam_wheel.so as required or requisite with use_uid
+# and a group=; the group must exist. A line the site already set, with any group, is kept
+# (a group that does not exist is created, empty). Otherwise the fix creates cis_su_group
+# empty when missing and puts `auth required pam_wheel.so use_uid group=<group>` in the file:
+# in place of a commented or non-compliant pam_wheel line when there is one, else right after
+# the pam_rootok line, so root can still use su. /etc/pam.d/su is not managed by authselect,
+# so the edit survives a profile change. The role never adds or removes members: a group that
+# already has members (listed, or with it as their primary group) is a finding in both modes,
+# with the names in a message. Under --check nothing changes and, in remediate mode, nothing
+# is recorded for a fix.
+#
+# The check prints line=ok|missing (a compliant pam_wheel line), group=<name> (the one in the
+# line, else cis_su_group), exists=yes|no, members=<comma separated names> and
+# state=ok|bad|nofile.
+
+- name: "5.2.12 - Handle the su restriction"
+  tags:
+    - "5.2.12"
+    - section-5
+    - level-1
+    - server
+    - workstation
+  block:
+    - name: "5.2.12 - Check the pam_wheel line of su and its group"
+      ansible.builtin.command:
+        argv: &cis_su_5_2_12_argv
+          - /bin/sh
+          - -c
+          - |
+            export LC_ALL=C
+            f=/etc/pam.d/su
+            if [ ! -f "$f" ]; then
+              echo "state=nofile"
+              exit 0
+            fi
+            g=$(sed 's/#.*//' "$f" | awk '
+              $1 == "auth" && ($2 == "required" || $2 == "requisite") && $3 ~ /(^|\/)pam_wheel\.so$/ {
+                u = 0; grp = ""
+                for (i = 4; i <= NF; i++) {
+                  if ($i == "use_uid") u = 1
+                  if ($i ~ /^group=./) grp = substr($i, 7)
+                }
+                if (u && grp != "") { print grp; exit }
+              }')
+            line=ok
+            if [ -z "$g" ]; then
+              line=missing
+              g=$1
+            fi
+            echo "line=$line"
+            echo "group=$g"
+            state=ok
+            [ "$line" = ok ] || state=bad
+            entry=$(getent group "$g" 2>/dev/null) || entry=""
+            members=""
+            if [ -n "$entry" ]; then
+              echo "exists=yes"
+              gid=$(printf '%s' "$entry" | cut -d: -f3)
+              members=$( { printf '%s' "$entry" | cut -d: -f4 | tr ',' '\n'
+                           getent passwd | awk -F: -v g="$gid" '$4 == g { print $1 }'; } | sed '/^$/d' | sort -u | paste -sd, -)
+            else
+              echo "exists=no"
+              state=bad
+            fi
+            echo "members=$members"
+            echo "state=$state"
+          - sh
+          - "{{ cis_su_group }}"
+      register: cis_check_5_2_12
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    - name: "5.2.12 - Work out what su needs"
+      ansible.builtin.set_fact:
+        cis_su_state: >-
+          {{ cis_check_5_2_12.stdout_lines | select('match', '^state=') | first
+             | default('state=unreadable') | regex_replace('^state=', '') }}
+        cis_su_line_ok: "{{ 'line=ok' in cis_check_5_2_12.stdout_lines }}"
+        cis_su_group_name: >-
+          {{ cis_check_5_2_12.stdout_lines | select('match', '^group=') | first
+             | default('group=' ~ cis_su_group) | regex_replace('^group=', '') }}
+        cis_su_group_exists: "{{ 'exists=yes' in cis_check_5_2_12.stdout_lines }}"
+        cis_su_members: >-
+          {{ (cis_check_5_2_12.stdout_lines | select('match', '^members=') | first | default('members=')
+              | regex_replace('^members=', '')).split(',') | select | list }}
+
+    - name: "5.2.12 - Report the members of the su group"
+      ansible.builtin.debug:
+        msg: >-
+          The su group {{ cis_su_group_name }} has members: {{ cis_su_members | join(', ') }}.
+          The group should be empty so that su stays closed to everyone and sudo is used instead.
+          The role never removes a member; remove them by hand.
+      when:
+        - cis_su_state != 'nofile'
+        - cis_su_members | length > 0
+
+    - name: "5.2.12 - Create the su group"
+      ansible.builtin.group:
+        name: "{{ cis_su_group_name }}"
+        state: present
+      when:
+        - not (cis_audit_only | bool)
+        - cis_su_state == 'bad'
+        - not cis_su_group_exists | bool
+
+    - name: "5.2.12 - Require membership of the su group in the pam_wheel line"
+      ansible.builtin.lineinfile:
+        path: /etc/pam.d/su
+        regexp: '^\s*#?\s*auth\s+\S+\s+\S*pam_wheel\.so'
+        line: "auth            required        pam_wheel.so use_uid group={{ cis_su_group }}"
+        insertafter: '^\s*auth\s+sufficient\s+pam_rootok\.so'
+        create: false
+      when:
+        - not (cis_audit_only | bool)
+        - cis_su_state == 'bad'
+        - not cis_su_line_ok | bool
+
+    - name: "5.2.12 - Check the pam_wheel line of su and its group again after the fix"
+      ansible.builtin.command:
+        argv: *cis_su_5_2_12_argv
+      register: cis_recheck_5_2_12
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_su_state == 'bad'
+
+    - name: "5.2.12 - Record the finding"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "5.2.12"
+      when:
+        - >-
+          cis_su_state in ['nofile', 'unreadable']
+          or cis_su_members | length > 0
+          or (cis_audit_only | bool and cis_su_state == 'bad')
+          or (cis_recheck_5_2_12 is not skipped and 'state=ok' not in cis_recheck_5_2_12.stdout_lines)
+...

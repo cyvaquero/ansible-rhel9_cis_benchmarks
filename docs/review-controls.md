@@ -41,13 +41,19 @@ so with `cis_fail_on_findings: true` they always count. Leave one out with
 
 ## Controls with a lockout guard
 
-These controls change who can log in over SSH. The role changes nothing when the change
-would cut its own connection, and says so.
+These controls change who can log in over SSH, or who can use sudo. The role changes nothing
+when the change would cut its own connection, and says so.
 
 | CIS ID | What the role does | What you decide |
 |---|---|---|
 | 5.1.8 | Writes `cis_sshd_allow_users`, `cis_sshd_allow_groups`, `cis_sshd_deny_users` and `cis_sshd_deny_groups` to its sshd drop-in, but only when the account it is connected as (the SSH login, read with `id -un`) is still allowed by the result, counting the effective lists for any list not set. With all four empty it writes nothing and, when no such line is in effect, it is a finding | Who may log in. An allow list locks out every account not in it (or in no listed group), a deny list every account in it, so list every account that needs SSH, including the one Ansible uses, and keep a console or out-of-band way in. Entries the guard cannot evaluate (`user@host`, `!` negations) are refused. An emptied variable does not remove a line an earlier run wrote |
 | 5.1.21 | Sets `PermitRootLogin no`, but not when the role is connected as root over SSH (or the account cannot be read): it prints a message and the control is a finding | Connect as a named account with sudo, then run the role again; make sure that account can log in first |
+| 5.2.6, 5.2.7 | Remove the `NOPASSWD:` tag (5.2.6, Level 2) or the `!authenticate` item (5.2.7) from sudoers lines in files it does not own, each edit validated with `visudo -cf`. When no become password is set for the run (`ansible_become_password` and `ansible_become_pass` undefined or empty), it leaves alone every line that reaches the account it is connected as (read with `id -un`, become off), or might: a rule for that account, a group it is in, `ALL` or an alias, a line with several rules, a global or host, command or runas scoped `Defaults` line. It prints the file and line and the control is a finding. Lines for other accounts are fixed | Whether Ansible should keep passwordless sudo. Either set a become password for the run (`ansible_become_password`, kept in Ansible Vault) so the role may remove the tag, or leave those lines and accept the finding, or list the control in `cis_exclusions`. A line that continues over several lines, or a file that does not pass `visudo -cf` on its own (it uses an alias another file defines), is left alone and reported |
+
+5.2.12 closes `su` to everyone but the members of `cis_su_group` (empty by default), so use
+sudo. A group that already has members is reported, and the role never removes them. The
+`Defaults` controls of 5.2 (5.2.4, 5.2.5, 5.2.8 to 5.2.11) never edit a file they do not own: a
+conflicting line that would still win is a finding with its file and line.
 
 Other 5.1 controls can break a site's own use without locking Ansible out: 5.1.11 turns off
 all forwarding (jump hosts, tunnels, X11), 5.1.12 turns off GSSAPI (Kerberos single sign-on),
@@ -67,7 +73,7 @@ shorter list, to run them; `cis_exclusions` is separate and unaffected.
 | 2.1.20 | Removes the graphical desktop and what depends on it from a server, and sets the default target to multi-user |
 | 2.1.21 | Removes the X window server and what depends on it, which includes the desktop |
 | 2.1.22 | Removes Xwayland and what depends on it, which includes the desktop |
-| 5.2.6 | Makes `sudo` ask for a password, which breaks passwordless become for Ansible |
+| 5.2.6 | Removes the `NOPASSWD:` tag from sudoers rules, which breaks passwordless become for Ansible (see the lockout guard above) |
 
 ## Controls that depend on the RHEL 9 minor release
 

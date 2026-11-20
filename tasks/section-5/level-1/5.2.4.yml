@@ -1,0 +1,17 @@
+---
+# 5.2.4 - sudo runs commands in a pseudo terminal: an effective global `Defaults use_pty` and no
+# `!use_pty` that wins. The logic is shared in tasks/lib/sudo_default.yml.
+
+- name: "5.2.4 - Ensure sudo commands use pty"
+  ansible.builtin.import_tasks: ../../lib/sudo_default.yml
+  vars:
+    cis_sdo_id: "5.2.4"
+    cis_sdo_option: "use_pty"
+    cis_sdo_line: 'use_pty'
+  tags:
+    - "5.2.4"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

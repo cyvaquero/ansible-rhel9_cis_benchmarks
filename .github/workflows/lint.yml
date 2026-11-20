@@ -33,6 +33,8 @@ jobs:
         run: |
           python tests/check_controls.py
           python tests/check_benchmark_version.py
+      - name: Test the sudoers scanner
+        run: python tests/check_sudoers_scan.py
       - name: Syntax check
         run: ansible-playbook -i localhost, -e target=localhost --syntax-check tests/syntax.yml
 ...

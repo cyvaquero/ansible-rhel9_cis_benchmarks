@@ -1,0 +1,165 @@
+---
+# Shared logic for the sudo Defaults controls (5.2.4, 5.2.5, 5.2.8 to 5.2.11). A control file
+# imports this with:
+#   cis_sdo_id      the CIS ID
+#   cis_sdo_option  the Defaults option (use_pty, logfile, pwfeedback, visiblepw,
+#                   timestamp_timeout, timestamp_type)
+#   cis_sdo_line    the line the fix writes, after "Defaults "
+#   cis_sdo_max     optional: for timestamp_timeout, the most minutes that pass (15)
+# and puts the tags, which every task here inherits, on the import.
+#
+# Compliance is judged on all the sudoers files sudo reads (files/sudoers_scan.py follows
+# /etc/sudoers and its include lines in sudo's order), never on one file. sudo applies the
+# last Defaults line it reads, so the effective value is the last global one; a line scoped
+# to a user, host, command or runas list (Defaults:user and so on) beats the global ones and
+# is judged on its own. A setting that is already compliant, wherever it comes from, is never
+# touched, so a stricter value is never loosened. The fix writes one line to the role's own
+# file (cis_sudoers_dropin, named to sort last), validated with visudo -cf before it lands,
+# and the whole configuration is checked with visudo -c afterwards. The role edits no sudoers
+# file it does not own for these controls: a non-compliant line that still wins (a file that
+# sorts after the role's, a line after the #includedir line of /etc/sudoers, or a scoped line)
+# makes the control a finding, with the file and line in the message. Under --check nothing
+# is fixed and, in remediate mode, nothing is recorded for a fix. A host without sudo passes.
+
+- name: "{{ cis_sdo_id ~ ' - Check the effective sudo Defaults' }}"
+  ansible.builtin.command:
+    argv: &cis_sdo_argv
+      - "{{ cis_sudo_python }}"
+      - -c
+      - "{{ lookup('ansible.builtin.file', role_path ~ '/files/sudoers_scan.py') }}"
+      - defaults
+      - "{{ cis_sdo_option }}"
+      - "{{ cis_sdo_max | default(15) }}"
+  register: cis_sdo_check
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: "{{ cis_sdo_id ~ ' - Work out what the sudo files set' }}"
+  ansible.builtin.set_fact:
+    cis_sdo_res: >-
+      {{ (cis_sdo_check.stdout | from_json)
+         if (cis_sdo_check.rc | default(1) == 0 and cis_sdo_check.stdout | default('') | length > 0)
+         else {'state': 'unreadable'} }}
+
+- name: "{{ cis_sdo_id ~ ' - Write the managed header of the sudoers file' }}"
+  ansible.builtin.lineinfile:
+    path: "{{ cis_sudoers_dropin }}"
+    regexp: '^# Managed by the CIS RHEL 9 role'
+    line: >-
+      # Managed by the CIS RHEL 9 role. sudo applies the last Defaults line it reads and
+      reads this folder in name order, so this file is named to be read last.
+    insertbefore: BOF
+    create: true
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+  when:
+    - not (cis_audit_only | bool)
+    - cis_sdo_res.state == 'bad'
+    - cis_sdo_res.global_bad | bool
+
+- name: "{{ cis_sdo_id ~ ' - Set the sudo Defaults line in the role file' }}"
+  ansible.builtin.lineinfile:
+    path: "{{ cis_sudoers_dropin }}"
+    regexp: '^\s*Defaults\s+!?{{ cis_sdo_option }}\b'
+    line: "Defaults {{ cis_sdo_line }}"
+    create: true
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+  register: cis_sdo_write
+  when:
+    - not (cis_audit_only | bool)
+    - cis_sdo_res.state == 'bad'
+    - cis_sdo_res.global_bad | bool
+
+- name: "{{ cis_sdo_id ~ ' - Check the whole sudo configuration after the change' }}"
+  ansible.builtin.command:
+    argv:
+      - /usr/sbin/visudo
+      - -c
+  register: cis_sdo_visudo
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - cis_sdo_write is changed
+    - not ansible_check_mode
+
+- name: "{{ cis_sdo_id ~ ' - Check the effective sudo Defaults again after the fix' }}"
+  ansible.builtin.command:
+    argv: *cis_sdo_argv
+  register: cis_sdo_recheck
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+    - cis_sdo_res.state == 'bad'
+    - cis_sdo_res.global_bad | bool
+
+- name: "{{ cis_sdo_id ~ ' - Work out what the sudo files set after the fix' }}"
+  ansible.builtin.set_fact:
+    cis_sdo_after: >-
+      {{ ((cis_sdo_recheck.stdout | from_json)
+          if (cis_sdo_recheck.rc | default(1) == 0 and cis_sdo_recheck.stdout | default('') | length > 0)
+          else {'state': 'unreadable'})
+         if cis_sdo_recheck is not skipped else {} }}
+
+- name: "{{ cis_sdo_id ~ ' - Pick the latest reading of the sudo files' }}"
+  ansible.builtin.set_fact:
+    cis_sdo_last: "{{ cis_sdo_after if cis_sdo_after | length > 0 else cis_sdo_res }}"
+
+- name: "{{ cis_sdo_id ~ ' - Report that the whole sudo configuration does not check out' }}"
+  ansible.builtin.debug:
+    msg: >-
+      visudo -c reports a problem in the sudo configuration after the change: {{
+      (cis_sdo_visudo.stdout_lines | default([])) + (cis_sdo_visudo.stderr_lines | default([])) }}
+  when:
+    - cis_sdo_visudo is not skipped
+    - cis_sdo_visudo.rc | default(1) != 0
+
+- name: "{{ cis_sdo_id ~ ' - Report a sudo line the role does not own that still wins' }}"
+  ansible.builtin.debug:
+    msg: >-
+      The line the role wrote to {{ cis_sudoers_dropin }} is not effective: sudo applies the
+      last Defaults line it reads, and
+      {{ cis_sdo_after.winner | default('another sudoers line', true) }} (or a Defaults line scoped to
+      a user, host or command) wins. The role edits no sudoers file it does not own for this
+      control; change that line by hand, or make sure the files that set {{ cis_sdo_option }} are
+      read before {{ cis_sudoers_dropin }}.
+  when:
+    - cis_sdo_after | length > 0
+    - cis_sdo_after.state | default('') != 'ok'
+    - cis_sdo_after.global_bad | default(false) | bool
+
+- name: "{{ cis_sdo_id ~ ' - Report a scoped sudo line that overrides the setting' }}"
+  ansible.builtin.debug:
+    msg: >-
+      A Defaults line scoped to a user, host, command or runas list sets {{ cis_sdo_option }} in a
+      way the control does not allow, and a scoped line beats the global ones:
+      {{ cis_sdo_last.scoped_bad | join(', ') }}. The role edits no
+      sudoers file it does not own for this control; change those lines by hand.
+  when:
+    - cis_sdo_res.state | default('') == 'bad'
+    - cis_sdo_last.scoped_bad | default([]) | length > 0
+
+# Audit mode, an unreadable configuration, a scoped line and a line that still wins after the
+# fix are findings. A problem found by visudo -c is too. Under --check the fix does not
+# happen, so remediate mode records nothing for a missing line then.
+- name: "{{ cis_sdo_id ~ ' - Record the finding' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "{{ cis_sdo_id }}"
+  when:
+    - cis_sdo_res.state | default('') in ['bad', 'unreadable']
+    - >-
+      (cis_audit_only | bool) or cis_sdo_res.state == 'unreadable'
+      or (cis_sdo_res.scoped_bad | default([]) | length > 0)
+      or (cis_sdo_after | length > 0 and cis_sdo_after.state | default('') != 'ok')
+      or (cis_sdo_visudo is not skipped and cis_sdo_visudo.rc | default(1) != 0)
+...

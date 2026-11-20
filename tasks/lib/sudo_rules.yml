@@ -1,0 +1,162 @@
+---
+# Shared logic for the two sudo controls that remove a tag from rules in files the role does
+# not own (5.2.6 NOPASSWD, 5.2.7 !authenticate). A control file imports this with:
+#   cis_sr_id   the CIS ID
+#   cis_sr_tag  NOPASSWD or !authenticate
+# and puts the tags, which every task here inherits, on the import.
+#
+# files/sudoers_scan.py reads every sudoers file sudo reads and lists the lines that carry
+# the tag, with the edit that removes it: NOPASSWD: is deleted from the rule, the rest of the
+# rule stays; !authenticate is dropped from its Defaults line, and a line that held only that
+# is commented out. Each edit is made with ansible.builtin.replace on the exact line and
+# validated with visudo -cf before it lands, so a broken file is never written. A line that
+# cannot be edited safely (it continues over several lines, or the tag is in an unexpected
+# place) is left alone.
+#
+# Lockout guard: the account the role is connected as (cis_sudo_conn_user, read with become
+# off) usually gets its sudo from exactly such a line. When no become password is set for
+# this run (ansible_become_password and ansible_become_pass undefined or empty), a line that
+# reaches that account, or might (a rule for the account, for a group it is in, for ALL or an
+# alias, a multi-rule line, a Defaults line that is global or has a host, command or runas
+# scope), is not changed: a message says so and the control is a finding. Lines for other
+# accounts are fixed. With a become password set, nothing is guarded.
+#
+# In audit mode every line found is a finding. In remediate mode a line left alone (guarded,
+# or not editable) is one, and so is any line still there after the fix. Under --check
+# nothing is edited and only the lines the fix would leave alone are recorded.
+
+- name: "{{ cis_sr_id ~ ' - Find the sudoers lines that carry ' ~ cis_sr_tag }}"
+  ansible.builtin.command:
+    argv: &cis_sr_argv
+      - "{{ cis_sudo_python }}"
+      - -c
+      - "{{ lookup('ansible.builtin.file', role_path ~ '/files/sudoers_scan.py') }}"
+      - rules
+      - "{{ cis_sr_tag }}"
+      - "{{ cis_sudo_conn_user | default('') }}"
+      - "{{ '0' if (ansible_become_password | default(ansible_become_pass | default('')) | string | length > 0) else '1' }}"
+  register: cis_sr_check
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: "{{ cis_sr_id ~ ' - Work out which sudoers lines may be changed' }}"
+  ansible.builtin.set_fact:
+    cis_sr_res: >-
+      {{ (cis_sr_check.stdout | from_json)
+         if (cis_sr_check.rc | default(1) == 0 and cis_sr_check.stdout | default('') | length > 0)
+         else {'state': 'unreadable'} }}
+
+- name: "{{ cis_sr_id ~ ' - Report the lines that are not changed to keep the role from being locked out' }}"
+  ansible.builtin.debug:
+    msg: >-
+      Not changed: {{ item.where }} ({{ item.text }}). It gives the account the role is
+      connected as ({{ cis_sudo_conn_user | default('unknown') }}) its sudo, or might, and no
+      become password is set for this run, so removing {{ cis_sr_tag }} could lock the role
+      out. Set ansible_become_password for this run and run it again, or edit the line by hand
+      after making sure that account can still use sudo.
+  loop: "{{ cis_sr_res.guarded | default([]) }}"
+  loop_control:
+    label: "{{ item.where }}"
+  when:
+    - not (cis_audit_only | bool)
+    - cis_sr_res.state == 'bad'
+
+- name: "{{ cis_sr_id ~ ' - Report the lines that cannot be edited safely' }}"
+  ansible.builtin.debug:
+    msg: >-
+      Not changed: {{ item.where }} ({{ item.text }}). The role edits only a rule or Defaults
+      line on a single line where it can find {{ cis_sr_tag }}; change this line by hand.
+  loop: "{{ cis_sr_res.manual | default([]) }}"
+  loop_control:
+    label: "{{ item.where }}"
+  when:
+    - not (cis_audit_only | bool)
+    - cis_sr_res.state == 'bad'
+
+- name: "{{ cis_sr_id ~ ' - Remove ' ~ cis_sr_tag ~ ' from the sudoers lines' }}"
+  ansible.builtin.replace:
+    path: "{{ item.file }}"
+    regexp: "{{ item.pattern }}"
+    replace: "{{ item.repl }}"
+    validate: /usr/sbin/visudo -cf %s
+  loop: "{{ cis_sr_res.fixes | default([]) }}"
+  loop_control:
+    label: "{{ item.where }}"
+  register: cis_sr_fix
+  # A file that does not parse alone (it uses an alias another file defines) fails
+  # validation and is left as it was; the recheck then records the finding.
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - cis_sr_res.state == 'bad'
+
+- name: "{{ cis_sr_id ~ ' - Report the edits that did not validate' }}"
+  ansible.builtin.debug:
+    msg: >-
+      Not changed: {{ item.item.where }} ({{ item.msg | default('') }}). The edited file did
+      not pass visudo -cf, so it was left as it was; change this line by hand.
+  loop: "{{ cis_sr_fix.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.where | default('') }}"
+  when:
+    - cis_sr_fix is not skipped
+    - item is not skipped
+    - item.msg | default('') is search('failed to validate')
+
+- name: "{{ cis_sr_id ~ ' - Check the whole sudo configuration after the change' }}"
+  ansible.builtin.command:
+    argv:
+      - /usr/sbin/visudo
+      - -c
+  register: cis_sr_visudo
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - cis_sr_fix is not skipped
+    - cis_sr_fix is changed
+    - not ansible_check_mode
+
+- name: "{{ cis_sr_id ~ ' - Find the sudoers lines that still carry ' ~ cis_sr_tag }}"
+  ansible.builtin.command:
+    argv: *cis_sr_argv
+  register: cis_sr_recheck
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+    - cis_sr_res.state == 'bad'
+    - cis_sr_res.fixes | default([]) | length > 0
+
+- name: "{{ cis_sr_id ~ ' - Work out what is left after the fix' }}"
+  ansible.builtin.set_fact:
+    cis_sr_left: >-
+      {{ ((cis_sr_recheck.stdout | from_json)
+          if (cis_sr_recheck.rc | default(1) == 0 and cis_sr_recheck.stdout | default('') | length > 0)
+          else {'state': 'unreadable'})
+         if cis_sr_recheck is not skipped
+         else {'state': ('bad' if ((cis_sr_res.guarded | default([])) + (cis_sr_res.manual | default([]))) | length > 0 else 'ok')} }}
+
+- name: "{{ cis_sr_id ~ ' - Report that the sudo configuration does not check out' }}"
+  ansible.builtin.debug:
+    msg: >-
+      visudo -c reports a problem in the sudo configuration after the change: {{
+      (cis_sr_visudo.stdout_lines | default([])) + (cis_sr_visudo.stderr_lines | default([])) }}
+  when:
+    - cis_sr_visudo is not skipped
+    - cis_sr_visudo.rc | default(1) != 0
+
+- name: "{{ cis_sr_id ~ ' - Record the finding' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "{{ cis_sr_id }}"
+  when:
+    - cis_sr_res.state | default('') in ['bad', 'unreadable']
+    - >-
+      (cis_audit_only | bool) or cis_sr_res.state == 'unreadable'
+      or cis_sr_left.state | default('') in ['bad', 'unreadable']
+      or (cis_sr_visudo is not skipped and cis_sr_visudo.rc | default(1) != 0)
+...

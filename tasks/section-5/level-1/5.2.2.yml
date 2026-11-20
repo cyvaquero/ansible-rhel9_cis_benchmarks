@@ -1,0 +1,65 @@
+---
+# 5.2.2 - /etc/sudoers and every regular file in /etc/sudoers.d are owned by root:root with
+# mode 0440 or stricter (no write or execute for the owner or group, nothing for others).
+# Judged on every regular file in the folder, whatever its name, as the benchmark does.
+# The fix sets only owner, group and the bits that are too open, so a stricter mode is
+# never loosened, and lists the files it changed. Under --check nothing changes and, in
+# remediate mode, nothing is recorded.
+
+- name: "5.2.2 - Handle the access on the sudoers files"
+  tags:
+    - "5.2.2"
+    - section-5
+    - level-1
+    - server
+  block:
+    - name: "5.2.2 - Check the owner and mode of the sudoers files"
+      ansible.builtin.command:
+        argv: &cis_sudo_5_2_2_argv
+          - /bin/sh
+          - -c
+          - |
+            export LC_ALL=C
+            [ -e /etc/sudoers ] || exit 0
+            paths=/etc/sudoers
+            [ -d /etc/sudoers.d ] && paths="$paths /etc/sudoers.d"
+            find $paths -type f \( -perm /0337 -o ! -user root -o ! -group root \) -print
+      register: cis_check_5_2_2
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    - name: "5.2.2 - Set the owner and mode of the sudoers files"
+      ansible.builtin.file:
+        path: "{{ item }}"
+        owner: root
+        group: root
+        mode: "u-wx,g-wx,o-rwx"
+        follow: false
+      loop: "{{ cis_check_5_2_2.stdout_lines }}"
+      when:
+        - not (cis_audit_only | bool)
+        - cis_check_5_2_2.rc == 0
+
+    - name: "5.2.2 - Check the owner and mode of the sudoers files again after the fix"
+      ansible.builtin.command:
+        argv: *cis_sudo_5_2_2_argv
+      register: cis_recheck_5_2_2
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_check_5_2_2.stdout_lines | length > 0
+
+    - name: "5.2.2 - Record the finding"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "5.2.2"
+      when:
+        - >-
+          (cis_audit_only | bool and cis_check_5_2_2.stdout_lines | length > 0)
+          or (cis_recheck_5_2_2 is not skipped and cis_recheck_5_2_2.stdout_lines | length > 0)
+          or cis_check_5_2_2.rc | default(1) != 0
+...
