@@ -1,8 +1,17 @@
 ---
-# Section 4, Level 2 controls. Placeholder: controls are added per section.
+# Section 4, Level 2 controls, one file per control in level-2/.
+#
+# import_tasks, not include_tasks: see tasks/section-1/level-1.yml.
 
-- name: "Section 4 Level 2 - No controls yet"
-  ansible.builtin.debug:
-    msg: "No controls in this file yet"
-    verbosity: 1
+- name: "4.1.8 - Ensure firewalld default zone is set to drop"
+  ansible.builtin.import_tasks: level-2/4.1.8.yml
+  when: "'4.1.8' in cis_selected_controls"
+
+- name: "4.1.10 - Ensure firewalld logs denied packets"
+  ansible.builtin.import_tasks: level-2/4.1.10.yml
+  when: "'4.1.10' in cis_selected_controls"
+
+- name: "4.1.11 - Ensure firewalld blocks ICMP timestamp requests and replies"
+  ansible.builtin.import_tasks: level-2/4.1.11.yml
+  when: "'4.1.11' in cis_selected_controls"
 ...

@@ -8,6 +8,23 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.27]
+
+### Added
+
+- Section 4.1, Level 2 and manual firewalld controls, which completes section 4: 4.1.10
+  sets `LogDenied` to `cis_firewalld_log_denied` only when it is `off`, with
+  `firewall-cmd --set-log-denied` when `firewalld` runs and in `firewalld.conf` otherwise;
+  4.1.11 blocks the ICMP `timestamp-request` and `timestamp-reply` types permanently in each
+  active zone bound to an interface other than `lo` or `virbr*` whose target is `default`
+  (removing them from the list when icmp-block-inversion is on) and reloads `firewalld`
+  once, and a runtime-only difference is fixed by the reload alone. Neither restricts SSH.
+  4.1.5, 4.1.6, 4.1.7 and 4.1.8 are manual: the role prints the loopback interface rules,
+  the loopback address rules, the active zones' services and ports and the default zone,
+  and changes nothing; 4.1.8 is a lockout risk. New variable `cis_firewalld_log_denied`
+  (default `unicast`, or `all`, `broadcast` or `multicast`), validated at preflight.
+  Part of #8.
+
 ## [3.0.0_0.0.26]
 
 ### Added

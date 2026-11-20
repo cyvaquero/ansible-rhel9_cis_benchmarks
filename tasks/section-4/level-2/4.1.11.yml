@@ -1,0 +1,136 @@
+---
+# 4.1.11 - firewalld blocks ICMP timestamp requests and replies. It applies to each active
+# zone bound to an interface other than lo or virbr* whose permanent target is default; a
+# zone with an ACCEPT, DROP or REJECT target is not applicable. For an applicable zone both
+# timestamp-request and timestamp-reply must be blocked, in the permanent and the runtime
+# configuration. A type is blocked when it is listed as an ICMP block with icmp-block-inversion
+# off, and when it is not listed with inversion on (inversion turns the list into an allow
+# list). firewalld not running is a finding with nothing to fix. firewalld running with no
+# applicable zone passes: there is nothing to check.
+#
+# The fix, per zone and type that is not blocked permanently, is
+# firewall-cmd --permanent --zone=Z --add-icmp-block=<type>, or --remove-icmp-block when
+# inversion is on; then firewalld is reloaded once. A difference that exists only at runtime
+# is fixed by the reload alone (which also drops runtime-only changes). This does not
+# restrict SSH, so there is no SSH guard. A control that still fails after the fix is a
+# finding; under --check nothing changes and nothing is recorded in remediate mode.
+#
+# The check prints one line per action: perm:<zone>:<type>:add|remove, reload, or
+# state=noactive; its exit status is 1 when any line is printed.
+- name: "4.1.11 - Handle firewalld blocking of ICMP timestamp requests and replies"
+  tags:
+    - "4.1.11"
+    - section-4
+    - level-2
+    - server
+    - workstation
+  block:
+    - name: "4.1.11 - Check the state"
+      ansible.builtin.command:
+        argv: &cis_fw_4_1_11_argv
+          - /bin/sh
+          - -c
+          - |
+            if ! systemctl is-active --quiet firewalld.service 2>/dev/null; then
+              echo "state=noactive"
+              exit 1
+            fi
+            zones=$(firewall-cmd --get-active-zones 2>/dev/null | awk '
+              /^[^ \t]/ { z = $1; next }
+              /^[ \t]+interfaces:/ {
+                for (i = 2; i <= NF; i++) {
+                  if ($i == "lo" || $i ~ /^virbr/) continue
+                  print z
+                  break
+                }
+              }')
+            bad=0
+            reload=0
+            for z in $zones; do
+              pt=$(firewall-cmd --permanent --zone="$z" --get-target 2>/dev/null | tr -d '%[:space:]')
+              [ "$pt" = default ] || continue
+              pinv=0
+              firewall-cmd --permanent --zone="$z" --query-icmp-block-inversion >/dev/null 2>&1 && pinv=1
+              rinv=0
+              firewall-cmd --zone="$z" --query-icmp-block-inversion >/dev/null 2>&1 && rinv=1
+              for t in timestamp-request timestamp-reply; do
+                plisted=0
+                firewall-cmd --permanent --zone="$z" --query-icmp-block="$t" >/dev/null 2>&1 && plisted=1
+                rlisted=0
+                firewall-cmd --zone="$z" --query-icmp-block="$t" >/dev/null 2>&1 && rlisted=1
+                if [ "$plisted" = "$pinv" ]; then
+                  # Not blocked permanently: list it, or take it off the allow list.
+                  if [ "$pinv" = 1 ]; then op=remove; else op=add; fi
+                  echo "perm:$z:$t:$op"
+                  bad=1
+                elif [ "$rlisted" = "$rinv" ]; then
+                  # Blocked permanently, not at runtime: the reload fixes it.
+                  reload=1
+                fi
+              done
+            done
+            if [ "$reload" = 1 ]; then
+              echo "reload"
+              bad=1
+            fi
+            exit $bad
+      register: cis_check_4_1_11
+      changed_when: false
+      check_mode: false
+      failed_when: false
+
+    - name: "4.1.11 - Block the ICMP type in the permanent configuration"
+      ansible.builtin.command:
+        argv:
+          - firewall-cmd
+          - --permanent
+          - "--zone={{ item.split(':')[1] }}"
+          - "--{{ item.split(':')[3] }}-icmp-block={{ item.split(':')[2] }}"
+      loop: "{{ cis_check_4_1_11.stdout_lines | select('match', '^perm:') | list }}"
+      register: cis_set_4_1_11
+      changed_when: true
+      when:
+        - not (cis_audit_only | bool)
+        - cis_check_4_1_11.rc != 0
+
+    - name: "4.1.11 - Reload firewalld to apply the permanent configuration"
+      ansible.builtin.command:
+        argv:
+          - firewall-cmd
+          - --reload
+      changed_when: true
+      when:
+        - not (cis_audit_only | bool)
+        - cis_check_4_1_11.rc != 0
+        - "'state=noactive' not in cis_check_4_1_11.stdout_lines"
+
+    - name: "4.1.11 - Check again after the fix"
+      ansible.builtin.command:
+        argv: *cis_fw_4_1_11_argv
+      register: cis_recheck_4_1_11
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_check_4_1_11.rc != 0
+
+    - name: "4.1.11 - Record the finding when the check fails in audit mode"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "4.1.11"
+      when:
+        - cis_audit_only | bool
+        - cis_check_4_1_11.rc != 0
+
+    # Under --check the fix does not happen, so the second check says nothing new.
+    - name: "4.1.11 - Record the finding when the fix did not take effect"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "4.1.11"
+      when:
+        - cis_recheck_4_1_11 is not skipped
+        - not ansible_check_mode
+        - cis_recheck_4_1_11.rc != 0
+...

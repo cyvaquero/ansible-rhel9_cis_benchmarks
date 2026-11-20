@@ -1,0 +1,29 @@
+---
+# 4.1.8 (manual) - lists the firewalld default zone, for review. The role never changes
+# it: a drop default zone can cut off SSH and lock Ansible out. It only reads, in both
+# modes, and records no finding: summary.yml lists manual controls. Output is empty when
+# the tool it reads is not available.
+
+- name: "4.1.8 - Find the default zone"
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - |
+        firewall-cmd --get-default-zone 2>/dev/null || true
+  register: cis_check_4_1_8
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: &cis_tags_4_1_8
+    - "4.1.8"
+    - section-4
+    - level-2
+    - server
+    - workstation
+
+- name: "4.1.8 - Report the default zone for review"
+  ansible.builtin.debug:
+    msg: "{{ ['Default firewalld zone (firewall-cmd --get-default-zone):'] + (cis_check_4_1_8.stdout_lines | default([])) }}"
+  tags: *cis_tags_4_1_8
+...
