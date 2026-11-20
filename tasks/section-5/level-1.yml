@@ -5,7 +5,7 @@
 # import_tasks, not include_tasks: see tasks/section-1/level-1.yml.
 #
 # 5.1 (SSH server). The role's own sshd settings go in one drop-in (cis_sshd_dropin) whose
-# name sorts before 50-redhat.conf, because sshd uses the first value it reads; the
+# name sorts before 50-redhat.conf, because sshd uses the first value it reads for most keywords (MaxStartups takes the last); the
 # controls judge the effective configuration with `sshd -T`, never one file, and a handler
 # validates it with `sshd -t` and reloads sshd only when it is running (never a restart).
 #

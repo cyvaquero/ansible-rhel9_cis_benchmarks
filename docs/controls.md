@@ -247,7 +247,7 @@ yet. `implemented`: the control has its task file at
 | 5.1.15 | Ensure sshd LoginGraceTime is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
 | 5.1.16 | Ensure sshd LogLevel is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
 | 5.1.17 | Ensure sshd MaxAuthTries is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
-| 5.1.18 | Ensure sshd MaxStartups is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 5.1.18 | Ensure sshd MaxStartups is configured | L1 Server, L1 Workstation | Automated | implement | implemented | sshd takes the last MaxStartups value, so a later file can override it (a finding) |
 | 5.1.19 | Ensure sshd MaxSessions is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
 | 5.1.20 | Ensure sshd PermitEmptyPasswords is disabled | L1 Server, L1 Workstation | Automated | implement | implemented |  |
 | 5.1.21 | Ensure sshd PermitRootLogin is disabled | L1 Server, L1 Workstation | Automated | implement | implemented | Lockout risk: confirm another admin login first; not changed while the role is connected as root |

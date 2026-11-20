@@ -20,8 +20,9 @@
 # touched. The fix writes the one directive into the role's own drop-in cis_sshd_dropin
 # (name sorts before 50-redhat.conf), validated with `sshd -t -f` before it is written, and
 # notifies the handler that checks the whole configuration with `sshd -t` and reloads sshd
-# only when it runs. A value set earlier than the drop-in (a file that sorts before it, or
-# the main file above its Include) still wins: the control is then a finding, and the role
+# only when it runs. A value set by another file still wins (for most keywords one read
+# earlier: a file that sorts before the drop-in, or the main file above its Include; for
+# MaxStartups, which sshd resolves last-value-wins, one read later): the control is then a finding, and the role
 # edits no file it does not own. Under --check nothing is fixed and, in remediate mode,
 # nothing is recorded.
 
@@ -108,7 +109,7 @@
   ansible.builtin.lineinfile:
     path: "{{ cis_sshd_dropin }}"
     regexp: '^# Managed by the CIS RHEL 9 role'
-    line: "# Managed by the CIS RHEL 9 role. Settings here win over later files: sshd uses the first value it reads."
+    line: "# Managed by the CIS RHEL 9 role. Most sshd keywords take the first value read, so this file sorts first; MaxStartups takes the last."
     insertbefore: BOF
     create: true
     owner: root
@@ -155,8 +156,10 @@
 - name: "{{ cis_sd_id ~ ' - Report a setting that another file overrides' }}"
   ansible.builtin.debug:
     msg: >-
-      The value written to {{ cis_sshd_dropin }} is not effective: a file read before it (a
-      drop-in that sorts earlier, or the main file above its Include) sets the same keyword.
+      The value written to {{ cis_sshd_dropin }} is not effective: another sshd file sets the
+      same keyword and wins. Most keywords take the first value read (a drop-in that sorts
+      earlier, or the main file above its Include); MaxStartups takes the last (any file read
+      after this one).
       The role edits no file it does not own; change that file by hand.
   when:
     - cis_sd_recheck is not skipped

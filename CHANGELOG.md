@@ -14,7 +14,8 @@ implements, then the role's own version.
 
 - Section 5.1, SSH server, 5.1.1 to 5.1.23. The role writes its sshd settings to one
   drop-in, `/etc/ssh/sshd_config.d/00-cis-rhel9.conf`, which sorts before `50-redhat.conf`
-  because sshd uses the first value it reads. Each control judges the effective
+  because sshd uses the first value it reads for most keywords (`MaxStartups` takes the last,
+  so a later file can override 5.1.18, which is then a finding). Each control judges the effective
   configuration with `sshd -T` (and `sshd -T -C` for the role's own account, so Match
   blocks are seen), writes a line only when the value is not compliant, validates it with
   `sshd -t -f`, and a handler checks the whole configuration with `sshd -t` and reloads

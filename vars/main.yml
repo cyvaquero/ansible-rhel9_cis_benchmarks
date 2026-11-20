@@ -21,6 +21,7 @@ cis_valid_profiles:
   - workstation
 
 # Section 5.1 (SSH server): the one drop-in the role owns. Its name sorts before
-# 50-redhat.conf, because sshd uses the first value it reads for a keyword.
+# 50-redhat.conf, because sshd uses the first value it reads for most keywords (MaxStartups
+# takes the last value, so a later file can override it).
 cis_sshd_dropin: /etc/ssh/sshd_config.d/00-cis-rhel9.conf
 ...

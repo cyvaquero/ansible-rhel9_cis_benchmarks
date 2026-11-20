@@ -148,7 +148,7 @@
       ansible.builtin.lineinfile:
         path: "{{ cis_sshd_dropin }}"
         regexp: '^# Managed by the CIS RHEL 9 role'
-        line: "# Managed by the CIS RHEL 9 role. Settings here win over later files: sshd uses the first value it reads."
+        line: "# Managed by the CIS RHEL 9 role. Most sshd keywords take the first value read, so this file sorts first; MaxStartups takes the last."
         insertbefore: BOF
         create: true
         owner: root

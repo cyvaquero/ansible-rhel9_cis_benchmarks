@@ -403,13 +403,14 @@ wherever it comes from, is never changed.
   `cis_at_allow_users`. It never removes a user or deletes a deny file.
 - SSH server (5.1): the role writes its settings to one drop-in,
   `/etc/ssh/sshd_config.d/00-cis-rhel9.conf` (mode 0600), whose name sorts before
-  `50-redhat.conf` because sshd uses the first value it reads. Every control judges the
+  `50-redhat.conf` because sshd uses the first value it reads for most keywords (`MaxStartups` takes the last). Every control judges the
   effective configuration with `sshd -T` (and `sshd -T -C` for the account the role is
   connected as, so a Match block for it is seen), never one file, and writes a line only
   when the effective value is not compliant. A line is validated with `sshd -t -f` before
   it is written; after any change a handler checks the whole configuration with `sshd -t`
   and reloads (never restarts) sshd, only when it is running. A value set before the drop-in
-  is read (a file that sorts earlier, or the main file above its `Include`) still wins: the
+  is read (a file that sorts earlier, or the main file above its `Include`; for `MaxStartups`,
+  any file read after it) still wins: the
   control is a finding, and the role edits no file it does not own. A host without
   `openssh-server` passes. 5.1.1 to 5.1.4 set owner and mode on `sshd_config`, the `.conf`
   drop-ins, the drop-in folder (0700) and the host keys (found from `sshd -T` and a glob; a
