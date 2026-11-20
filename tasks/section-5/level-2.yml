@@ -1,8 +1,11 @@
 ---
-# Section 5, Level 2 controls. Placeholder: controls are added per section.
+# Section 5, Level 2 controls, one file per control in level-2/.
+#
+# import_tasks, not include_tasks: see tasks/section-1/level-1.yml.
 
-- name: "Section 5 Level 2 - No controls yet"
-  ansible.builtin.debug:
-    msg: "No controls in this file yet"
-    verbosity: 1
+# 5.2.6 reads the account of this run (cis_sudo_conn_user), which level-1.yml sets, and
+# Level 2 includes Level 1. It is also in cis_default_exclusions.
+- name: "5.2.6 - Ensure users must provide password for escalation"
+  ansible.builtin.import_tasks: level-2/5.2.6.yml
+  when: "'5.2.6' in cis_selected_controls"
 ...

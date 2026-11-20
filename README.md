@@ -4,7 +4,7 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.28).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.29).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and these controls are implemented:
 
 - kernel modules, 1.1.1.1 to 1.1.1.11;
@@ -24,7 +24,8 @@ selection, audit mode and lint CI exist, and these controls are implemented:
 - IPv4 kernel parameters, 3.3.1.1 to 3.3.1.20;
 - IPv6 kernel parameters, 3.3.2.1 to 3.3.2.8;
 - firewalld, 4.1.1 to 4.1.11 (section 4 is complete);
-- SSH server, 5.1.1 to 5.1.23.
+- SSH server, 5.1.1 to 5.1.23;
+- sudo and su, 5.2.1 to 5.2.12.
 
 Every other control is still planned. Do not run this against hosts you care about.
 
@@ -178,6 +179,14 @@ before running the role on such a host. To skip a control, list its ID in `cis_e
 
 Values outside these ranges stop the run at preflight. A setting that is already compliant,
 wherever it comes from, is never changed.
+
+### sudo and su (5.2)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `cis_sudo_logfile` | `/var/log/sudo.log` | 5.2.5: the path written as `Defaults logfile=` when no sudo log file is set. An absolute path of letters, digits, underscore, dot, hyphen and slash; anything else stops the run at preflight. A log file the site already set is kept. Rotate the file (logrotate) to keep it from filling the disk. |
+| `cis_sudo_timestamp_timeout` | `15` | 5.2.10: minutes, from 1 to 15, written when the effective timeout is above 15 or disabled (negative). No line (sudo's own default of 5) and any value from 0 to 15 are compliant and never changed. |
+| `cis_su_group` | `sugroup` | 5.2.12: the group `pam_wheel` allows to use `su`. A plain group name (lowercase letters, digits, underscore, hyphen); anything else stops the run at preflight. The role creates it empty when missing and never adds or removes members. A group that has members is a finding. |
 
 ### Audit vs remediate
 
@@ -432,6 +441,36 @@ wherever it comes from, is never changed.
   allowed. A connection that is not SSH (for example `local`) passes the guard. An empty
   list is left alone, and a line written by an earlier run stays when its variable is later
   emptied. See [docs/review-controls.md](docs/review-controls.md).
+- sudo and su (5.2): the role writes its sudo `Defaults` lines (5.2.4, 5.2.5, 5.2.8 to
+  5.2.11) to one file, `/etc/sudoers.d/zz-cis-rhel9` (mode 0440). sudo applies the last
+  `Defaults` line it reads and reads `/etc/sudoers.d` in name order (skipping names with a dot or
+  a trailing `~`), so the name sorts after the usual ones and the role's lines win over the
+  files that sort before it. Each control judges every sudoers file sudo reads
+  (`/etc/sudoers` and its `@include`, `#include`, `@includedir` and `#includedir` targets, in
+  sudo's order), not one file, and writes a line only when the effective value is not
+  compliant, so a stricter value is never loosened. Every write is validated with
+  `visudo -cf` before it lands, and the whole configuration is checked with `visudo -c`
+  afterwards. A non-compliant `Defaults` line that still wins (in a file that sorts after the
+  role's, after the `#includedir` line of `/etc/sudoers`, or scoped to a user, host, command
+  or runas list, which beats the global lines) is not edited: the control is a finding with
+  the file and line. 5.2.1 installs sudo; 5.2.2 and 5.2.3 set owner, group and only the mode
+  bits that are too open on the sudoers files and `/etc/sudoers.d`. 5.2.8, 5.2.9 and 5.2.11
+  pass on a host with no line (the defaults are compliant). 5.2.6 (Level 2, in
+  `cis_default_exclusions`) and 5.2.7 remove the `NOPASSWD:` tag, or the `!authenticate` item
+  of a `Defaults` line, from files the role does not own, validating each edit with
+  `visudo -cf`. **Lockout guard:** the account the role is connected as (read with become
+  off) usually gets its sudo from exactly such a line. When no become password is set for
+  the run (`ansible_become_password` and `ansible_become_pass` undefined or empty), a line
+  that reaches that account, or might (a rule for the account, a group it is in, `ALL` or an
+  alias, a line with several rules, a global `Defaults` line), is left alone, a message says
+  so and the control is a finding; lines for other accounts are fixed. With a become password
+  set nothing is guarded. A line that continues over several lines is not edited. 5.2.12 adds
+  `auth required pam_wheel.so use_uid group=<cis_su_group>` to `/etc/pam.d/su` (in place of
+  the commented line, else right after `pam_rootok`, so root can still use `su`) and creates
+  the group empty when missing; a line the site already set is kept. `/etc/pam.d/su` is not
+  managed by authselect. Members of the group are reported (a finding), never removed. The
+  scanner is `files/sudoers_scan.py`, run with the managed node's Python. See
+  [docs/review-controls.md](docs/review-controls.md).
 - The summary is tagged `summary` and `always`, and lists every selected audit-only and
   manual control even on a run limited by tags.
 
@@ -452,6 +491,7 @@ ansible-lint
 ansible-playbook -i localhost, -e target=localhost --syntax-check tests/syntax.yml
 python3 tests/check_controls.py
 python3 tests/check_benchmark_version.py
+python3 tests/check_sudoers_scan.py
 ```
 
 `tests/requirements.txt` pins ansible-lint 6.22.2, the newest release that installs with

@@ -8,6 +8,31 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.29]
+
+### Added
+
+- Section 5.2, sudo and su, 5.2.1 to 5.2.12. The role writes its sudo `Defaults` lines
+  (5.2.4 `use_pty`, 5.2.5 `logfile`, 5.2.8 `!pwfeedback`, 5.2.9 `!visiblepw`, 5.2.10
+  `timestamp_timeout`, 5.2.11 `timestamp_type`) to one file, `/etc/sudoers.d/zz-cis-rhel9`
+  (mode 0440), named to sort last because sudo applies the last `Defaults` line it reads. Each
+  control judges all the sudoers files sudo reads, not one, writes a line only when the
+  effective value is not compliant (a stricter value is never loosened), validates every
+  write with `visudo -cf` and checks the whole configuration with `visudo -c`. A
+  non-compliant line elsewhere that would still win (a later file, a line after the
+  `#includedir` line, or a user, host, command or runas scoped line) is a finding with its
+  file and line; the role edits none of them. 5.2.1 installs sudo; 5.2.2 and 5.2.3 set owner
+  and mode on the sudoers files and `/etc/sudoers.d`. 5.2.6 (Level 2, still in
+  `cis_default_exclusions`) and 5.2.7 remove the `NOPASSWD:` tag and `!authenticate` from
+  sudoers files the role does not own, with `visudo -cf` validation, except lines that give
+  the account the role is connected as its sudo when no become password is set for the run:
+  those are left alone with a message and are a finding. 5.2.12 adds
+  `auth required pam_wheel.so use_uid group=sugroup` to `/etc/pam.d/su` after `pam_rootok`
+  and creates the group empty; members found in it are a finding and are never removed. New
+  variables `cis_sudo_logfile` (`/var/log/sudo.log`), `cis_sudo_timestamp_timeout` (15) and
+  `cis_su_group` (`sugroup`), validated at preflight. New `tests/check_sudoers_scan.py`.
+  Part of #9.
+
 ## [3.0.0_0.0.28]
 
 ### Added

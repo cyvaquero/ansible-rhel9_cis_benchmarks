@@ -236,6 +236,29 @@
     - always
     - preflight
 
+- name: "Preflight - Validate the sudo and su settings"
+  ansible.builtin.assert:
+    that:
+      - cis_sudo_logfile is string
+      - cis_sudo_logfile is match('^/[A-Za-z0-9_./-]+$')
+      - "'..' not in cis_sudo_logfile"
+      - not cis_sudo_logfile.endswith('/')
+      - cis_sudo_timestamp_timeout | string is match('^[0-9]+$')
+      - cis_sudo_timestamp_timeout | int >= 1
+      - cis_sudo_timestamp_timeout | int <= 15
+      - cis_su_group is string
+      - cis_su_group is match('^[a-z_][a-z0-9_-]{0,31}$')
+    fail_msg: >-
+      cis_sudo_logfile must be an absolute file path of letters, digits, underscore, dot,
+      hyphen and slash (got {{ cis_sudo_logfile | to_json }}), cis_sudo_timestamp_timeout a
+      whole number from 1 to 15 (got {{ cis_sudo_timestamp_timeout | to_json }}) and
+      cis_su_group a plain group name of lowercase letters, digits, underscore and hyphen
+      (got {{ cis_su_group | to_json }}).
+    quiet: true
+  tags:
+    - always
+    - preflight
+
 - name: "Preflight - Compute the selected controls"
   ansible.builtin.set_fact:
     # The single list every control task or include tests with

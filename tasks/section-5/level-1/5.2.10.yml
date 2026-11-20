@@ -1,0 +1,20 @@
+---
+# 5.2.10 - the sudo credential cache lasts at most 15 minutes and is not disabled (a negative
+# value never expires). No line is the default of 5 minutes and passes; a value from 0 to 15,
+# however strict, is kept. Otherwise cis_sudo_timestamp_timeout is written. The logic is shared
+# in tasks/lib/sudo_default.yml.
+
+- name: "5.2.10 - Ensure sudo timestamp_timeout is configured"
+  ansible.builtin.import_tasks: ../../lib/sudo_default.yml
+  vars:
+    cis_sdo_id: "5.2.10"
+    cis_sdo_option: "timestamp_timeout"
+    cis_sdo_line: 'timestamp_timeout={{ cis_sudo_timestamp_timeout }}'
+    cis_sdo_max: 15
+  tags:
+    - "5.2.10"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

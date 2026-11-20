@@ -141,4 +141,21 @@ cis_sshd_allow_users: []
 cis_sshd_allow_groups: []
 cis_sshd_deny_users: []
 cis_sshd_deny_groups: []
+
+# sudo (5.2.5): the log file path written as `Defaults logfile=...` when no sudo log file is
+# set. An absolute path of letters, digits, underscore, dot, hyphen and slash; preflight
+# stops the run on anything else. A log file the site already set is left alone. Rotate it
+# (logrotate) to keep it from filling the disk.
+cis_sudo_logfile: /var/log/sudo.log
+
+# sudo (5.2.10): the timestamp_timeout in minutes written when the effective value is above
+# 15 or disables the timeout (a negative number). A whole number from 1 to 15. A stricter
+# value that is already set (0 to 15) is never loosened.
+cis_sudo_timestamp_timeout: 15
+
+# su (5.2.12): the group pam_wheel allows to use su. The role creates it empty when missing
+# and never adds or removes members; a group that already has members is a finding. A plain
+# group name (lowercase letters, digits, underscore and hyphen, starting with a letter or
+# underscore); preflight stops the run on anything else.
+cis_su_group: sugroup
 ...

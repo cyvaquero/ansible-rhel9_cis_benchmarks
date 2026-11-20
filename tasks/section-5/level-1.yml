@@ -11,6 +11,13 @@
 #
 # 5.1.11 and 5.1.12 are Level 1 on a workstation and Level 2 on a server, so they sit here
 # and preflight's selection decides.
+#
+# 5.2 (sudo and su). The role's own sudo Defaults go in one file, cis_sudoers_dropin, named
+# to sort last in /etc/sudoers.d because sudo applies the last Defaults line it reads. The
+# controls judge all the sudoers files sudo reads (files/sudoers_scan.py), validate every
+# write with visudo -cf and check the whole configuration with visudo -c. 5.2.6 (Level 2) is
+# in level-2.yml. Server-only controls (5.2.2, 5.2.3, 5.2.8, 5.2.9, 5.2.11) sit here and
+# preflight's selection decides.
 
 # The account the role is connected as, for the lockout guards of 5.1.8 and 5.1.21 and for
 # `sshd -T -C`, which evaluates Match blocks for that account. Read with become off (sudo
@@ -136,4 +143,77 @@
 - name: "5.1.23 - Ensure sshd UsePAM is enabled"
   ansible.builtin.import_tasks: level-1/5.1.23.yml
   when: "'5.1.23' in cis_selected_controls"
+
+# 5.2 (sudo and su).
+
+# The account the role is connected as, for the lockout guard of 5.2.6 and 5.2.7: the
+# sudoers lines that give that account its sudo are not changed unless a become password is
+# set. Read with become off, so it is the login account, not root. It only reads the host,
+# so it runs in audit mode too, and it carries the always tag so a run limited to one
+# control still has it.
+- name: "5.2 - Read the account of this run"
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - 'id -un 2>/dev/null'
+  register: cis_sudo_conn_read
+  become: false
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when: "cis_selected_controls | select('match', '^5\\.2\\.(6|7)$') | list | length > 0"
+  tags:
+    - always
+
+- name: "5.2 - Record the account of this run"
+  ansible.builtin.set_fact:
+    cis_sudo_conn_user: "{{ cis_sudo_conn_read.stdout_lines[0] | default('') }}"
+  when: "cis_selected_controls | select('match', '^5\\.2\\.(6|7)$') | list | length > 0"
+  tags:
+    - always
+
+- name: "5.2.1 - Ensure sudo is installed"
+  ansible.builtin.import_tasks: level-1/5.2.1.yml
+  when: "'5.2.1' in cis_selected_controls"
+
+- name: "5.2.2 - Ensure access on sudoers configuration files is configured"
+  ansible.builtin.import_tasks: level-1/5.2.2.yml
+  when: "'5.2.2' in cis_selected_controls"
+
+- name: "5.2.3 - Ensure access on the /etc/sudoers.d directory is configured"
+  ansible.builtin.import_tasks: level-1/5.2.3.yml
+  when: "'5.2.3' in cis_selected_controls"
+
+- name: "5.2.4 - Ensure sudo commands use pty"
+  ansible.builtin.import_tasks: level-1/5.2.4.yml
+  when: "'5.2.4' in cis_selected_controls"
+
+- name: "5.2.5 - Ensure sudo log file exists"
+  ansible.builtin.import_tasks: level-1/5.2.5.yml
+  when: "'5.2.5' in cis_selected_controls"
+
+- name: "5.2.7 - Ensure re-authentication for privilege escalation is not disabled globally"
+  ansible.builtin.import_tasks: level-1/5.2.7.yml
+  when: "'5.2.7' in cis_selected_controls"
+
+- name: "5.2.8 - Ensure sudo pwfeedback is configured"
+  ansible.builtin.import_tasks: level-1/5.2.8.yml
+  when: "'5.2.8' in cis_selected_controls"
+
+- name: "5.2.9 - Ensure sudo visiblepw is configured"
+  ansible.builtin.import_tasks: level-1/5.2.9.yml
+  when: "'5.2.9' in cis_selected_controls"
+
+- name: "5.2.10 - Ensure sudo timestamp_timeout is configured"
+  ansible.builtin.import_tasks: level-1/5.2.10.yml
+  when: "'5.2.10' in cis_selected_controls"
+
+- name: "5.2.11 - Ensure sudo timestamp_type is configured"
+  ansible.builtin.import_tasks: level-1/5.2.11.yml
+  when: "'5.2.11' in cis_selected_controls"
+
+- name: "5.2.12 - Ensure access to the su command is restricted"
+  ansible.builtin.import_tasks: level-1/5.2.12.yml
+  when: "'5.2.12' in cis_selected_controls"
 ...

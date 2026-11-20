@@ -1,0 +1,18 @@
+---
+# 5.2.8 - sudo does not echo asterisks while a password is typed: pwfeedback is not enabled
+# by an effective global line (no line is the default and passes), and no scoped line enables
+# it. A non-compliant line is overridden with `Defaults !pwfeedback` in the role file. The logic
+# is shared in tasks/lib/sudo_default.yml.
+
+- name: "5.2.8 - Ensure sudo pwfeedback is configured"
+  ansible.builtin.import_tasks: ../../lib/sudo_default.yml
+  vars:
+    cis_sdo_id: "5.2.8"
+    cis_sdo_option: "pwfeedback"
+    cis_sdo_line: '!pwfeedback'
+  tags:
+    - "5.2.8"
+    - section-5
+    - level-1
+    - server
+...

@@ -1,0 +1,17 @@
+---
+# 5.2.6 - no sudoers rule carries the NOPASSWD tag. Level 2, and in cis_default_exclusions
+# because it breaks passwordless become. The logic, the edit and the lockout guard for the
+# account the role is connected as are in tasks/lib/sudo_rules.yml.
+
+- name: "5.2.6 - Ensure users must provide password for escalation"
+  ansible.builtin.import_tasks: ../../lib/sudo_rules.yml
+  vars:
+    cis_sr_id: "5.2.6"
+    cis_sr_tag: "NOPASSWD"
+  tags:
+    - "5.2.6"
+    - section-5
+    - level-2
+    - server
+    - workstation
+...
