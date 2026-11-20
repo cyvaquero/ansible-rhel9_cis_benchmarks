@@ -162,6 +162,80 @@
     - always
     - preflight
 
+- name: "Preflight - Validate the SSH server access lists"
+  ansible.builtin.assert:
+    that:
+      - item.value is sequence and item.value is not string and item.value is not mapping
+      - cis_rejected_names | length == 0
+    fail_msg: >-
+      {{ item.key }} must be a list of plain user or group names (letters, digits, underscore,
+      dot and hyphen, not starting with a digit or hyphen){{
+      (' - rejected items: ' ~ (cis_rejected_names | map('to_json') | join(', ')))
+      if cis_rejected_names | length > 0 else '' }}.
+    quiet: true
+  vars:
+    cis_rejected_names: >-
+      {{ ((item.value | reject('string') | list)
+          + (item.value | select('string') | reject('regex', '^[A-Za-z_][A-Za-z0-9_.-]*$', match_type='fullmatch') | list))
+         if (item.value is sequence and item.value is not string and item.value is not mapping)
+         else [] }}
+  loop:
+    - key: cis_sshd_allow_users
+      value: "{{ cis_sshd_allow_users }}"
+    - key: cis_sshd_allow_groups
+      value: "{{ cis_sshd_allow_groups }}"
+    - key: cis_sshd_deny_users
+      value: "{{ cis_sshd_deny_users }}"
+    - key: cis_sshd_deny_groups
+      value: "{{ cis_sshd_deny_groups }}"
+  loop_control:
+    label: "{{ item.key }}"
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Validate the SSH server limits"
+  ansible.builtin.assert:
+    that:
+      - item.value | string is match('^[0-9]+$')
+      - item.value | int >= 1
+      - item.max == 0 or item.value | int <= item.max
+    fail_msg: >-
+      {{ item.key }} must be a whole number from 1{{ (' to ' ~ item.max) if item.max > 0 else ' up' }}
+      (got {{ item.value | to_json }}).
+    quiet: true
+  loop:
+    - {key: cis_sshd_client_alive_interval, value: "{{ cis_sshd_client_alive_interval }}", max: 0}
+    - {key: cis_sshd_client_alive_count_max, value: "{{ cis_sshd_client_alive_count_max }}", max: 0}
+    - {key: cis_sshd_login_grace_time, value: "{{ cis_sshd_login_grace_time }}", max: 60}
+    - {key: cis_sshd_max_auth_tries, value: "{{ cis_sshd_max_auth_tries }}", max: 4}
+    - {key: cis_sshd_max_sessions, value: "{{ cis_sshd_max_sessions }}", max: 10}
+  loop_control:
+    label: "{{ item.key }}"
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Validate the SSH server log level and MaxStartups"
+  ansible.builtin.assert:
+    that:
+      - cis_sshd_log_level in ['INFO', 'VERBOSE']
+      - cis_sshd_max_startups | string is match('^[0-9]+:[0-9]+:[0-9]+$')
+      - cis_sshd_startups_parts | map('int') | min >= 1
+      - cis_sshd_startups_parts[0] | int <= 10
+      - cis_sshd_startups_parts[1] | int <= 30
+      - cis_sshd_startups_parts[2] | int <= 60
+    fail_msg: >-
+      cis_sshd_log_level must be INFO or VERBOSE (got {{ cis_sshd_log_level | to_json }}) and
+      cis_sshd_max_startups three whole numbers start:rate:full of at least 1 and at most
+      10:30:60 (got {{ cis_sshd_max_startups | to_json }}).
+    quiet: true
+  vars:
+    cis_sshd_startups_parts: "{{ (cis_sshd_max_startups | string).split(':') }}"
+  tags:
+    - always
+    - preflight
+
 - name: "Preflight - Compute the selected controls"
   ansible.builtin.set_fact:
     # The single list every control task or include tests with

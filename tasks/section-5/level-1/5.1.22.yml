@@ -1,0 +1,19 @@
+---
+# 5.1.22 - PermitUserEnvironment is no.
+# The logic is shared in tasks/lib/sshd_option.yml.
+
+- name: "5.1.22 - Ensure sshd PermitUserEnvironment is disabled"
+  ansible.builtin.import_tasks: ../../lib/sshd_option.yml
+  vars:
+    cis_sd_id: "5.1.22"
+    cis_sd_options:
+      - spec: "permituserenvironment|eq|no"
+        directive: "PermitUserEnvironment"
+        value: "no"
+  tags:
+    - "5.1.22"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

@@ -39,6 +39,23 @@ so with `cis_fail_on_findings: true` they always count. Leave one out with
 | 4.1.7 | manual | The full configuration of each active zone, with its services, ports and rich rules | Whether each allowed service and port is needed on the host; remove the rest |
 | 4.1.8 | manual | The firewalld default zone | Whether it should be `drop`. Lockout risk: `drop` blocks SSH unless SSH is allowed in the zone that carries your connection, so allow SSH there first and change the zone by hand |
 
+## Controls with a lockout guard
+
+These controls change who can log in over SSH. The role changes nothing when the change
+would cut its own connection, and says so.
+
+| CIS ID | What the role does | What you decide |
+|---|---|---|
+| 5.1.8 | Writes `cis_sshd_allow_users`, `cis_sshd_allow_groups`, `cis_sshd_deny_users` and `cis_sshd_deny_groups` to its sshd drop-in, but only when the account it is connected as (the SSH login, read with `id -un`) is still allowed by the result, counting the effective lists for any list not set. With all four empty it writes nothing and, when no such line is in effect, it is a finding | Who may log in. An allow list locks out every account not in it (or in no listed group), a deny list every account in it, so list every account that needs SSH, including the one Ansible uses, and keep a console or out-of-band way in. Entries the guard cannot evaluate (`user@host`, `!` negations) are refused. An emptied variable does not remove a line an earlier run wrote |
+| 5.1.21 | Sets `PermitRootLogin no`, but not when the role is connected as root over SSH (or the account cannot be read): it prints a message and the control is a finding | Connect as a named account with sudo, then run the role again; make sure that account can log in first |
+
+Other 5.1 controls can break a site's own use without locking Ansible out: 5.1.11 turns off
+all forwarding (jump hosts, tunnels, X11), 5.1.12 turns off GSSAPI (Kerberos single sign-on),
+and 5.1.17 to 5.1.19 lower the connection limits that busy automation or many parallel
+sessions may reach. Raise the matching `cis_sshd_*` value within the benchmark's limit, or
+list the ID in `cis_exclusions`, when a site needs it. 5.1.1 to 5.1.4 read only the default
+`/etc/ssh/sshd_config.d` folder; a folder named by another `Include` is for you to check.
+
 ## Excluded by default
 
 These controls change the host when they run, so `cis_default_exclusions` skips them: they

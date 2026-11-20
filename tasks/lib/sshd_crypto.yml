@@ -1,0 +1,100 @@
+---
+# Shared logic for the sshd algorithm controls (5.1.5 Ciphers, 5.1.6 KexAlgorithms, 5.1.7
+# MACs). A control file imports this with:
+#   cis_sc_id      the CIS ID
+#   cis_sc_key     the keyword as sshd -T prints it: ciphers, kexalgorithms or macs
+#   cis_sc_weak    the weak algorithms, separated by spaces
+#   cis_sc_kind    the crypto policy check that fixes it (see tasks/lib/crypto_policy.yml)
+#   cis_sc_module  the policy module that fixes it
+#   cis_sc_body    the text of the role's own module, or empty for a shipped one
+# and puts the tags, which every task here inherits, on the import.
+#
+# On RHEL 9 sshd takes its algorithm lists from the system crypto policy, through the
+# back-end file that /etc/ssh/sshd_config.d/50-redhat.conf includes, so the fix is the
+# crypto policy route of 1.6, not a Ciphers, KexAlgorithms or MACs line: the role then edits
+# no sshd file and cannot leave sshd with no algorithm in common with its clients. The
+# check reads the effective list from `sshd -T`. Only when a weak algorithm is offered, and
+# only in remediate mode, the shared policy logic runs (it appends the missing module to the
+# current policy string and reloads sshd through the handler); a control that 1.6 already
+# fixed changes nothing here. A weak algorithm that is still offered afterwards (a Ciphers,
+# KexAlgorithms or MACs line in a sshd file, or a policy base that offers it) is a finding,
+# and the role edits no file it does not own. Under --check nothing is fixed, so nothing
+# is recorded in remediate mode.
+
+- name: "{{ cis_sc_id ~ ' - Check the algorithms sshd offers' }}"
+  ansible.builtin.command:
+    argv: &cis_sc_argv
+      - /bin/sh
+      - -c
+      - |
+        set -u
+        export LC_ALL=C
+        if [ ! -x /usr/sbin/sshd ]; then
+          echo "state=nosshd"
+          exit 0
+        fi
+        out=$(/usr/sbin/sshd -T 2>/dev/null) || { echo "state=unreadable"; exit 1; }
+        offered=$(printf '%s\n' "$out" | awk -v n="$1" '$1 == n { print $2; exit }' | tr ',' '\n')
+        bad=0
+        for a in $2; do
+          if printf '%s\n' "$offered" | grep -Fxq -- "$a"; then
+            echo "weak=$a"
+            bad=1
+          fi
+        done
+        if [ "$bad" -eq 1 ]; then
+          echo "state=bad"
+          exit 1
+        fi
+        echo "state=ok"
+      - sh
+      - "{{ cis_sc_key }}"
+      - "{{ cis_sc_weak }}"
+  register: cis_sc_check
+  changed_when: false
+  check_mode: false
+  failed_when: false
+
+- name: "{{ cis_sc_id ~ ' - Fix the crypto policy' }}"
+  ansible.builtin.import_tasks: crypto_policy.yml
+  vars:
+    cis_cp_id: "{{ cis_sc_id }}"
+    cis_cp_kind: "{{ cis_sc_kind }}"
+    cis_cp_module: "{{ cis_sc_module }}"
+    cis_cp_pmod_body: "{{ cis_sc_body | default('') }}"
+  when:
+    - not (cis_audit_only | bool)
+    - "'state=bad' in cis_sc_check.stdout_lines"
+
+- name: "{{ cis_sc_id ~ ' - Check the algorithms sshd offers again after the fix' }}"
+  ansible.builtin.command:
+    argv: *cis_sc_argv
+  register: cis_sc_recheck
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - not ansible_check_mode
+    - "'state=bad' in cis_sc_check.stdout_lines"
+
+- name: "{{ cis_sc_id ~ ' - Report an algorithm that the crypto policy does not remove' }}"
+  ansible.builtin.debug:
+    msg: >-
+      sshd still offers {{ cis_sc_recheck.stdout_lines | select('match', '^weak=') | map('regex_replace', '^weak=', '') | join(', ') }}
+      after the crypto policy change. A {{ cis_sc_key }} line in a sshd file, or the policy
+      base, still allows it; the role edits no file it does not own.
+  when:
+    - cis_sc_recheck is not skipped
+    - "'state=ok' not in cis_sc_recheck.stdout_lines"
+
+- name: "{{ cis_sc_id ~ ' - Record the finding' }}"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "{{ cis_sc_id }}"
+  when:
+    - >-
+      ('state=unreadable' in cis_sc_check.stdout_lines)
+      or ((cis_audit_only | bool) and 'state=bad' in cis_sc_check.stdout_lines)
+      or (cis_sc_recheck is not skipped and 'state=ok' not in cis_sc_recheck.stdout_lines)
+...

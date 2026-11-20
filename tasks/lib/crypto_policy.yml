@@ -152,6 +152,8 @@
       - "{{ cis_cp_new }}"
   changed_when: true
   failed_when: false
+  # sshd reads the SSH back-end files of the policy when it is reloaded.
+  notify: Reload sshd when running
   when:
     - not (cis_audit_only | bool)
     - cis_cp_bad == '1'

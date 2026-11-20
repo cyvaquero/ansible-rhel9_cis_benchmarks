@@ -1,0 +1,16 @@
+---
+# 5.1.4 - SSH public host keys are owned by root, group root (or ssh_keys) and are not writable
+# by group or other. The logic is shared in tasks/lib/sshd_files.yml.
+
+- name: "5.1.4 - Ensure access to SSH public host key files is configured"
+  ansible.builtin.import_tasks: ../../lib/sshd_files.yml
+  vars:
+    cis_sf_id: "5.1.4"
+    cis_sf_kind: "public"
+  tags:
+    - "5.1.4"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

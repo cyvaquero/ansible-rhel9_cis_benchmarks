@@ -230,29 +230,29 @@ yet. `implemented`: the control has its task file at
 
 | CIS ID | Title | Profile | Type | Disposition | Status | Notes |
 |---|---|---|---|---|---|---|
-| 5.1.1 | Ensure access to /etc/ssh/sshd_config is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.1.2 | Ensure access to /etc/ssh/sshd_config.d/ directory is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.1.3 | Ensure access to SSH private host key files is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.1.4 | Ensure access to SSH public host key files is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.1.5 | Ensure sshd Ciphers are configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.1.6 | Ensure sshd KexAlgorithms is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.1.7 | Ensure sshd MACs are configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.1.8 | Ensure sshd access is configured | L1 Server, L1 Workstation | Automated | implement | planned | Needs site-supplied allow or deny lists; report only when unset |
-| 5.1.9 | Ensure sshd Banner is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.1.10 | Ensure sshd ClientAliveInterval and ClientAliveCountMax are configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.1.11 | Ensure sshd DisableForwarding is enabled | L1 Workstation, L2 Server | Automated | implement | planned | Profile differs: L1 Workstation, L2 Server |
-| 5.1.12 | Ensure sshd GSSAPIAuthentication is disabled | L1 Workstation, L2 Server | Automated | implement | planned | Profile differs: L1 Workstation, L2 Server |
-| 5.1.13 | Ensure sshd HostbasedAuthentication is disabled | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.1.14 | Ensure sshd IgnoreRhosts is enabled | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.1.15 | Ensure sshd LoginGraceTime is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.1.16 | Ensure sshd LogLevel is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.1.17 | Ensure sshd MaxAuthTries is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.1.18 | Ensure sshd MaxStartups is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.1.19 | Ensure sshd MaxSessions is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.1.20 | Ensure sshd PermitEmptyPasswords is disabled | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.1.21 | Ensure sshd PermitRootLogin is disabled | L1 Server, L1 Workstation | Automated | implement | planned | Lockout risk: confirm another admin login first |
-| 5.1.22 | Ensure sshd PermitUserEnvironment is disabled | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.1.23 | Ensure sshd UsePAM is enabled | L1 Server, L1 Workstation | Automated | implement | planned |  |
+| 5.1.1 | Ensure access to /etc/ssh/sshd_config is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 5.1.2 | Ensure access to /etc/ssh/sshd_config.d/ directory is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 5.1.3 | Ensure access to SSH private host key files is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 5.1.4 | Ensure access to SSH public host key files is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 5.1.5 | Ensure sshd Ciphers are configured | L1 Server, L1 Workstation | Automated | implement | implemented | Fixed through the crypto policy (CIS-NO-SSHCBC), not a Ciphers line |
+| 5.1.6 | Ensure sshd KexAlgorithms is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Fixed through the crypto policy (NO-SHA1), not a KexAlgorithms line |
+| 5.1.7 | Ensure sshd MACs are configured | L1 Server, L1 Workstation | Automated | implement | implemented | Fixed through the crypto policy (CIS-NO-WEAKMAC), not a MACs line |
+| 5.1.8 | Ensure sshd access is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Needs site-supplied allow or deny lists (`cis_sshd_*`); report only when unset; lockout guard on the role's own account |
+| 5.1.9 | Ensure sshd Banner is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Banner is /etc/issue.net, whose text 1.7.3 manages |
+| 5.1.10 | Ensure sshd ClientAliveInterval and ClientAliveCountMax are configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 5.1.11 | Ensure sshd DisableForwarding is enabled | L1 Workstation, L2 Server | Automated | implement | implemented | Profile differs: L1 Workstation, L2 Server |
+| 5.1.12 | Ensure sshd GSSAPIAuthentication is disabled | L1 Workstation, L2 Server | Automated | implement | implemented | Profile differs: L1 Workstation, L2 Server |
+| 5.1.13 | Ensure sshd HostbasedAuthentication is disabled | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 5.1.14 | Ensure sshd IgnoreRhosts is enabled | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 5.1.15 | Ensure sshd LoginGraceTime is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 5.1.16 | Ensure sshd LogLevel is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 5.1.17 | Ensure sshd MaxAuthTries is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 5.1.18 | Ensure sshd MaxStartups is configured | L1 Server, L1 Workstation | Automated | implement | implemented | sshd takes the last MaxStartups value, so a later file can override it (a finding) |
+| 5.1.19 | Ensure sshd MaxSessions is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 5.1.20 | Ensure sshd PermitEmptyPasswords is disabled | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 5.1.21 | Ensure sshd PermitRootLogin is disabled | L1 Server, L1 Workstation | Automated | implement | implemented | Lockout risk: confirm another admin login first; not changed while the role is connected as root |
+| 5.1.22 | Ensure sshd PermitUserEnvironment is disabled | L1 Server, L1 Workstation | Automated | implement | implemented |  |
+| 5.1.23 | Ensure sshd UsePAM is enabled | L1 Server, L1 Workstation | Automated | implement | implemented |  |
 | 5.2.1 | Ensure sudo is installed | L1 Server, L1 Workstation | Automated | implement | planned |  |
 | 5.2.2 | Ensure access on sudoers configuration files is configured | L1 Server | Automated | implement | planned |  |
 | 5.2.3 | Ensure access on the /etc/sudoers.d directory is configured | L1 Server | Automated | implement | planned |  |

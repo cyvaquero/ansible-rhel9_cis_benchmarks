@@ -8,6 +8,39 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.28]
+
+### Added
+
+- Section 5.1, SSH server, 5.1.1 to 5.1.23. The role writes its sshd settings to one
+  drop-in, `/etc/ssh/sshd_config.d/00-cis-rhel9.conf`, which sorts before `50-redhat.conf`
+  because sshd uses the first value it reads for most keywords (`MaxStartups` takes the last,
+  so a later file can override 5.1.18, which is then a finding). Each control judges the effective
+  configuration with `sshd -T` (and `sshd -T -C` for the role's own account, so Match
+  blocks are seen), writes a line only when the value is not compliant, validates it with
+  `sshd -t -f`, and a handler checks the whole configuration with `sshd -t` and reloads
+  sshd (never a restart) only when it is running. A value an earlier file sets is a finding;
+  the role edits no file it does not own. 5.1.1 to 5.1.4 set owner and mode on `sshd_config`,
+  its `.conf` drop-ins, the drop-in folder (0700) and the host keys, which are found from
+  `sshd -T` and a glob (a private key keeps the `ssh_keys` group). 5.1.5 to 5.1.7 remove weak
+  ciphers, key exchanges and MACs through the system crypto policy, the same modules as
+  1.6.2 to 1.6.4, and reload sshd. 5.1.9 sets `Banner /etc/issue.net`. 5.1.10 to 5.1.23 set
+  the remaining options. 5.1.8 writes new variables `cis_sshd_allow_users`,
+  `cis_sshd_allow_groups`, `cis_sshd_deny_users` and `cis_sshd_deny_groups` (default `[]`)
+  only when the account the role is connected as stays allowed; with all four empty it is a
+  finding and changes nothing. 5.1.21 does not run while the role is connected as root over
+  SSH. New variables `cis_sshd_client_alive_interval` (15), `cis_sshd_client_alive_count_max`
+  (3), `cis_sshd_login_grace_time` (60), `cis_sshd_log_level` (`INFO`), `cis_sshd_max_auth_tries`
+  (4), `cis_sshd_max_startups` (`10:30:60`) and `cis_sshd_max_sessions` (10), validated at
+  preflight. 5.1.11 and 5.1.12 are Level 1 on a workstation and Level 2 on a server.
+  Part of #9.
+
+### Changed
+
+- The crypto policy controls 1.6.1 to 1.6.4 and 1.6.7 now also reload sshd (through the
+  same handler, only when it is running) after they change the policy, so a running sshd
+  reads the new algorithm lists.
+
 ## [3.0.0_0.0.27]
 
 ### Added

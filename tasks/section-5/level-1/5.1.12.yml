@@ -1,0 +1,21 @@
+---
+# 5.1.12 - GSSAPIAuthentication is no (Level 1 Workstation, Level 2 Server). RHEL 9 ships it
+# as yes in 50-redhat.conf, which the role's drop-in overrides.
+# The logic is shared in tasks/lib/sshd_option.yml.
+
+- name: "5.1.12 - Ensure sshd GSSAPIAuthentication is disabled"
+  ansible.builtin.import_tasks: ../../lib/sshd_option.yml
+  vars:
+    cis_sd_id: "5.1.12"
+    cis_sd_options:
+      - spec: "gssapiauthentication|eq|no"
+        directive: "GSSAPIAuthentication"
+        value: "no"
+  tags:
+    - "5.1.12"
+    - section-5
+    - level-1
+    - level-2
+    - server
+    - workstation
+...

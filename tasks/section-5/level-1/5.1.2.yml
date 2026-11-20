@@ -1,0 +1,16 @@
+---
+# 5.1.2 - the /etc/ssh/sshd_config.d folder is owned by root:root and closed to group and other
+# (the fix sets 0700). The logic is shared in tasks/lib/sshd_files.yml.
+
+- name: "5.1.2 - Ensure access to /etc/ssh/sshd_config.d/ directory is configured"
+  ansible.builtin.import_tasks: ../../lib/sshd_files.yml
+  vars:
+    cis_sf_id: "5.1.2"
+    cis_sf_kind: "dir"
+  tags:
+    - "5.1.2"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

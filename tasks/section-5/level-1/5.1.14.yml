@@ -1,0 +1,19 @@
+---
+# 5.1.14 - IgnoreRhosts is yes.
+# The logic is shared in tasks/lib/sshd_option.yml.
+
+- name: "5.1.14 - Ensure sshd IgnoreRhosts is enabled"
+  ansible.builtin.import_tasks: ../../lib/sshd_option.yml
+  vars:
+    cis_sd_id: "5.1.14"
+    cis_sd_options:
+      - spec: "ignorerhosts|eq|yes"
+        directive: "IgnoreRhosts"
+        value: "yes"
+  tags:
+    - "5.1.14"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

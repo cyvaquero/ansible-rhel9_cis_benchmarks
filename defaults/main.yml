@@ -100,4 +100,45 @@ cis_firewalld_zone_target: default
 # or multicast; preflight stops the run on anything else. A value other than off is never
 # changed.
 cis_firewalld_log_denied: unicast
+
+# SSH server (5.1.10): the ClientAliveInterval in seconds and the ClientAliveCountMax written
+# when the effective values are not both above zero. A whole number of 1 or more; preflight
+# stops the run on anything else. A value already above zero is never changed.
+cis_sshd_client_alive_interval: 15
+cis_sshd_client_alive_count_max: 3
+
+# SSH server (5.1.15): the LoginGraceTime in seconds written when the effective value is 0 or
+# above 60. A whole number from 1 to 60; preflight stops the run on anything else.
+cis_sshd_login_grace_time: 60
+
+# SSH server (5.1.16): the LogLevel written when the effective value is neither INFO nor
+# VERBOSE. INFO or VERBOSE; preflight stops the run on anything else.
+cis_sshd_log_level: INFO
+
+# SSH server (5.1.17): the MaxAuthTries written when the effective value is above 4. A whole
+# number from 1 to 4; preflight stops the run on anything else.
+cis_sshd_max_auth_tries: 4
+
+# SSH server (5.1.18): the MaxStartups written when any of its three numbers is above
+# 10:30:60. Three whole numbers start:rate:full, at most 10, 30 and 60 and at least 1;
+# preflight stops the run on anything else.
+cis_sshd_max_startups: "10:30:60"
+
+# SSH server (5.1.19): the MaxSessions written when the effective value is above 10. A whole
+# number from 1 to 10; preflight stops the run on anything else.
+cis_sshd_max_sessions: 10
+
+# SSH server (5.1.8): who may log in over SSH, written to AllowUsers, AllowGroups, DenyUsers
+# and DenyGroups in the role's sshd drop-in. A non-empty list is written; an empty one leaves
+# that directive alone. While all four are empty and none is in effect, 5.1.8 is only a
+# finding and nothing changes. IMPORTANT: an allow list locks out every account not in it
+# (or in no listed group), and a deny list every account in it. The role writes the lists
+# only when the account it is connected as (the SSH login) is still allowed by the result;
+# otherwise it changes nothing and says why. List every account that needs SSH, including
+# the one Ansible uses. Plain user and group names only (letters, digits, underscore, dot
+# and hyphen, not starting with a digit or hyphen); preflight stops the run on anything else.
+cis_sshd_allow_users: []
+cis_sshd_allow_groups: []
+cis_sshd_deny_users: []
+cis_sshd_deny_groups: []
 ...

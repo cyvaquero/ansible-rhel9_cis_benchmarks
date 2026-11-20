@@ -1,0 +1,19 @@
+---
+# 5.1.17 - MaxAuthTries is from 1 to 4. The fix writes cis_sshd_max_auth_tries.
+# The logic is shared in tasks/lib/sshd_option.yml.
+
+- name: "5.1.17 - Ensure sshd MaxAuthTries is configured"
+  ansible.builtin.import_tasks: ../../lib/sshd_option.yml
+  vars:
+    cis_sd_id: "5.1.17"
+    cis_sd_options:
+      - spec: "maxauthtries|num|4"
+        directive: "MaxAuthTries"
+        value: "{{ cis_sshd_max_auth_tries }}"
+  tags:
+    - "5.1.17"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

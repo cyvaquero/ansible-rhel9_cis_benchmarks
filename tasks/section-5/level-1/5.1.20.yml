@@ -1,0 +1,19 @@
+---
+# 5.1.20 - PermitEmptyPasswords is no.
+# The logic is shared in tasks/lib/sshd_option.yml.
+
+- name: "5.1.20 - Ensure sshd PermitEmptyPasswords is disabled"
+  ansible.builtin.import_tasks: ../../lib/sshd_option.yml
+  vars:
+    cis_sd_id: "5.1.20"
+    cis_sd_options:
+      - spec: "permitemptypasswords|eq|no"
+        directive: "PermitEmptyPasswords"
+        value: "no"
+  tags:
+    - "5.1.20"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

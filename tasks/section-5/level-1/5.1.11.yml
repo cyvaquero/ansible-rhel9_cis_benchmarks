@@ -1,0 +1,21 @@
+---
+# 5.1.11 - DisableForwarding is yes (Level 1 Workstation, Level 2 Server). It turns off X11,
+# agent, TCP and Unix socket forwarding.
+# The logic is shared in tasks/lib/sshd_option.yml.
+
+- name: "5.1.11 - Ensure sshd DisableForwarding is enabled"
+  ansible.builtin.import_tasks: ../../lib/sshd_option.yml
+  vars:
+    cis_sd_id: "5.1.11"
+    cis_sd_options:
+      - spec: "disableforwarding|eq|yes"
+        directive: "DisableForwarding"
+        value: "yes"
+  tags:
+    - "5.1.11"
+    - section-5
+    - level-1
+    - level-2
+    - server
+    - workstation
+...

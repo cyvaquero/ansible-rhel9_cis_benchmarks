@@ -1,0 +1,20 @@
+---
+# 5.1.6 - sshd must not offer a SHA-1 key exchange. Fixed through the crypto policy with the
+# shipped NO-SHA1 module, the same one 1.6.2 adds.
+
+- name: "5.1.6 - Ensure sshd KexAlgorithms is configured"
+  ansible.builtin.import_tasks: ../../lib/sshd_crypto.yml
+  vars:
+    cis_sc_id: "5.1.6"
+    cis_sc_key: "kexalgorithms"
+    cis_sc_weak: >-
+      diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group-exchange-sha1
+    cis_sc_kind: "sha1"
+    cis_sc_module: "NO-SHA1"
+  tags:
+    - "5.1.6"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...
