@@ -1,0 +1,17 @@
+---
+# 5.4.2.3 (audit-only) - reports the groups with GID 0. It only reads, in both modes, and
+# records no finding: summary.yml lists audit-only controls. The role never changes it:
+# moving a group means moving the files it owns, so a person decides.
+
+- name: "5.4.2.3 - Report the groups with GID 0 for review"
+  ansible.builtin.debug:
+    msg: >-
+      Groups with GID 0 other than root:
+      {{ cis_acct.gid0_groups | join(', ') if cis_acct.gid0_groups | length > 0 else 'none' }}.
+  tags:
+    - "5.4.2.3"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

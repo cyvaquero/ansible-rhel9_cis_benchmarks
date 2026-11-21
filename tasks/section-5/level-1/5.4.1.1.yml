@@ -1,0 +1,59 @@
+---
+# 5.4.1.1 - The maximum password age. PASS_MAX_DAYS in /etc/login.defs is from 1 to 365 (the value
+# the role writes is cis_pass_max_days; a lower value already set is kept) and so is the maximum
+# of every account that has a password hash (field 2 of /etc/shadow starts with `$`), set with
+# `chage --maxdays`. Accounts without a hash (locked, no password) are left alone. The scan
+# (files/accounts_scan.py, tasks/lib/accounts_state.yml) works out first whether the new maximum
+# would make an account's password expired or inactive today (a last change date of 0, no last
+# change date, a password older than the maximum): such an account is skipped, named in a
+# message, and the control is a finding. An account the role is connected as is covered by the
+# same rule.
+
+- name: "5.4.1.1 - Handle password expiration"
+  tags:
+    - "5.4.1.1"
+    - section-5
+    - level-1
+    - server
+    - workstation
+  block:
+    - name: "5.4.1.1 - Set the default maximum password age in login.defs"
+      ansible.builtin.lineinfile:
+        path: /etc/login.defs
+        regexp: '^\s*PASS_MAX_DAYS\s'
+        line: "PASS_MAX_DAYS {{ cis_pass_max_days }}"
+      when:
+        - not (cis_audit_only | bool)
+        - not cis_acct.defaults.max.ok
+
+    - name: "5.4.1.1 - Set the maximum password age of accounts with a password"
+      ansible.builtin.command:
+        argv:
+          - chage
+          - --maxdays
+          - "{{ item.value }}"
+          - "{{ item.user }}"
+      loop: "{{ cis_acct.aging.max.fix }}"
+      loop_control:
+        label: "{{ item.user }}"
+      changed_when: true
+      when: not (cis_audit_only | bool)
+
+    - name: "5.4.1.1 - Report accounts left alone"
+      ansible.builtin.debug:
+        msg: >-
+          5.4.1.1: {{ item.user }} is left as it is, because {{ item.reason }}.
+          Fix its password by hand (the role never changes such an account); it is a finding.
+      loop: "{{ cis_acct.aging.max.skip }}"
+      loop_control:
+        label: "{{ item.user }}"
+
+    - name: "5.4.1.1 - Record the finding"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "5.4.1.1"
+      when:
+        - >-
+          cis_acct.aging.max.skip | length > 0
+          or (cis_audit_only | bool and (not cis_acct.defaults.max.ok or cis_acct.aging.max.fix | length > 0))
+...

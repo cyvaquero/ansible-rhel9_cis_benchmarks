@@ -1,0 +1,19 @@
+---
+# 5.4.1.2 (manual) - reports the minimum password age: PASS_MIN_DAYS in /etc/login.defs and the
+# accounts with a password hash whose minimum is below 1. It only reads, in both modes, and
+# records no finding: summary.yml lists manual controls. The minimum age is a site policy (it
+# stops a user from changing a password straight back), so the role never sets it.
+
+- name: "5.4.1.2 - Report the minimum password age for review"
+  ansible.builtin.debug:
+    msg: >-
+      PASS_MIN_DAYS in /etc/login.defs is {{ cis_acct.defaults.min.value | default('not set', true) }}.
+      Accounts with a password whose minimum age is below 1 day:
+      {{ cis_acct.min_below | join(', ') if cis_acct.min_below | length > 0 else 'none' }}.
+  tags:
+    - "5.4.1.2"
+    - section-5
+    - level-2
+    - server
+    - workstation
+...

@@ -1,0 +1,77 @@
+---
+# Reads the accounts and the shell environment of the host (files/accounts_scan.py state,
+# read-only) into the fact cis_acct: the defaults of login.defs and useradd, the aging plan
+# for accounts with a password hash, the system accounts to give a nologin shell or lock,
+# the lines of /etc/shells, TMOUT, the umask of the shell files and of root's login, and
+# root's PATH. Include it again after a change to see the result. It carries the always tag,
+# as finding.yml does, so a run limited to one control still has it.
+#
+# Root's login shell is asked once (`su - root`, what the benchmark's audits run) for its umask
+# and PATH, only when 5.4.2.5 or 5.4.2.6 is selected. An answer that cannot be had (root's shell
+# is not usable, su fails) leaves those two empty and the scanner judges the files alone.
+
+- name: "5.4 - Read root's login umask and PATH"
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/timeout
+      - "30"
+      - /usr/bin/su
+      - "-"
+      - root
+      - "-c"
+      - 'printf "umask=%s\npath=%s\n" "$(umask)" "$PATH"'
+  register: cis_acct_su_read
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when: "cis_selected_controls | select('match', '^5\\.4\\.2\\.[56]$') | list | length > 0"
+  tags:
+    - always
+
+- name: "5.4 - Read the accounts and the shell environment"
+  ansible.builtin.command:
+    argv:
+      - "{{ cis_accounts_python }}"
+      - -c
+      - "{{ lookup('ansible.builtin.file', role_path ~ '/files/accounts_scan.py') }}"
+      - state
+      - "{{ cis_acct_params | to_json }}"
+  vars:
+    cis_acct_su_lines: "{{ cis_acct_su_read.stdout_lines | default([]) if (cis_acct_su_read.rc | default(1)) == 0 else [] }}"
+    cis_acct_params:
+      max_days: "{{ cis_pass_max_days | int }}"
+      warn_age: "{{ cis_pass_warn_age | int }}"
+      inactive_days: "{{ cis_inactive_days | int }}"
+      tmout: "{{ cis_tmout | int }}"
+      guard: "{{ cis_acct_guard | default([]) }}"
+      exceptions: "{{ cis_account_exceptions }}"
+      lock: "{{ '5.4.2.8' in cis_selected_controls }}"
+      owned_profile: "{{ cis_shell_dropin }}"
+      effective_umask: >-
+        {{ (cis_acct_su_lines | select('match', '^umask=[0-7]+$') | first | default('umask=')) | regex_replace('^umask=', '') }}
+      root_path: >-
+        {{ (cis_acct_su_lines | select('match', '^path=') | first | default('path=')) | regex_replace('^path=', '') }}
+  register: cis_acct_read
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags:
+    - always
+
+- name: "5.4 - Stop when the accounts cannot be read"
+  ansible.builtin.assert:
+    that:
+      - cis_acct_read.rc == 0
+      - cis_acct_read.stdout | length > 0
+    fail_msg: >-
+      The account scan failed (rc {{ cis_acct_read.rc | default('unknown') }}): {{ cis_acct_read.stderr | default('') }}
+    quiet: true
+  tags:
+    - always
+
+- name: "5.4 - Record the accounts and the shell environment"
+  ansible.builtin.set_fact:
+    cis_acct: "{{ cis_acct_read.stdout | from_json }}"
+  tags:
+    - always
+...

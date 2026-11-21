@@ -1,0 +1,55 @@
+---
+# 5.4.1.3 - The warning age. PASS_WARN_AGE in /etc/login.defs is 7 or more (the value the role
+# writes is cis_pass_warn_age; a longer warning already set is kept) and so is the warning of
+# every account that has a password hash, set with `chage --warndays`. Accounts without a hash
+# are left alone. An account whose password is already expired or inactive, or would be with
+# the maximum age 5.4.1.1 sets, is skipped and reported, as for 5.4.1.1.
+
+- name: "5.4.1.3 - Handle password expiration warning days"
+  tags:
+    - "5.4.1.3"
+    - section-5
+    - level-1
+    - server
+    - workstation
+  block:
+    - name: "5.4.1.3 - Set the default warning days in login.defs"
+      ansible.builtin.lineinfile:
+        path: /etc/login.defs
+        regexp: '^\s*PASS_WARN_AGE\s'
+        line: "PASS_WARN_AGE {{ cis_pass_warn_age }}"
+      when:
+        - not (cis_audit_only | bool)
+        - not cis_acct.defaults.warn.ok
+
+    - name: "5.4.1.3 - Set the warning days of accounts with a password"
+      ansible.builtin.command:
+        argv:
+          - chage
+          - --warndays
+          - "{{ item.value }}"
+          - "{{ item.user }}"
+      loop: "{{ cis_acct.aging.warn.fix }}"
+      loop_control:
+        label: "{{ item.user }}"
+      changed_when: true
+      when: not (cis_audit_only | bool)
+
+    - name: "5.4.1.3 - Report accounts left alone"
+      ansible.builtin.debug:
+        msg: >-
+          5.4.1.3: {{ item.user }} is left as it is, because {{ item.reason }}.
+          Fix its password by hand (the role never changes such an account); it is a finding.
+      loop: "{{ cis_acct.aging.warn.skip }}"
+      loop_control:
+        label: "{{ item.user }}"
+
+    - name: "5.4.1.3 - Record the finding"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "5.4.1.3"
+      when:
+        - >-
+          cis_acct.aging.warn.skip | length > 0
+          or (cis_audit_only | bool and (not cis_acct.defaults.warn.ok or cis_acct.aging.warn.fix | length > 0))
+...

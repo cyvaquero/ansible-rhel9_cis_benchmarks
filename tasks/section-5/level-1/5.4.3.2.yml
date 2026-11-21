@@ -1,0 +1,54 @@
+---
+# 5.4.3.2 - TMOUT is set once, to 1 to 900 seconds, readonly and exported. Judged on every file the
+# login shells read (/etc/profile, /etc/profile.d/*.sh, /etc/*bashrc, sh.local), file by file as
+# the benchmark does. When no file sets TMOUT, the role writes it to its own
+# /etc/profile.d/zz-cis-rhel9.sh (cis_shell_dropin), in a marked block that is `typeset -xr
+# TMOUT=<cis_tmout>` inside a test for an interactive shell (PS1 set), so a non-interactive
+# shell, such as the role's own SSH connection and become, never sees it: TMOUT is only an idle
+# timeout for interactive input, and the guard also keeps `read` in scripts that run from a
+# login shell from timing out. A TMOUT in a file the role does not own, or set twice (a
+# second assignment of a readonly variable prints an error at every login), is reported with
+# its file and line and left alone, and the control is a finding. A value in the role's own file
+# that is not compliant is rewritten.
+
+- name: "5.4.3.2 - Handle the default shell timeout"
+  tags:
+    - "5.4.3.2"
+    - section-5
+    - level-1
+    - server
+    - workstation
+  block:
+    - name: "5.4.3.2 - Set the shell timeout in the role's profile.d file"
+      ansible.builtin.blockinfile:
+        path: "{{ cis_shell_dropin }}"
+        create: true
+        owner: root
+        group: root
+        mode: "0644"
+        marker: "# {mark} CIS 5.4.3.2 (managed by the role)"
+        block: |
+          # Idle timeout of interactive shells, in seconds; readonly so a user cannot unset it.
+          if [ -n "${PS1-}" ]; then
+              typeset -xr TMOUT={{ cis_tmout }}
+          fi
+      when:
+        - not (cis_audit_only | bool)
+        - cis_acct.tmout.need_block
+
+    - name: "5.4.3.2 - Report the TMOUT settings the role leaves alone"
+      ansible.builtin.debug:
+        msg: "5.4.3.2: {{ item.file }}{{ (':' ~ item.line) if item.line | int > 0 else '' }}: {{ item.message }}. The role does not edit this file."
+      loop: "{{ cis_acct.tmout.external_problems }}"
+      loop_control:
+        label: "{{ item.file }}"
+
+    - name: "5.4.3.2 - Record the finding"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "5.4.3.2"
+      when:
+        - >-
+          cis_acct.tmout.external_problems | length > 0
+          or (cis_audit_only | bool and cis_acct.tmout.state == 'bad')
+...

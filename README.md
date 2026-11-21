@@ -4,7 +4,7 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.30).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.31).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and these controls are implemented:
 
 - kernel modules, 1.1.1.1 to 1.1.1.11;
@@ -26,7 +26,8 @@ selection, audit mode and lint CI exist, and these controls are implemented:
 - firewalld, 4.1.1 to 4.1.11 (section 4 is complete);
 - SSH server, 5.1.1 to 5.1.23;
 - sudo and su, 5.2.1 to 5.2.12;
-- PAM and authselect, 5.3.1.1 to 5.3.3.4.4.
+- PAM and authselect, 5.3.1.1 to 5.3.3.4.4;
+- user accounts and environment, 5.4.1.1 to 5.4.3.4 (section 5 is complete).
 
 Every other control is still planned. Do not run this against hosts you care about.
 
@@ -200,6 +201,17 @@ wherever it comes from, is never changed.
 | `cis_pwquality_difok`, `cis_pwquality_minlen` | `2`, `14` | 5.3.3.2.1, 5.3.3.2.2: the values written to the role's pwquality drop-in when the value in effect is below 2 and below 14. A higher value already set anywhere is kept. |
 | `cis_pwquality_maxrepeat`, `cis_pwquality_maxsequence` | `3`, `3` | 5.3.3.2.4, 5.3.3.2.5: from 1 to 3, written when the value in effect is unset, 0 or above 3. |
 | `cis_pwhistory_remember` | `24` | 5.3.3.3.1: `remember` in `/etc/security/pwhistory.conf`, from 24 to 400, written when the value there is below 24. |
+
+### Accounts and environment (5.4)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `cis_pass_max_days` | `365` | 5.4.1.1: the maximum password age, from 1 to 365, written to `PASS_MAX_DAYS` in `login.defs` and with `chage --maxdays` to each existing account that has a password hash, when the value there is not from 1 to 365. A lower value already set is kept. |
+| `cis_pass_warn_age` | `7` | 5.4.1.3: the warning days, 7 or more, written to `PASS_WARN_AGE` and with `chage --warndays` to each account with a password hash, when the value there is below 7. A longer warning already set is kept. |
+| `cis_inactive_days` | `45` | 5.4.1.5: the inactive days, from 0 to 45, written with `useradd -D -f` and with `chage --inactive` to each account with a password hash, when the value there is unset, negative or above 45. A shorter period already set is kept. |
+| `cis_umask` | `"027"` | 5.4.2.6, 5.4.3.3, 5.4.3.4: the umask written to `UMASK` in `login.defs`, to the role's `/etc/profile.d` file and to root's `.bash_profile` and `.bashrc`. Three or four octal digits, 027 or more restrictive, in quotes (an unquoted `027` is the number 23). A stricter umask already set is kept. |
+| `cis_tmout` | `900` | 5.4.3.2: the shell idle timeout in seconds, from 1 to 900, written readonly and exported to the role's `/etc/profile.d` file when no file sets `TMOUT`. |
+| `cis_account_exceptions` | `[]` | 5.4.2.7, 5.4.2.8: login names of system accounts the role leaves alone (shell and lock state), reported as findings. Plain names; anything else stops the run at preflight. |
 
 Values outside these ranges stop the run at preflight.
 
@@ -528,6 +540,36 @@ Values outside these ranges stop the run at preflight.
   a finding. The password hash is `sha512` (also accepted: `yescrypt`). 5.3.3.2.3 only
   reports the complexity settings in effect. The scanner is `files/pam_scan.py`, run with the
   managed node's Python. See [docs/review-controls.md](docs/review-controls.md).
+- User accounts and environment (5.4): the scan is `files/accounts_scan.py`, run with the managed
+  node's Python (read-only; the tasks make the changes). **Password aging** (5.4.1.1, 5.4.1.3,
+  5.4.1.5) sets the defaults (`PASS_MAX_DAYS` and `PASS_WARN_AGE` in `login.defs`, `useradd -D -f`)
+  and also the maximum, warning and inactive days of every existing account that has a password
+  hash (field 2 of `/etc/shadow` starts with `$`), with `chage`. An account without a hash
+  (locked, `*`, `!`, `!!`, empty) is left alone and is not a finding. Before changing an account the
+  role works out whether the new value would make its password already expired or inactive today:
+  a last change date of 0, no last change date (which `pam_unix` reads as day -1, so any maximum
+  expires it at once), or a password older than the new maximum. Such an account is skipped, named
+  in a message, and the control is a finding; the role never changes it. A stricter value already
+  set is never loosened. 5.4.1.4 sets `ENCRYPT_METHOD` in `login.defs` to `SHA512` (or `YESCRYPT`
+  when the `pam_unix` line already uses it); the PAM side is 5.3.3.4.3 and is not repeated.
+  5.4.1.2 (manual, Level 2), 5.4.1.6 and 5.4.2.1 to 5.4.2.5 (audit-only) only report; the
+  [review page](docs/review-controls.md) lists what. **Lockout guard:** 5.4.2.7 (nologin shell)
+  and 5.4.2.8 (`usermod -L`) change only system accounts (UID below `UID_MIN`, or 65534), never
+  root, never the benchmark's exceptions for 5.4.2.7 (halt, sync, shutdown, nfsnobody), and never
+  the account the role is connected as (read with `id -un`, become off), `ansible_user`,
+  `ansible_ssh_user` or the account become runs through, an account with a running process, or
+  an account in `cis_account_exceptions`; each skipped account is named with the reason and the
+  control is a finding. 5.4.2.6 edits only root's `.bash_profile` and `.bashrc` (a looser umask
+  statement is rewritten, a file with none gets `umask 027` at its end), judged on what
+  `su - root` reports and the statements in those files. **Shell environment:** 5.4.3.2 (`TMOUT`,
+  readonly and exported) and 5.4.3.4 (`umask`) keep a marked block each in one role-owned file,
+  `/etc/profile.d/zz-cis-rhel9.sh`. Every file the shells read (`/etc/profile`,
+  `/etc/profile.d/*.sh`, `/etc/bashrc`) is judged; a weaker setting in a file the role does not
+  own is a finding with its file and line and is never edited. The `TMOUT` block runs only in
+  interactive shells, and `umask 027` is what `pam_umask` already gives every SSH session from
+  `UMASK` (5.4.3.3), so the role's own connections and become are not affected. 5.4.3.1 (Level 2)
+  removes the `nologin` lines from `/etc/shells`. See
+  [docs/review-controls.md](docs/review-controls.md).
 - The summary is tagged `summary` and `always`, and lists every selected audit-only and
   manual control even on a run limited by tags.
 
@@ -537,7 +579,7 @@ Every push and pull request runs [ansible-lint](https://ansible.readthedocs.io/p
 (`production` profile, configured in `.ansible-lint`) and an
 `ansible-playbook --syntax-check` of `tests/syntax.yml`, plus the consistency checks
 `tests/check_controls.py` and `tests/check_benchmark_version.py` and the scanner tests
-`tests/check_sudoers_scan.py` and `tests/check_pam_scan.py`, on Python 3.9 with Ansible 8.7
+`tests/check_sudoers_scan.py`, `tests/check_pam_scan.py` and `tests/check_accounts_scan.py`, on Python 3.9 with Ansible 8.7
 (ansible-core 2.15), the supported control node. To run the same locally:
 
 ```sh
@@ -551,6 +593,7 @@ python3 tests/check_controls.py
 python3 tests/check_benchmark_version.py
 python3 tests/check_sudoers_scan.py
 python3 tests/check_pam_scan.py
+python3 tests/check_accounts_scan.py
 ```
 
 `tests/requirements.txt` pins ansible-lint 6.22.2, the newest release that installs with

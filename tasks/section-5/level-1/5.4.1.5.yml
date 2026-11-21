@@ -1,0 +1,59 @@
+---
+# 5.4.1.5 - The inactive period. The useradd default (`useradd -D -f`, INACTIVE in
+# /etc/default/useradd) is from 0 to 45 days (the value the role writes is cis_inactive_days; a
+# shorter period already set is kept) and so is the inactive period of every account that has
+# a password hash, set with `chage --inactive`. Accounts without a hash are left alone. An
+# account whose password would be expired or inactive today with the new period is skipped and
+# reported, as for 5.4.1.1.
+
+- name: "5.4.1.5 - Handle inactive password lock"
+  tags:
+    - "5.4.1.5"
+    - section-5
+    - level-1
+    - server
+    - workstation
+  block:
+    - name: "5.4.1.5 - Set the default inactive period for new accounts"
+      ansible.builtin.command:
+        argv:
+          - useradd
+          - -D
+          - -f
+          - "{{ cis_inactive_days }}"
+      changed_when: true
+      when:
+        - not (cis_audit_only | bool)
+        - not cis_acct.defaults.inactive.ok
+
+    - name: "5.4.1.5 - Set the inactive days of accounts with a password"
+      ansible.builtin.command:
+        argv:
+          - chage
+          - --inactive
+          - "{{ item.value }}"
+          - "{{ item.user }}"
+      loop: "{{ cis_acct.aging.inactive.fix }}"
+      loop_control:
+        label: "{{ item.user }}"
+      changed_when: true
+      when: not (cis_audit_only | bool)
+
+    - name: "5.4.1.5 - Report accounts left alone"
+      ansible.builtin.debug:
+        msg: >-
+          5.4.1.5: {{ item.user }} is left as it is, because {{ item.reason }}.
+          Fix its password by hand (the role never changes such an account); it is a finding.
+      loop: "{{ cis_acct.aging.inactive.skip }}"
+      loop_control:
+        label: "{{ item.user }}"
+
+    - name: "5.4.1.5 - Record the finding"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "5.4.1.5"
+      when:
+        - >-
+          cis_acct.aging.inactive.skip | length > 0
+          or (cis_audit_only | bool and (not cis_acct.defaults.inactive.ok or cis_acct.aging.inactive.fix | length > 0))
+...

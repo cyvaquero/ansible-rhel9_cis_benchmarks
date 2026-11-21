@@ -13,4 +13,14 @@
 - name: "5.3.3.1.3 - Ensure password failed attempts lockout includes root account"
   ansible.builtin.import_tasks: level-2/5.3.3.1.3.yml
   when: "'5.3.3.1.3' in cis_selected_controls"
+
+# 5.4.1.2 and 5.4.3.1 read the scan of the accounts (cis_acct), which level-1.yml reads, and Level 2
+# includes Level 1.
+- name: "5.4.1.2 - Ensure minimum password days is configured"
+  ansible.builtin.import_tasks: level-2/5.4.1.2.yml
+  when: "'5.4.1.2' in cis_selected_controls"
+
+- name: "5.4.3.1 - Ensure nologin is not listed in /etc/shells"
+  ansible.builtin.import_tasks: level-2/5.4.3.1.yml
+  when: "'5.4.3.1' in cis_selected_controls"
 ...

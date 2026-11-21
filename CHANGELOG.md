@@ -8,6 +8,32 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.31]
+
+### Added
+
+- Section 5.4, user accounts and environment, 5.4.1.1 to 5.4.3.4; this completes section 5.
+  Password aging (5.4.1.1, 5.4.1.3, 5.4.1.5) sets the maximum age (365 days), the warning
+  (7 days) and the inactive period (45 days) in `login.defs` and `useradd -D -f`, and with
+  `chage` on every existing account that has a password hash; accounts without a hash are left
+  alone. An account whose password would be expired or inactive with the new value (a last change
+  date of 0 or none, or a password older than the maximum) is skipped, named in a message and
+  recorded as a finding, never changed; a stricter value is never loosened. 5.4.1.4 sets
+  `ENCRYPT_METHOD` in `login.defs` (SHA512, or YESCRYPT when PAM already uses it). 5.4.2.6 sets
+  root's umask in `/root/.bash_profile` and `/root/.bashrc`. 5.4.2.7 gives system accounts a
+  nologin shell and 5.4.2.8 locks them, behind a lockout guard: never root, the benchmark's
+  exceptions, the account the role is connected as or becomes, an account with a running process
+  or one in `cis_account_exceptions`; skipped accounts are reported and are findings. 5.4.3.2
+  (`TMOUT`, readonly, exported, interactive shells only) and 5.4.3.4 (`umask 027`) go in one
+  role-owned file, `/etc/profile.d/zz-cis-rhel9.sh`, judging every file the shells read; a weaker
+  setting in a file the role does not own is a finding with its file and line. 5.4.3.3 sets
+  `UMASK` in `login.defs`. 5.4.3.1 (Level 2) removes `nologin` lines from `/etc/shells`. 5.4.1.2
+  (manual, Level 2), 5.4.1.6 and 5.4.2.1 to 5.4.2.5 (audit-only) report what they found and
+  change nothing; they are listed in `docs/review-controls.md`. New variables `cis_pass_max_days`
+  (365), `cis_pass_warn_age` (7), `cis_inactive_days` (45), `cis_umask` (`"027"`), `cis_tmout`
+  (900) and `cis_account_exceptions` (`[]`), validated at preflight. New
+  `tests/check_accounts_scan.py`, run in CI. Part of #9.
+
 ## [3.0.0_0.0.30]
 
 ### Added

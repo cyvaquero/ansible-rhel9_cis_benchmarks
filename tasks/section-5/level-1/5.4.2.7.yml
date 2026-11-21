@@ -1,0 +1,50 @@
+---
+# 5.4.2.7 - system accounts (UID below UID_MIN of login.defs, or 65534) have no valid login shell:
+# a shell listed in /etc/shells that is not nologin or false. Accounts the benchmark exempts (root,
+# halt, sync, shutdown, nfsnobody) are never touched. Lockout guard: also left alone, with a
+# message and a finding, are the account the role is connected as and the one it becomes
+# (cis_acct_guard), an account with a running process, and the accounts in cis_account_exceptions.
+# The shell set is the host's nologin. Accounts that are not system accounts are out of scope.
+
+- name: "5.4.2.7 - Handle the login shells of system accounts"
+  tags:
+    - "5.4.2.7"
+    - section-5
+    - level-1
+    - server
+    - workstation
+  block:
+    - name: "5.4.2.7 - Give system accounts a nologin shell"
+      ansible.builtin.user:
+        name: "{{ item.user }}"
+        shell: "{{ cis_acct.nologin_path }}"
+      loop: "{{ cis_acct.sysshell.fix }}"
+      loop_control:
+        label: "{{ item.user }} ({{ item.shell }})"
+      when: not (cis_audit_only | bool)
+
+    - name: "5.4.2.7 - Report system accounts left alone"
+      ansible.builtin.debug:
+        msg: >-
+          5.4.2.7: {{ item.user }} has the login shell {{ item.shell }} and is left alone, because
+          {{ item.reason }}. Change its shell by hand when it should not log in; it is a finding.
+      loop: "{{ cis_acct.sysshell.skip }}"
+      loop_control:
+        label: "{{ item.user }}"
+
+    - name: "5.4.2.7 - Read the accounts again after the change"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/lib/accounts_state.yml"
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_acct.sysshell.fix | length > 0
+
+    - name: "5.4.2.7 - Record the finding"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "5.4.2.7"
+      when:
+        - >-
+          cis_acct.sysshell.skip | length > 0
+          or (cis_audit_only | bool and cis_acct.sysshell.fix | length > 0)
+...

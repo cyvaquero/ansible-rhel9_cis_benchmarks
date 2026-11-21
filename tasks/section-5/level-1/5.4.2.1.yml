@@ -1,0 +1,16 @@
+---
+# 5.4.2.1 (audit-only) - reports root is the only UID 0 account. It only reads, in both modes, and
+# records no finding: summary.yml lists audit-only controls. The role never changes it:
+# changing a UID means moving the account's files, so a person decides.
+
+- name: "5.4.2.1 - Report root is the only UID 0 account for review"
+  ansible.builtin.debug:
+    msg: >-
+      Accounts with UID 0 (only root is expected): {{ cis_acct.uid0 | join(', ') }}.
+  tags:
+    - "5.4.2.1"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

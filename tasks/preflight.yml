@@ -291,6 +291,54 @@
     - always
     - preflight
 
+- name: "Preflight - Validate the account and environment settings"
+  ansible.builtin.assert:
+    that:
+      - item.value | string is match('^[0-9]+$')
+      - item.value | int >= item.min
+      - item.value | int <= item.max
+    fail_msg: >-
+      {{ item.key }} must be a whole number from {{ item.min }} to {{ item.max }}
+      (got {{ item.value | to_json }}).
+    quiet: true
+  loop:
+    - {key: cis_pass_max_days, value: "{{ cis_pass_max_days }}", min: 1, max: 365}
+    - {key: cis_pass_warn_age, value: "{{ cis_pass_warn_age }}", min: 7, max: 99999}
+    - {key: cis_inactive_days, value: "{{ cis_inactive_days }}", min: 0, max: 45}
+    - {key: cis_tmout, value: "{{ cis_tmout }}", min: 1, max: 900}
+  loop_control:
+    label: "{{ item.key }}"
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Validate the umask and the account exceptions"
+  ansible.builtin.assert:
+    that:
+      - cis_umask is string
+      # Three or four octal digits (the first of four is ignored) that deny at least what 027 does:
+      # write for the group (2, 3, 6 or 7) and everything for others (7).
+      - cis_umask is match('^[0-7]?[0-7][2367]7$')
+      - cis_account_exceptions is sequence and cis_account_exceptions is not string and cis_account_exceptions is not mapping
+      - cis_rejected_exceptions | length == 0
+    fail_msg: >-
+      cis_umask must be a quoted string of three or four octal digits that is 027 or more
+      restrictive, for example "027" (got {{ cis_umask | to_json }}), and cis_account_exceptions
+      a list of plain login names (letters, digits, underscore, dot and hyphen, not starting
+      with a digit or hyphen){{
+      (' - rejected items: ' ~ (cis_rejected_exceptions | map('to_json') | join(', ')))
+      if cis_rejected_exceptions | length > 0 else '' }}.
+    quiet: true
+  vars:
+    cis_rejected_exceptions: >-
+      {{ ((cis_account_exceptions | reject('string') | list)
+          + (cis_account_exceptions | select('string') | reject('regex', '^[A-Za-z_][A-Za-z0-9_.-]*$', match_type='fullmatch') | list))
+         if (cis_account_exceptions is sequence and cis_account_exceptions is not string and cis_account_exceptions is not mapping)
+         else [] }}
+  tags:
+    - always
+    - preflight
+
 - name: "Preflight - Compute the selected controls"
   ansible.builtin.set_fact:
     # The single list every control task or include tests with

@@ -37,6 +37,8 @@ jobs:
         run: python tests/check_sudoers_scan.py
       - name: Test the PAM scanner
         run: python tests/check_pam_scan.py
+      - name: Test the accounts scanner
+        run: python tests/check_accounts_scan.py
       - name: Syntax check
         run: ansible-playbook -i localhost, -e target=localhost --syntax-check tests/syntax.yml
 ...

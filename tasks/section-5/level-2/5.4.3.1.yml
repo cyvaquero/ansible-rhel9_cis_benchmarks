@@ -1,0 +1,35 @@
+---
+# 5.4.3.1 (Level 2) - no line of /etc/shells names nologin. The lines that do are removed, so a
+# nologin account counts as restricted to chsh and to programs that read the file. 5.4.2.7 and
+# 5.4.2.8 already treat nologin and false as not valid shells, so removing the lines changes
+# nothing for them.
+
+- name: "5.4.3.1 - Remove nologin from /etc/shells"
+  ansible.builtin.lineinfile:
+    path: /etc/shells
+    regexp: '^\s*[^#\n\r]*/nologin\b'
+    state: absent
+  when:
+    - not (cis_audit_only | bool)
+    - cis_acct.nologin_lines | length > 0
+  tags:
+    - "5.4.3.1"
+    - section-5
+    - level-2
+    - server
+    - workstation
+
+- name: "5.4.3.1 - Record the finding"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+  vars:
+    cis_finding_id: "5.4.3.1"
+  when:
+    - cis_audit_only | bool
+    - cis_acct.nologin_lines | length > 0
+  tags:
+    - "5.4.3.1"
+    - section-5
+    - level-2
+    - server
+    - workstation
+...

@@ -290,24 +290,24 @@ yet. `implemented`: the control has its task file at
 | 5.3.3.4.2 | Ensure pam_unix does not include remember | L1 Server, L1 Workstation | Automated | implement | implemented | Fixed in the templates of the role's own authselect profile; a finding on another profile |
 | 5.3.3.4.3 | Ensure pam_unix includes a strong password hashing algorithm | L1 Server, L1 Workstation | Automated | implement | implemented | Adds `sha512` in the templates of the role's own authselect profile; a finding on another profile |
 | 5.3.3.4.4 | Ensure pam_unix includes use_authtok | L1 Server, L1 Workstation | Automated | implement | implemented | Fixed in the templates of the role's own authselect profile; a finding on another profile |
-| 5.4.1.1 | Ensure password expiration is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.4.1.2 | Ensure minimum password days is configured | L2 Server, L2 Workstation | Manual | manual | planned |  |
-| 5.4.1.3 | Ensure password expiration warning days is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.4.1.4 | Ensure strong password hashing algorithm is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.4.1.5 | Ensure inactive password lock is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.4.1.6 | Ensure all users last password change date is in the past | L1 Server, L1 Workstation | Automated | audit-only | planned | Future change dates need a person to decide the fix |
-| 5.4.2.1 | Ensure root is the only UID 0 account | L1 Server, L1 Workstation | Automated | audit-only | planned | Never modify accounts automatically; report only |
-| 5.4.2.2 | Ensure root is the only GID 0 account | L1 Server, L1 Workstation | Automated | audit-only | planned | Never modify accounts automatically; report only |
-| 5.4.2.3 | Ensure group root is the only GID 0 group | L1 Server, L1 Workstation | Automated | audit-only | planned | Never modify groups automatically; report only |
-| 5.4.2.4 | Ensure root account access is controlled | L1 Server, L1 Workstation | Automated | audit-only | planned | Root password versus locked root is a site decision; report only |
-| 5.4.2.5 | Ensure root path integrity | L1 Server, L1 Workstation | Automated | audit-only | planned | PATH fixes depend on the site; report only |
-| 5.4.2.6 | Ensure root user umask is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.4.2.7 | Ensure system accounts do not have a valid login shell | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.4.2.8 | Ensure accounts without a valid login shell are locked | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.4.3.1 | Ensure nologin is not listed in /etc/shells | L2 Server, L2 Workstation | Automated | implement | planned |  |
-| 5.4.3.2 | Ensure default user shell timeout is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.4.3.3 | Ensure default user umask is configured in /etc/login.defs | L1 Server, L1 Workstation | Automated | implement | planned |  |
-| 5.4.3.4 | Ensure default user umask is configured | L1 Server, L1 Workstation | Automated | implement | planned |  |
+| 5.4.1.1 | Ensure password expiration is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Sets login.defs and `chage --maxdays` on accounts with a password hash, skipping and reporting any whose password would expire |
+| 5.4.1.2 | Ensure minimum password days is configured | L2 Server, L2 Workstation | Manual | manual | implemented | Reports PASS_MIN_DAYS and the accounts with a password and a minimum below 1; the role never sets it |
+| 5.4.1.3 | Ensure password expiration warning days is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Sets login.defs and `chage --warndays` on accounts with a password hash |
+| 5.4.1.4 | Ensure strong password hashing algorithm is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Sets ENCRYPT_METHOD in login.defs (SHA512, or YESCRYPT when PAM already uses it); the PAM hash is 5.3.3.4.3 |
+| 5.4.1.5 | Ensure inactive password lock is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Sets the useradd default and `chage --inactive` on accounts with a password hash, skipping and reporting any that would become inactive |
+| 5.4.1.6 | Ensure all users last password change date is in the past | L1 Server, L1 Workstation | Automated | audit-only | implemented | Future change dates need a person to decide the fix |
+| 5.4.2.1 | Ensure root is the only UID 0 account | L1 Server, L1 Workstation | Automated | audit-only | implemented | Never modify accounts automatically; report only |
+| 5.4.2.2 | Ensure root is the only GID 0 account | L1 Server, L1 Workstation | Automated | audit-only | implemented | Never modify accounts automatically; report only |
+| 5.4.2.3 | Ensure group root is the only GID 0 group | L1 Server, L1 Workstation | Automated | audit-only | implemented | Never modify groups automatically; report only |
+| 5.4.2.4 | Ensure root account access is controlled | L1 Server, L1 Workstation | Automated | audit-only | implemented | Root password versus locked root is a site decision; report only |
+| 5.4.2.5 | Ensure root path integrity | L1 Server, L1 Workstation | Automated | audit-only | implemented | PATH fixes depend on the site; report only |
+| 5.4.2.6 | Ensure root user umask is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Edits root's `.bash_profile` and `.bashrc` only; lockout guard for the connecting account |
+| 5.4.2.7 | Ensure system accounts do not have a valid login shell | L1 Server, L1 Workstation | Automated | implement | implemented | System accounts only; lockout guard (connecting account, running processes, `cis_account_exceptions`) |
+| 5.4.2.8 | Ensure accounts without a valid login shell are locked | L1 Server, L1 Workstation | Automated | implement | implemented | System accounts only; same lockout guard as 5.4.2.7 |
+| 5.4.3.1 | Ensure nologin is not listed in /etc/shells | L2 Server, L2 Workstation | Automated | implement | implemented | Removes the lines from `/etc/shells` |
+| 5.4.3.2 | Ensure default user shell timeout is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Role-owned `/etc/profile.d/zz-cis-rhel9.sh`, interactive shells only; a TMOUT elsewhere is judged, never edited |
+| 5.4.3.3 | Ensure default user umask is configured in /etc/login.defs | L1 Server, L1 Workstation | Automated | implement | implemented | Sets UMASK in login.defs |
+| 5.4.3.4 | Ensure default user umask is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Role-owned `/etc/profile.d/zz-cis-rhel9.sh`; a looser umask elsewhere is a finding |
 
 ## 6 Logging and Auditing
 

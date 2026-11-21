@@ -1,0 +1,76 @@
+---
+# 5.4.2.6 - root's login umask is 027 or more restrictive. Judged on what root's login shell
+# reports (`su - root`, read in tasks/lib/accounts_state.yml) and on the umask statements of
+# root's own /root/.bash_profile and /root/.bashrc. When it is not compliant the fix works only on
+# those two files: a statement looser than 027 is rewritten to cis_umask, and a file with no
+# umask statement gets `umask <cis_umask>` at its end (so it comes after /etc/bashrc, which
+# .bashrc sources first). A stricter statement is kept. System files the role does not own
+# (/etc/profile, /etc/profile.d, /etc/bashrc) are never edited here; 5.4.3.4 judges them. When
+# the files are compliant and root's login still reports a looser umask, nothing more can be
+# done here and the control is a finding. Without an answer from `su - root` the files alone are
+# judged.
+
+- name: "5.4.2.6 - Handle the root user umask"
+  tags:
+    - "5.4.2.6"
+    - section-5
+    - level-1
+    - server
+    - workstation
+  block:
+    - name: "5.4.2.6 - Remember the state before the fix"
+      ansible.builtin.set_fact:
+        cis_root_umask_before: "{{ cis_acct.root_umask }}"
+
+    - name: "5.4.2.6 - Tighten the umask statements in root's shell files"
+      ansible.builtin.replace:
+        path: "{{ item.path }}"
+        regexp: '^{{ item.old | regex_escape }}$'
+        replace: "{{ item.new }}"
+      loop: "{{ cis_root_umask_before.replace }}"
+      loop_control:
+        label: "{{ item.path }}:{{ item.line }}"
+      when:
+        - not (cis_audit_only | bool)
+        - cis_root_umask_before.state == 'bad'
+
+    - name: "5.4.2.6 - Add the umask to root's shell files that have none"
+      ansible.builtin.lineinfile:
+        path: "{{ item.path }}"
+        line: "umask {{ cis_umask }}"
+        create: true
+        # A file that exists keeps its mode; one that is created gets the usual one.
+        mode: "{{ omit if item.exists else '0644' }}"
+      loop: "{{ cis_root_umask_before.append }}"
+      loop_control:
+        label: "{{ item.path }}"
+      when:
+        - not (cis_audit_only | bool)
+        - cis_root_umask_before.state == 'bad'
+
+    - name: "5.4.2.6 - Read root's umask again after the fix"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/lib/accounts_state.yml"
+      when:
+        - not (cis_audit_only | bool)
+        - not ansible_check_mode
+        - cis_root_umask_before.state == 'bad'
+
+    - name: "5.4.2.6 - Report what the fix could not reach"
+      ansible.builtin.debug:
+        msg: >-
+          root's login shell reports umask {{ cis_root_umask_before.effective }} although the umask
+          statements in /root/.bash_profile and /root/.bashrc are compliant. A later file or the shell
+          itself sets it; find it with a login shell trace and fix it there.
+      when: cis_root_umask_before.unfixable
+
+    - name: "5.4.2.6 - Record the finding"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "5.4.2.6"
+      when:
+        - cis_root_umask_before.state == 'bad'
+        - >-
+          cis_audit_only | bool
+          or cis_root_umask_before.unfixable
+          or (not ansible_check_mode and cis_acct.root_umask.state == 'bad')
+...

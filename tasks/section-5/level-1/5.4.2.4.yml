@@ -1,0 +1,18 @@
+---
+# 5.4.2.4 (audit-only) - reports the root account's access. It only reads, in both modes, and
+# records no finding: summary.yml lists audit-only controls. The role never changes it:
+# whether root has a password or is locked is a site decision, and locking root
+# can remove emergency login.
+
+- name: "5.4.2.4 - Report the root account's access for review"
+  ansible.builtin.debug:
+    msg: >-
+      The state of the root password as passwd -S reports it: {{ cis_acct.root_status }}
+      (P: a password is set, L: locked; anything else is a root account with neither).
+  tags:
+    - "5.4.2.4"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...
