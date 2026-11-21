@@ -1,0 +1,49 @@
+---
+# 5.4.3.4 - no shell initialization file sets a umask looser than 027. Judged on every umask
+# statement of /etc/profile, /etc/bashrc, /etc/bash.bashrc, /etc/profile.d/sh.local and
+# /etc/profile.d/*.sh (octal, or symbolic with = clauses; a value that cannot be evaluated is
+# looser). A test of the current umask (`[ `umask` -eq 0 ] && umask 022`, as /etc/bashrc has it)
+# is a conditional default, not a setting. The role keeps `umask <cis_umask>` in a marked block of
+# its own /etc/profile.d/zz-cis-rhel9.sh (cis_shell_dropin), which sorts after the usual files,
+# unless that file already has a compliant statement. A looser statement in any file is reported
+# with its file and line and left alone, and the control is a finding. The umask also reaches
+# the role's own non-interactive shells (sshd runs ~/.bashrc, which sources /etc/bashrc and
+# /etc/profile.d); 5.4.3.3's UMASK already applies to every SSH session through pam_umask, so this
+# adds nothing new there. sudo ORs the user's umask with its own (022), so what the role runs
+# with become gets the stricter one. The role's own tasks set the modes of what they write.
+
+- name: "5.4.3.4 - Handle the default user umask"
+  tags:
+    - "5.4.3.4"
+    - section-5
+    - level-1
+    - server
+    - workstation
+  block:
+    - name: "5.4.3.4 - Set the umask in the role's profile.d file"
+      ansible.builtin.blockinfile:
+        path: "{{ cis_shell_dropin }}"
+        create: true
+        owner: root
+        group: root
+        mode: "0644"
+        marker: "# {mark} CIS 5.4.3.4 (managed by the role)"
+        block: |
+          umask {{ cis_umask }}
+      when:
+        - not (cis_audit_only | bool)
+        - cis_acct.umask.need_block
+
+    - name: "5.4.3.4 - Report the umask statements the role leaves alone"
+      ansible.builtin.debug:
+        msg: "5.4.3.4: {{ item.file }}:{{ item.line }}: {{ item.text }} is looser than 027. The role does not edit this file."
+      loop: "{{ cis_acct.umask.problems }}"
+      loop_control:
+        label: "{{ item.file }}"
+
+    - name: "5.4.3.4 - Record the finding"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "5.4.3.4"
+      when: cis_acct.umask.problems | length > 0
+...

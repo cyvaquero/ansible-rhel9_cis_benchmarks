@@ -1,0 +1,46 @@
+---
+# 5.4.2.8 - every account except root whose shell is not a valid login shell (not in /etc/shells,
+# or nologin or false) is locked, as `passwd -S` reports it. Only system accounts (UID below
+# UID_MIN of login.defs, or 65534) are locked, with `usermod -L`, and the same lockout guard as
+# 5.4.2.7 applies: the account the role is connected as and the one it becomes, an account with
+# a running process and the accounts in cis_account_exceptions are left alone, named in a
+# message, and the control is a finding. An unlocked account that is not a system account is
+# reported and left alone, also a finding. root is never touched. It runs after 5.4.2.7, so an
+# account that just lost its login shell is locked in the same run.
+
+- name: "5.4.2.8 - Handle the lock state of accounts without a login shell"
+  tags:
+    - "5.4.2.8"
+    - section-5
+    - level-1
+    - server
+    - workstation
+  block:
+    - name: "5.4.2.8 - Lock system accounts without a login shell"
+      ansible.builtin.user:
+        name: "{{ item.user }}"
+        password_lock: true
+      loop: "{{ cis_acct.lock.fix }}"
+      loop_control:
+        label: "{{ item.user }}"
+      when: not (cis_audit_only | bool)
+
+    - name: "5.4.2.8 - Report accounts left alone"
+      ansible.builtin.debug:
+        msg: >-
+          5.4.2.8: {{ item.user }} has no valid login shell and is not locked, and is left alone, because
+          {{ item.reason }}. Lock it by hand when it should not authenticate; it is a finding.
+      loop: "{{ cis_acct.lock.skip + cis_acct.lock.other }}"
+      loop_control:
+        label: "{{ item.user }}"
+
+    - name: "5.4.2.8 - Record the finding"
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
+      vars:
+        cis_finding_id: "5.4.2.8"
+      when:
+        - >-
+          cis_acct.lock.skip | length > 0
+          or cis_acct.lock.other | length > 0
+          or (cis_audit_only | bool and cis_acct.lock.fix | length > 0)
+...

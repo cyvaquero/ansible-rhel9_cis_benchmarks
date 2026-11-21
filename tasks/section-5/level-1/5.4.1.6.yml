@@ -1,0 +1,18 @@
+---
+# 5.4.1.6 (audit-only) - reports the accounts with a password whose last change date is in the
+# future, which lets the password bypass its expiry. It only reads, in both modes, and records no
+# finding: summary.yml lists audit-only controls. Which date is right, and whether to reset or
+# expire the password, is for a person to decide, so the role never changes it.
+
+- name: "5.4.1.6 - Report accounts whose last password change is in the future"
+  ansible.builtin.debug:
+    msg: >-
+      Accounts with a password whose last change date is in the future:
+      {{ cis_acct.future | join(', ') if cis_acct.future | length > 0 else 'none' }}.
+  tags:
+    - "5.4.1.6"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

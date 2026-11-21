@@ -1,0 +1,26 @@
+---
+# 5.4.2.5 (audit-only) - reports the problems of root's PATH as root's login shell sets it
+# (`su - root`, read once in tasks/lib/accounts_state.yml): an empty, trailing or `.` entry, and
+# a directory that does not exist, is not owned by root or is writable by group or other. It
+# only reads, in both modes, and records no finding: summary.yml lists audit-only controls. The
+# PATH comes from the site's profile files and the fix depends on them, so the role never
+# changes it. A directory a default PATH lists that does not exist (/root/bin) is reported.
+
+- name: "5.4.2.5 - Report the problems of root's PATH for review"
+  ansible.builtin.debug:
+    msg: >-
+      {% if not cis_acct.root_path.known %}
+      root's PATH could not be read (su - root failed).
+      {% elif cis_acct.root_path.problems | length > 0 %}
+      root's PATH is {{ cis_acct.root_path.value }} and has these problems:
+      {{ cis_acct.root_path.problems | join('; ') }}.
+      {% else %}
+      root's PATH is {{ cis_acct.root_path.value }} and has no problems.
+      {% endif %}
+  tags:
+    - "5.4.2.5"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...

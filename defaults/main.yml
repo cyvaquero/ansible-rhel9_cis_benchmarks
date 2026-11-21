@@ -190,4 +190,34 @@ cis_pwquality_maxsequence: 3
 # pam_pwhistory (5.3.3.3.1): the number of passwords remembered, written to
 # /etc/security/pwhistory.conf when the value there is below 24. A whole number from 24 to 400.
 cis_pwhistory_remember: 24
+
+# Password aging (5.4.1.1, 5.4.1.3, 5.4.1.5). Set in /etc/login.defs (PASS_MAX_DAYS,
+# PASS_WARN_AGE), in the useradd defaults (INACTIVE) and, with chage, on every existing account
+# that has a password hash, when its value is not compliant. cis_pass_max_days: from 1 to 365.
+# cis_pass_warn_age: 7 or more. cis_inactive_days: from 0 to 45. A stricter value already set
+# (a lower maximum, a longer warning, a shorter inactive period) is never loosened. An account
+# whose password would already be expired or inactive with the new value (a last change of 0, no
+# last change date, a password older than the maximum) is skipped and reported, never changed.
+# Accounts without a hash (locked, no password) are left alone. Preflight stops the run on
+# anything else.
+cis_pass_max_days: 365
+cis_pass_warn_age: 7
+cis_inactive_days: 45
+
+# Default umask (5.4.2.6, 5.4.3.3, 5.4.3.4): the UMASK written to /etc/login.defs, the umask line
+# of the role's /etc/profile.d file and of root's .bash_profile and .bashrc. Three or four octal
+# digits, 027 or more restrictive, in quotes (an unquoted 027 is the number 23 in YAML).
+# Preflight stops the run on anything else.
+cis_umask: "027"
+
+# Interactive shell timeout (5.4.3.2): TMOUT in seconds, from 1 to 900, written readonly and
+# exported to the role's /etc/profile.d file when no file sets TMOUT. A TMOUT set elsewhere is
+# judged, never edited.
+cis_tmout: 900
+
+# System accounts 5.4.2.7 and 5.4.2.8 must not touch (login names): the role leaves their shell
+# and lock state alone and reports them. Accounts with a running process, root, and the account
+# the role is connected as (and the one it becomes) are always left alone, whatever this says.
+# Plain login names; preflight stops the run on anything else.
+cis_account_exceptions: []
 ...

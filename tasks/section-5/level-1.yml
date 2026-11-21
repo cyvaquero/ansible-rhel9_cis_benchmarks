@@ -328,4 +328,112 @@
 - name: "5.3.3.4.4 - Ensure pam_unix includes use_authtok"
   ansible.builtin.import_tasks: level-1/5.3.3.4.4.yml
   when: "'5.3.3.4.4' in cis_selected_controls"
+
+# 5.4 (accounts and environment). The scan of the accounts, the account databases, the shell
+# files and root's login (files/accounts_scan.py, tasks/lib/accounts_state.yml) is read once here
+# and again after a change. The password aging controls (5.4.1.1, 5.4.1.3, 5.4.1.5) also change
+# existing accounts that have a password hash, but never one whose password would be expired or
+# inactive with the new value. 5.4.2.7 and 5.4.2.8 change only system accounts and never the
+# account the role is connected as (see below), root, an account with a running process or one
+# in cis_account_exceptions. 5.4.1.2 and 5.4.3.1 (Level 2) are in level-2.yml, and run after the
+# Level 1 controls here. 5.4.3.2 and 5.4.3.4 share one role-owned /etc/profile.d file.
+
+# The accounts the role must never lock out or give a nologin shell: the account it is connected
+# as (read with become off, so it is the login account, not root), ansible_user and the account
+# become runs through. It only reads the host, so it runs in audit mode too, and it carries the
+# always tag so a run limited to one control still has it.
+- name: "5.4 - Read the account of this run"
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - 'id -un 2>/dev/null'
+  register: cis_acct_conn_read
+  become: false
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when: "cis_selected_controls | select('match', '^5\\.4\\.') | list | length > 0"
+  tags:
+    - always
+
+- name: "5.4 - Record the accounts the role must never lock out"
+  ansible.builtin.set_fact:
+    cis_acct_guard: >-
+      {{ ([cis_acct_conn_read.stdout_lines[0] | default(''), ansible_user | default(''),
+           ansible_ssh_user | default(''), ansible_become_user | default('root')]
+          | select | unique | list) }}
+  when: "cis_selected_controls | select('match', '^5\\.4\\.') | list | length > 0"
+  tags:
+    - always
+
+- name: "5.4 - Read the accounts and the shell environment"
+  ansible.builtin.include_tasks: "{{ role_path }}/tasks/lib/accounts_state.yml"
+  when: "cis_selected_controls | select('match', '^5\\.4\\.') | list | length > 0"
+  tags:
+    - always
+
+- name: "5.4.1.1 - Ensure password expiration is configured"
+  ansible.builtin.import_tasks: level-1/5.4.1.1.yml
+  when: "'5.4.1.1' in cis_selected_controls"
+
+- name: "5.4.1.3 - Ensure password expiration warning days is configured"
+  ansible.builtin.import_tasks: level-1/5.4.1.3.yml
+  when: "'5.4.1.3' in cis_selected_controls"
+
+- name: "5.4.1.4 - Ensure strong password hashing algorithm is configured"
+  ansible.builtin.import_tasks: level-1/5.4.1.4.yml
+  when: "'5.4.1.4' in cis_selected_controls"
+
+- name: "5.4.1.5 - Ensure inactive password lock is configured"
+  ansible.builtin.import_tasks: level-1/5.4.1.5.yml
+  when: "'5.4.1.5' in cis_selected_controls"
+
+- name: "5.4.1.6 - Ensure all users last password change date is in the past"
+  ansible.builtin.import_tasks: level-1/5.4.1.6.yml
+  when: "'5.4.1.6' in cis_selected_controls"
+
+- name: "5.4.2.1 - Ensure root is the only UID 0 account"
+  ansible.builtin.import_tasks: level-1/5.4.2.1.yml
+  when: "'5.4.2.1' in cis_selected_controls"
+
+- name: "5.4.2.2 - Ensure root is the only GID 0 account"
+  ansible.builtin.import_tasks: level-1/5.4.2.2.yml
+  when: "'5.4.2.2' in cis_selected_controls"
+
+- name: "5.4.2.3 - Ensure group root is the only GID 0 group"
+  ansible.builtin.import_tasks: level-1/5.4.2.3.yml
+  when: "'5.4.2.3' in cis_selected_controls"
+
+- name: "5.4.2.4 - Ensure root account access is controlled"
+  ansible.builtin.import_tasks: level-1/5.4.2.4.yml
+  when: "'5.4.2.4' in cis_selected_controls"
+
+- name: "5.4.2.5 - Ensure root path integrity"
+  ansible.builtin.import_tasks: level-1/5.4.2.5.yml
+  when: "'5.4.2.5' in cis_selected_controls"
+
+- name: "5.4.2.6 - Ensure root user umask is configured"
+  ansible.builtin.import_tasks: level-1/5.4.2.6.yml
+  when: "'5.4.2.6' in cis_selected_controls"
+
+- name: "5.4.2.7 - Ensure system accounts do not have a valid login shell"
+  ansible.builtin.import_tasks: level-1/5.4.2.7.yml
+  when: "'5.4.2.7' in cis_selected_controls"
+
+- name: "5.4.2.8 - Ensure accounts without a valid login shell are locked"
+  ansible.builtin.import_tasks: level-1/5.4.2.8.yml
+  when: "'5.4.2.8' in cis_selected_controls"
+
+- name: "5.4.3.2 - Ensure default user shell timeout is configured"
+  ansible.builtin.import_tasks: level-1/5.4.3.2.yml
+  when: "'5.4.3.2' in cis_selected_controls"
+
+- name: "5.4.3.3 - Ensure default user umask is configured in /etc/login.defs"
+  ansible.builtin.import_tasks: level-1/5.4.3.3.yml
+  when: "'5.4.3.3' in cis_selected_controls"
+
+- name: "5.4.3.4 - Ensure default user umask is configured"
+  ansible.builtin.import_tasks: level-1/5.4.3.4.yml
+  when: "'5.4.3.4' in cis_selected_controls"
 ...

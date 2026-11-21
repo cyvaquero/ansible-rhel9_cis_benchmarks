@@ -44,4 +44,13 @@ cis_pwquality_dropin: /etc/security/pwquality.conf.d/zz-cis-rhel9.conf
 # Section 5.3: the Python the PAM controls run their read-only scanner with
 # (files/pam_scan.py): the interpreter Ansible found on the managed node.
 cis_pam_python: "{{ ansible_facts.python.executable | default('/usr/bin/python3') }}"
+
+# Section 5.4 (accounts and environment): the one profile.d file the role owns. 5.4.3.2 (TMOUT)
+# and 5.4.3.4 (umask) each keep a marked block in it. /etc/profile reads /etc/profile.d/*.sh in
+# name order, so the name sorts after the usual ones.
+cis_shell_dropin: /etc/profile.d/zz-cis-rhel9.sh
+
+# Section 5.4: the Python the account controls run their read-only scanner with
+# (files/accounts_scan.py): the interpreter Ansible found on the managed node.
+cis_accounts_python: "{{ ansible_facts.python.executable | default('/usr/bin/python3') }}"
 ...

@@ -1,0 +1,17 @@
+---
+# 5.4.2.2 (audit-only) - reports the accounts with primary GID 0. It only reads, in both modes, and
+# records no finding: summary.yml lists audit-only controls. The role never changes it:
+# which group an account belongs in is a site decision.
+
+- name: "5.4.2.2 - Report the accounts with primary GID 0 for review"
+  ansible.builtin.debug:
+    msg: >-
+      Accounts with primary GID 0 other than root, sync, shutdown, halt and operator:
+      {{ cis_acct.gid0_accounts | join(', ') if cis_acct.gid0_accounts | length > 0 else 'none' }}.
+  tags:
+    - "5.4.2.2"
+    - section-5
+    - level-1
+    - server
+    - workstation
+...
