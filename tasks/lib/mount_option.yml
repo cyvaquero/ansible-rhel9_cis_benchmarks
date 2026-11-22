@@ -202,7 +202,7 @@
     - not (cis_audit_only | bool)
     - cis_mo_mounted | bool
     - cis_mo_route != 'none'
-    - (cis_mo_option not in cis_mo_live_words) if cis_mo_wanted | bool else (cis_mo_option in cis_mo_live_words)
+    - ((cis_mo_option not in cis_mo_live_words) if (cis_mo_wanted | bool) else (cis_mo_option in cis_mo_live_words))
 
 - name: "{{ cis_mo_id ~ ' - Check the live options of ' ~ cis_mo_path ~ ' again after the fix' }}"
   ansible.builtin.command:
