@@ -65,7 +65,8 @@ cis_module_firewire_core_blocked: true      # 1.1.1.9
 cis_module_usb_storage_blocked: true        # 1.1.1.10
 
 # 1.1.2.1.1: true makes the role enable the tmp.mount unit (for the next boot, not started) when
-# /tmp is not a mount point. false: the role does not enable it.
+# /tmp is not a mount point. false: the role does not enable it, and never disables a tmp.mount
+# the host already enabled.
 cis_tmp_mount_enabled: true
 
 # 1.1.2.1.2 to 1.1.2.7.4: the mount options each mount point holds. Only nodev, nosuid and
@@ -197,10 +198,11 @@ cis_motd_path: /etc/motd
 cis_issue_path: /etc/issue
 cis_issue_net_path: /etc/issue.net
 
-# 1.7.1, 1.7.2, 1.7.3, 1.8.1: the text the role writes to the three banner files, and sets as the
-# GDM login banner, when the current content is not compliant. A file that already has
-# compliant content is never rewritten. Keep it free of the escapes \m \r \s \v and of the
-# operating system name, or the controls can never pass.
+# 1.7.1, 1.7.2, 1.7.3, 1.8.1: the text the role holds in the three banner files and as the GDM
+# login banner. Whenever a file or the banner differs from it, the role replaces it, also when
+# the current text is compliant: a site's own banner is overwritten, so set your text here. Keep
+# it free of the escapes \m \r \s \v and of the operating system name, or the controls can
+# never pass.
 cis_banner_text: "This computer is for approved users and purposes only. Use of it may be logged and reviewed."
 
 # 1.7.1 to 1.7.6: the owner, group and mode of the banner files. 1.7.1 to 1.7.3 give a new

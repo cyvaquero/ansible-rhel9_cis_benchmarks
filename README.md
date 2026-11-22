@@ -168,7 +168,7 @@ roles:
 | Variable | Default | Meaning |
 |---|---|---|
 | `cis_module_<name>_blocked` | `true` | 1.1.1.1 to 1.1.1.10: whether the role blocks (install line to `/bin/false` plus blacklist) and unloads the module. `<name>` is `cramfs`, `freevxfs`, `hfs`, `hfsplus`, `jffs2`, `overlay`, `squashfs`, `udf`, `firewire_core` or `usb_storage`. `false` removes the role's own `/etc/modprobe.d/<module>.conf` (a file it did not write stays) and the control reports the module as not blocked. |
-| `cis_tmp_mount_enabled` | `true` | 1.1.2.1.1: enable `tmp.mount` (for the next boot) when `/tmp` is not a mount point. `false` does not enable it; the role never disables a unit. |
+| `cis_tmp_mount_enabled` | `true` | 1.1.2.1.1: enable `tmp.mount` (for the next boot) when `/tmp` is not a mount point. `false` does not enable it; the role never disables a `tmp.mount` the host already enabled. |
 | `cis_tmp_mount_options`, `cis_dev_shm_mount_options`, `cis_home_mount_options`, `cis_var_mount_options`, `cis_var_tmp_mount_options`, `cis_var_log_mount_options`, `cis_var_log_audit_mount_options` | `/tmp`, `/dev/shm`, `/var/tmp`, `/var/log`, `/var/log/audit`: `[nodev, nosuid, noexec]`; `/home`, `/var`: `[nodev, nosuid]` | 1.1.2.x.2 to 1.1.2.x.4: the options that mount point holds. A listed option is added (fstab entry, unit drop-in, remount); one of `nodev`, `nosuid`, `noexec` left out of the list is removed from the fstab entry or drop-in and remounted out, and its control reports a finding while the mount lacks it. Other fstab options are never touched. |
 | `cis_dnf_gpgcheck` | `true` | 1.2.1.2: the `gpgcheck` value written to `dnf.conf` and to each repository file (except `redhat.repo`) where it is off. |
 | `cis_dnf_install_weak_deps` | `false` | 1.2.1.5 (Level 2): the `install_weak_deps` value written to `dnf.conf`. |
@@ -202,7 +202,7 @@ roles:
 | Variable | Default | Meaning |
 |---|---|---|
 | `cis_motd_path`, `cis_issue_path`, `cis_issue_net_path` | `/etc/motd`, `/etc/issue`, `/etc/issue.net` | 1.7.1 to 1.7.6: the banner files. |
-| `cis_banner_text` | a short notice that the computer is for approved users and use may be logged | The text 1.7.1 to 1.7.3 write to the three banner files, and 1.8.1 sets as the GDM login banner, when the current content is not compliant. Keep it free of the escapes `\m`, `\r`, `\s`, `\v` and of the operating system name, or the controls cannot pass. |
+| `cis_banner_text` | a short notice that the computer is for approved users and use may be logged | The text the role holds in the three banner files (1.7.1 to 1.7.3) and as the GDM login banner (1.8.1). A file or banner that differs from it is replaced, also when its text is compliant, so a site's own banner is overwritten: set your text here. Keep it free of the escapes `\m`, `\r`, `\s`, `\v` and of the operating system name, or the controls cannot pass. |
 | `cis_banner_file_owner`, `cis_banner_file_group`, `cis_banner_file_mode` | `root`, `root`, `"0644"` | 1.7.1 to 1.7.6: the owner, group and mode of a new banner file; 1.7.4 to 1.7.6 set exactly this owner, group and mode on an existing file that differs (a stricter mode is replaced). |
 | `cis_gdm_banner_enable`, `cis_gdm_disable_user_list` | `true`, `true` | 1.8.1, 1.8.2: the `banner-message-enable` and `disable-user-list` values. |
 | `cis_gdm_idle_delay` | `900` | 1.8.3: the idle time in seconds the role writes when the configured one is not accepted. The check accepts 1 to 900 (0, never, is not). |
@@ -366,8 +366,9 @@ Values outside these ranges stop the run at preflight.
 - Banner controls (1.7): a file is not compliant when it holds a login escape
   (`\m`, `\r`, `\s`, `\v`, any case) or the operating system name from `/etc/os-release`;
   `/etc/issue` and `/etc/issue.net` must also hold text, while an empty or missing
-  `/etc/motd` is compliant. The fix writes `cis_banner_text` only to a non-compliant file,
-  so a site's own compliant banner stays. 1.7.4 to 1.7.6 require root:root and no write for
+  `/etc/motd` is compliant (the check judges only these rules). The fix makes each file hold
+  exactly `cis_banner_text` and a final newline whenever it differs, also when it is compliant, so
+  a site's own banner is replaced. 1.7.4 to 1.7.6 require root:root and no write for
   group or other and no execute bit (0644 or stricter); the fix sets exactly the configured owner,
   group and mode, also on a stricter file. A
   symlink is a finding for all six and is never replaced or chmod-ed. `/etc/motd.d` and
@@ -383,8 +384,7 @@ Values outside these ranges stop the run at preflight.
   that sorts later and overrides a key stays a finding, as does a `user` profile without
   `system-db:local`; the role creates `/etc/dconf/profile/user` only when it is missing.
   The configured value is written whenever the effective one differs, also when it already
-  passes (a screen lock delay of 0 becomes 5 with the defaults); the banner text only when the
-  key has none. 1.8.4 sets `automount` and `automount-open` to false (Level 1 for Server, Level 2 for
+  passes (a screen lock delay of 0 becomes 5 with the defaults); the banner text too (exactly `cis_banner_text`). 1.8.4 sets `automount` and `automount-open` to false (Level 1 for Server, Level 2 for
   Workstation). 1.8.6 sets `Enable=false` in the `[xdmcp]` section of `/etc/gdm/custom.conf`
   when it is true, and 1.8.7 removes an active `WaylandEnable=false` from `[daemon]`. GDM
   reads `custom.conf` only when it starts, so while GDM is running and the file is newer

@@ -11,8 +11,8 @@
 #   cis_dc_b        range: the maximum
 #                   (a and b are benchmark constants, cis_expect_gdm_*)
 #   cis_dc_write    the value the fix writes (a role variable), whenever the effective value is
-#                   not exactly it (also when the effective value is stricter than the benchmark's;
-#                   a text key only needs some text), as GVariant text (true, uint32 900, 'text')
+#                   not exactly it (also when the effective value is stricter than the benchmark's,
+#                   and the GDM banner text), as GVariant text (true, uint32 900, 'text')
 # and puts the tags and a gdm-installed condition on the import.
 #
 # The effective value is read from the compiled databases with dconf read, under the profile
@@ -51,9 +51,15 @@
           nonempty) [ -n "$val" ] && [ "$val" != "''" ] && value=ok ;;
           range) [[ "$val" =~ ^[0-9]+$ ]] && (( 10#$val >= a && 10#$val <= b )) && value=ok ;;
         esac
-        # Is the value exactly the one the fix writes? A text key (nonempty) keeps any text.
+        # Is the value exactly the one the fix writes? A text value is compared without its
+        # quotes, because dconf may print it in double quotes where the fix writes single quotes.
+        unq() { local s=$1; s=${s:1:-1}; s=${s//\\\'/\'}; s=${s//\\\"/\"}; printf '%s' "$s"; }
         same=bad
-        if [ "$kind" = nonempty ]; then [ "$value" = ok ] && same=ok; else [ "$val" = "${site#uint32 }" ] && same=ok; fi
+        if [ "$kind" = nonempty ]; then
+          [ "$(unq "$val")" = "$(unq "$site")" ] && same=ok
+        else
+          [ "$val" = "${site#uint32 }" ] && same=ok
+        fi
         lock=bad
         for f in /etc/dconf/db/*.d/locks/*; do
           if [ -f "$f" ] && grep -qxF -- "$path" "$f"; then lock=ok; break; fi

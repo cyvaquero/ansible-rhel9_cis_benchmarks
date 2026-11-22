@@ -40,7 +40,11 @@ implements, then the role's own version.
   role's drop-in), 1.4.5 (a `ConfirmSpawn` setting other than the configured one is rewritten),
   1.8.1, 1.8.2 and 1.8.4 to 1.8.7 (a different value is replaced; a `WaylandEnable` line of any
   value is removed), and 1.3.1.2 and 1.3.1.3 (the arguments and the policy type of the
-  variables are enforced). Also new: `cis_module_<name>_blocked: false` removes the role's own
+  variables are enforced), and 1.7.1 to 1.7.3 and 1.8.1 (the three banner files and the GDM banner
+  text are replaced with `cis_banner_text` whenever they differ, also when the current text is
+  compliant: a site's own banner is overwritten on the first run, so sites set their text in
+  `cis_banner_text`). `cis_tmp_mount_enabled: false` only stops the role enabling `tmp.mount`; it
+  never disables one the host enabled. Also new: `cis_module_<name>_blocked: false` removes the role's own
   modprobe.d drop-in, and a mount option left out of its list is removed from the fstab entry and
   the live mount. Preflight validates only the type and format of the new variables. The README has an "Overriding values" section and a
   table per group of controls. The shared `tasks/lib/` helpers take the new inputs as optional
