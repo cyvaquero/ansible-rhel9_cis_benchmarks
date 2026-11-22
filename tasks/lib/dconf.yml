@@ -53,7 +53,7 @@
         esac
         # Is the value exactly the one the fix writes? A text value is compared without its
         # quotes, because dconf may print it in double quotes where the fix writes single quotes.
-        unq() { local s=$1; s=${s:1:-1}; s=${s//\\\'/\'}; s=${s//\\\"/\"}; printf '%s' "$s"; }
+        unq() { local s=$1; s=${s#?}; s=${s%?}; s=${s//\\\'/\'}; s=${s//\\\"/\"}; printf '%s' "$s"; }
         same=bad
         if [ "$kind" = nonempty ]; then
           [ "$(unq "$val")" = "$(unq "$site")" ] && same=ok
