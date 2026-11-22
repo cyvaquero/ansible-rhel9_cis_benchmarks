@@ -1,17 +1,18 @@
 ---
-# 1.3.1.3 - the SELinux policy type in /etc/selinux/config is targeted. The state comes from
-# the shared read in tasks/section-1/level-1.yml (cis_selinux_*). The fix edits only the
-# SELINUXTYPE line: ansible.posix.selinux sets the mode and the policy together and would
-# also change the runtime mode, which could lower an enforcing host to permissive. The
-# targeted policy must already be installed (/etc/selinux/targeted); the role does not
-# install it, so without it the control is a finding. A loaded policy only changes at
-# boot, so when SELinux is running a different policy the control sets cis_reboot_required.
-# Remediate mode records a finding when the setting is still wrong after the fix; under
-# --check nothing is fixed, so nothing is recorded then.
+# 1.3.1.3 - the SELinux policy type in /etc/selinux/config is targeted (the check always
+# judges cis_expect_selinux_policy; the fix writes cis_selinux_policy, targeted by default).
+# The state comes from the shared read in tasks/section-1/level-1.yml (cis_selinux_*). The fix
+# edits only the SELINUXTYPE line: ansible.posix.selinux sets the mode and the policy together
+# and would also change the runtime mode, which could lower an enforcing host to permissive.
+# The targeted policy must already be installed (/etc/selinux/targeted); the role does not
+# install it, so without it the control is a finding. A loaded policy only changes at boot, so
+# when SELinux is running a different policy the control sets cis_reboot_required. Remediate
+# mode records a finding when the setting is still wrong after the fix; under --check nothing
+# is fixed, so nothing is recorded then.
 
 - name: "1.3.1.3 - Check that the targeted policy is installed"
   ansible.builtin.stat:
-    path: /etc/selinux/targeted
+    path: "/etc/selinux/{{ cis_selinux_policy }}"
   register: cis_check_1_3_1_3_policy
   check_mode: false
   tags: &cis_tags_1_3_1_3
@@ -25,12 +26,12 @@
   ansible.builtin.lineinfile:
     path: /etc/selinux/config
     regexp: '^\s*SELINUXTYPE\s*='
-    line: SELINUXTYPE=targeted
+    line: "SELINUXTYPE={{ cis_selinux_policy }}"
     create: false
   failed_when: false
   when:
     - not (cis_audit_only | bool)
-    - cis_selinux_type != 'targeted'
+    - cis_selinux_type != cis_expect_selinux_policy
     - cis_check_1_3_1_3_policy.stat.isdir | default(false)
   tags: *cis_tags_1_3_1_3
 
@@ -53,7 +54,7 @@
   when:
     - not (cis_audit_only | bool)
     - not ansible_check_mode
-    - cis_selinux_type != 'targeted'
+    - cis_selinux_type != cis_expect_selinux_policy
     - cis_check_1_3_1_3_policy.stat.isdir | default(false)
   tags: *cis_tags_1_3_1_3
 
@@ -67,18 +68,18 @@
   ansible.builtin.set_fact:
     cis_reboot_required: true
   when:
-    - cis_selinux_type == 'targeted'
+    - cis_selinux_type == cis_selinux_policy
     - cis_selinux_runtime != 'disabled'
-    - cis_selinux_loaded_policy not in ['', 'targeted']
+    - cis_selinux_loaded_policy not in ['', cis_selinux_policy]
   tags: *cis_tags_1_3_1_3
 
 - name: "1.3.1.3 - Report that the loaded policy changes at the next reboot"
   ansible.builtin.debug:
-    msg: "A reboot is pending: SELinux is running the {{ cis_selinux_loaded_policy }} policy and the configuration selects targeted."
+    msg: "A reboot is pending: SELinux is running the {{ cis_selinux_loaded_policy }} policy and the configuration selects {{ cis_selinux_policy }}."
   when:
-    - cis_selinux_type == 'targeted'
+    - cis_selinux_type == cis_selinux_policy
     - cis_selinux_runtime != 'disabled'
-    - cis_selinux_loaded_policy not in ['', 'targeted']
+    - cis_selinux_loaded_policy not in ['', cis_selinux_policy]
   tags: *cis_tags_1_3_1_3
 
 # Under --check the fix does not happen, so remediate mode records nothing then.
@@ -87,7 +88,7 @@
   vars:
     cis_finding_id: "1.3.1.3"
   when:
-    - cis_selinux_type != 'targeted'
+    - cis_selinux_type != cis_expect_selinux_policy
     - (cis_audit_only | bool) or not ansible_check_mode
   tags: *cis_tags_1_3_1_3
 ...

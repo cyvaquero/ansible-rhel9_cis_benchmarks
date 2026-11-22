@@ -37,7 +37,8 @@
   failed_when: false
   tags: *cis_tags_1_1_2_1_1
 
-# No state: the unit is enabled for the next boot and not started.
+# No state: the unit is enabled for the next boot and not started. Only when
+# cis_tmp_mount_enabled is true; otherwise the control just reports the finding.
 - name: "1.1.2.1.1 - Enable the tmp.mount unit without starting it"
   ansible.builtin.systemd:
     name: tmp.mount
@@ -45,6 +46,7 @@
   failed_when: false
   when:
     - not (cis_audit_only | bool)
+    - cis_tmp_mount_enabled | bool
     - cis_check_1_1_2_1_1_mount.rc != 0
     - cis_check_1_1_2_1_1_unit.stdout != 'enabled'
   tags: *cis_tags_1_1_2_1_1

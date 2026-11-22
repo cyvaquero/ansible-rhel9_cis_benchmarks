@@ -1,8 +1,8 @@
 ---
 # 1.4.2 - boot loader configuration is readable by root only. Two parts:
 #  - /boot/grub2/grub.cfg, grubenv and user.cfg (regular files, when present) must be
-#    owned by root:root with no group, other or execute bits; the fix sets 0600 root:root
-#    and leaves stricter modes alone.
+#    owned by root:root with no group, other or execute bits (cis_expect_bootloader_file_*);
+#    the fix sets cis_bootloader_file_owner, _group and _mode (root:root 0600 by default).
 #  - /boot/efi, when /etc/fstab mounts it as vfat (UEFI), must carry uid=0, gid=0 and a
 #    umask of 0077 (or fmask and dmask, each covering 077), because vfat has no file
 #    permissions. A host with no such entry (BIOS) skips this part. The fix rewrites the
@@ -35,14 +35,14 @@
       - "("
       - "!"
       - -user
-      - root
+      - "{{ cis_expect_bootloader_file_owner }}"
       - -o
       - "!"
       - -group
-      - root
+      - "{{ cis_expect_bootloader_file_group }}"
       - -o
       - -perm
-      - /177
+      - "/{{ cis_expect_bootloader_file_forbidden_bits }}"
       - ")"
   register: cis_check_1_4_2_files
   changed_when: false
@@ -63,8 +63,9 @@
       - -c
       - |
         set -u
+        want_uid=$1; want_gid=$2; want_umask=$3
         get() { tr ',' '\n' <<<"$2" | sed -n "s/^$1=//p" | tail -n 1; }
-        six() { [[ "$1" =~ ^[0-7]+$ ]] && (( (8#$1 & 63) == 63 )); }
+        six() { [[ "$1" =~ ^[0-7]+$ ]] && (( (8#$1 & 8#$want_umask) == 8#$want_umask )); }
         mask_ok() {
           local u f d
           u=$(get umask "$1"); f=$(get fmask "$1"); d=$(get dmask "$1")
@@ -76,15 +77,19 @@
         if [ "${ftype:-}" = vfat ]; then
           fstab=bad
           mask_ok "$fopts" && maskok=yes
-          if [ "$maskok" = yes ] && [ "$(get uid "$fopts")" = 0 ] && [ "$(get gid "$fopts")" = 0 ]; then fstab=ok; fi
+          if [ "$maskok" = yes ] && [ "$(get uid "$fopts")" = "$want_uid" ] && [ "$(get gid "$fopts")" = "$want_gid" ]; then fstab=ok; fi
         fi
         live=absent
         if read -r ltype lopts < <(findmnt -n -o FSTYPE,OPTIONS --mountpoint /boot/efi 2>/dev/null) && [ "$ltype" = vfat ]; then
           live=bad
           u=$(get uid "$lopts"); g=$(get gid "$lopts")
-          if mask_ok "$lopts" && { [ -z "$u" ] || [ "$u" = 0 ]; } && { [ -z "$g" ] || [ "$g" = 0 ]; }; then live=ok; fi
+          if mask_ok "$lopts" && { [ -z "$u" ] || [ "$u" = "$want_uid" ]; } && { [ -z "$g" ] || [ "$g" = "$want_gid" ]; }; then live=ok; fi
         fi
         echo "fstab=$fstab"; echo "opts=${fopts:-}"; echo "maskok=$maskok"; echo "live=$live"
+      - bash
+      - "{{ cis_expect_bootloader_efi_uid }}"
+      - "{{ cis_expect_bootloader_efi_gid }}"
+      - "{{ cis_expect_bootloader_efi_umask }}"
   register: cis_check_1_4_2_efi
   changed_when: false
   check_mode: false
@@ -109,9 +114,9 @@
   ansible.builtin.file:
     path: "{{ item }}"
     state: file
-    owner: root
-    group: root
-    mode: "0600"
+    owner: "{{ cis_bootloader_file_owner }}"
+    group: "{{ cis_bootloader_file_group }}"
+    mode: "{{ cis_bootloader_file_mode }}"
   loop: "{{ cis_check_1_4_2_files.stdout_lines }}"
   failed_when: false
   when:
@@ -133,7 +138,8 @@
          | reject('match', '^(umask|fmask|dmask)=' if not cis_state_1_4_2_maskok else '^$')
          | list }}
     cis_state_1_4_2_new_opts: >-
-      {{ (cis_state_1_4_2_kept + ['uid=0', 'gid=0'] + ([] if cis_state_1_4_2_maskok else ['umask=0077'])) | join(',') }}
+      {{ (cis_state_1_4_2_kept + ['uid=' ~ cis_bootloader_efi_uid, 'gid=' ~ cis_bootloader_efi_gid]
+          + ([] if cis_state_1_4_2_maskok else ['umask=' ~ cis_bootloader_efi_umask])) | join(',') }}
   when:
     - not (cis_audit_only | bool)
     - cis_state_1_4_2_fstab == 'bad'

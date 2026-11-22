@@ -4,7 +4,8 @@
 #   cis_gc_section  the section in /etc/gdm/custom.conf
 #   cis_gc_key      the option
 #   cis_gc_bad      the values (lowercase, "|" separated) that are not compliant
-#   cis_gc_fix      "false" to set the option to false, "absent" to remove it
+#   cis_gc_fix      "absent" to remove the option, any other value (for example "false") is
+#                   written as its new value
 # and puts the tags and a gdm-installed condition on the import.
 #
 # The check prints "val=<value>" for the last assignment of the option in the section
@@ -59,17 +60,17 @@
   check_mode: false
   failed_when: false
 
-- name: "{{ cis_gc_id ~ ' - Set ' ~ cis_gc_key ~ ' to false' }}"
+- name: "{{ cis_gc_id ~ ' - Set ' ~ cis_gc_key ~ ' to ' ~ cis_gc_fix }}"
   community.general.ini_file:
     path: /etc/gdm/custom.conf
     section: "{{ cis_gc_section }}"
     option: "{{ cis_gc_key }}"
-    value: "false"
+    value: "{{ cis_gc_fix }}"
     no_extra_spaces: true
     create: false
   when:
     - not (cis_audit_only | bool)
-    - cis_gc_fix == 'false'
+    - cis_gc_fix != 'absent'
     - (cis_gc_check.stdout_lines | select('match', '^val=') | first | default('val=') | regex_replace('^val=', '')) in cis_gc_bad.split('|')
 
 - name: "{{ cis_gc_id ~ ' - Remove ' ~ cis_gc_key ~ ' from /etc/gdm/custom.conf' }}"

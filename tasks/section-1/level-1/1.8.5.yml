@@ -12,9 +12,9 @@
     cis_dc_section: "org/gnome/desktop/media-handling"
     cis_dc_key: "autorun-never"
     cis_dc_kind: "eq"
-    cis_dc_a: "true"
+    cis_dc_a: "{{ cis_expect_gdm_autorun_never }}"
     cis_dc_b: ""
-    cis_dc_write: "true"
+    cis_dc_write: "{{ cis_gdm_autorun_never | bool | string | lower }}"
   when: "'gdm' in ansible_facts.packages"
   tags:
     - "1.8.5"

@@ -9,6 +9,7 @@
     cis_cp_kind: "legacy"
     cis_cp_module: ""
     cis_cp_drop_legacy: true
+    cis_cp_base: "{{ cis_crypto_policy_base }}"
   tags:
     - "1.6.1"
     - section-1

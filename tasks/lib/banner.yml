@@ -10,8 +10,9 @@
 # "no", when it is missing or holds nothing but whitespace. An empty /etc/motd is compliant:
 # it discloses nothing. The check reads through a symlink; the fix never replaces one (the
 # link is a finding to resolve by hand). A compliant file is never rewritten, so a site's
-# own banner stays. The fix writes cis_banner_text, and gives a new file mode 0644 only
-# (an existing file keeps its mode: 1.7.4 to 1.7.6 own that). Remediate mode records a
+# own banner stays. The fix writes cis_banner_text, owned by cis_banner_file_owner and
+# cis_banner_file_group, and gives a new file mode cis_banner_file_mode only (an existing
+# file keeps its mode: 1.7.4 to 1.7.6 own that). Remediate mode records a
 # finding when the file is still not compliant after the fix; under --check nothing is
 # fixed, so nothing is recorded then.
 # Task names are one template expression because the CIS ID must come first.
@@ -51,9 +52,9 @@
   ansible.builtin.copy:
     dest: "{{ cis_bn_path }}"
     content: "{{ cis_banner_text | trim }}\n"
-    owner: root
-    group: root
-    mode: "{{ '0644' if 'exists=no' in cis_bn_check.stdout_lines else omit }}"
+    owner: "{{ cis_banner_file_owner }}"
+    group: "{{ cis_banner_file_group }}"
+    mode: "{{ cis_banner_file_mode if 'exists=no' in cis_bn_check.stdout_lines else omit }}"
   when:
     - not (cis_audit_only | bool)
     - "'state=bad' in cis_bn_check.stdout_lines"

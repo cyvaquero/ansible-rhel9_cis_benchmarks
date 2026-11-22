@@ -1,9 +1,9 @@
 ---
 # 1.2.1.5 - dnf does not pull in weak dependencies. [main] in /etc/dnf/dnf.conf must set
-# install_weak_deps to a false value (0, false or no); a missing setting counts as off
-# because dnf's own default is on. The fix writes install_weak_deps=False. Remediate mode
-# records a finding when it is still not off after the fix; under --check nothing is
-# fixed, so nothing is recorded then.
+# install_weak_deps to a false value (0, false or no); a missing setting counts as off because
+# dnf's own default is on. The fix writes install_weak_deps from cis_dnf_install_weak_deps
+# (False by default). Remediate mode records a finding when it is still not off after the fix;
+# under --check nothing is fixed, so nothing is recorded then.
 
 - name: "1.2.1.5 - Check install_weak_deps in dnf.conf"
   ansible.builtin.command:
@@ -38,7 +38,7 @@
     path: /etc/dnf/dnf.conf
     section: main
     option: install_weak_deps
-    value: "False"
+    value: "{{ 'True' if cis_dnf_install_weak_deps | bool else 'False' }}"
     no_extra_spaces: true
     mode: "0644"
   failed_when: false

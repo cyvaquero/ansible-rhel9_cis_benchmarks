@@ -1,9 +1,10 @@
 ---
 # 1.3.1.2 - no boot entry turns SELinux off from the kernel command line. grubby reads and
 # edits the boot entries of every installed kernel (BLS entries on RHEL 9); the check counts
-# selinux=0 and enforcing=0 arguments in them. A grubby that cannot be read counts as not
-# compliant. The fix removes both arguments from all kernels. A running kernel started with
-# either argument stays that way until the next boot, so the control sets
+# SELinux-disabling arguments in them (cis_expect_selinux_forbidden_args: selinux=0 and
+# enforcing=0). A grubby that cannot be read counts as not compliant. The fix removes the
+# arguments in cis_selinux_remove_boot_args (both by default) from all kernels. A running
+# kernel started with either argument stays that way until the next boot, so the control sets
 # cis_reboot_required when /proc/cmdline still holds one and the boot entries are clean.
 # Remediate mode records a finding when the entries still hold an argument after the fix;
 # under --check nothing is fixed, so nothing is recorded then.
@@ -15,14 +16,17 @@
       - -c
       - |
         set -eu
-        grubby --info=ALL | awk '
+        grubby --info=ALL | awk -v list="$1" '
+        BEGIN { m = split(list, w, " "); for (j = 1; j <= m; j++) bad[w[j]] = 1 }
         /^args=/ {
           for (i = 1; i <= NF; i++) {
             a = $i; gsub(/^args="/, "", a); gsub(/"$/, "", a)
-            if (a == "selinux=0" || a == "enforcing=0") n++
+            if (a in bad) n++
           }
         }
         END { print n + 0 }'
+      - sh
+      - "{{ cis_expect_selinux_forbidden_args | join(' ') }}"
   register: cis_check_1_3_1_2
   changed_when: false
   check_mode: false
@@ -39,7 +43,13 @@
     argv:
       - /bin/sh
       - -c
-      - tr ' ' '\n' < /proc/cmdline | grep -Eqx 'selinux=0|enforcing=0'
+      - |
+        for a in $1; do
+          tr ' ' '\n' < /proc/cmdline | grep -Fqx -- "$a" && exit 0
+        done
+        exit 1
+      - sh
+      - "{{ cis_expect_selinux_forbidden_args | join(' ') }}"
   register: cis_check_1_3_1_2_running
   changed_when: false
   check_mode: false
@@ -53,11 +63,12 @@
       - grubby
       - --update-kernel=ALL
       - --remove-args
-      - selinux=0 enforcing=0
+      - "{{ cis_selinux_remove_boot_args | join(' ') }}"
   changed_when: true
   failed_when: false
   when:
     - not (cis_audit_only | bool)
+    - cis_selinux_remove_boot_args | length > 0
     - cis_check_1_3_1_2.rc == 0
     - cis_check_1_3_1_2.stdout | trim | int > 0
   tags: *cis_tags_1_3_1_2

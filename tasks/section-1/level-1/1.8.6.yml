@@ -1,7 +1,7 @@
 ---
 # 1.8.6 - XDMCP is not enabled in /etc/gdm/custom.conf.
 # Only when GDM is installed; without it the control is skipped with no finding.
-# Fix: sets Enable=false in [xdmcp].
+# Fix: sets Enable to cis_gdm_xdmcp_enable (false by default) in [xdmcp].
 # The logic, including the reboot flag, is shared in tasks/lib/gdm_custom.yml.
 
 - name: "1.8.6 - Ensure Enable is configured in /etc/gdm/custom.conf"
@@ -10,8 +10,8 @@
     cis_gc_id: "1.8.6"
     cis_gc_section: "xdmcp"
     cis_gc_key: "Enable"
-    cis_gc_bad: "true|1"
-    cis_gc_fix: "false"
+    cis_gc_bad: "{{ cis_expect_gdm_xdmcp_bad }}"
+    cis_gc_fix: "{{ cis_gdm_xdmcp_enable | bool | string | lower }}"
   when: "'gdm' in ansible_facts.packages"
   tags:
     - "1.8.6"

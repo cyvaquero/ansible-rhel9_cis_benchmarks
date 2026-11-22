@@ -3,7 +3,9 @@
 # this with:
 #   cis_cd_id     the CIS ID
 #   cis_cd_key    the option in the [Coredump] section
-#   cis_cd_value  the required value (compared without regard to case)
+#   cis_cd_value  the value the fix writes (a role variable)
+#   cis_cd_expect the value the check requires (compared without regard to case); default
+#                 cis_cd_value
 # and puts the tags on the import.
 #
 # The effective value is the last assignment in systemd-analyze cat-config of coredump.conf
@@ -36,7 +38,7 @@
 
 - name: "{{ cis_cd_id ~ ' - Work out whether ' ~ cis_cd_key ~ ' is compliant' }}"
   ansible.builtin.set_fact:
-    cis_cd_bad: "{{ (cis_cd_check.stdout | trim | regex_replace('^v=', '') | lower) != (cis_cd_value | lower) }}"
+    cis_cd_bad: "{{ (cis_cd_check.stdout | trim | regex_replace('^v=', '') | lower) != (cis_cd_expect | default(cis_cd_value) | lower) }}"
 
 - name: "{{ cis_cd_id ~ ' - Create the coredump.conf.d folder' }}"
   ansible.builtin.file:
@@ -80,6 +82,6 @@
   vars:
     cis_finding_id: "{{ cis_cd_id }}"
   when:
-    - (cis_cd_recheck.stdout | default(cis_cd_check.stdout) | trim | regex_replace('^v=', '') | lower) != (cis_cd_value | lower)
+    - (cis_cd_recheck.stdout | default(cis_cd_check.stdout) | trim | regex_replace('^v=', '') | lower) != (cis_cd_expect | default(cis_cd_value) | lower)
     - (cis_audit_only | bool) or not ansible_check_mode
 ...

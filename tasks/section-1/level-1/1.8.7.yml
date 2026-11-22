@@ -1,7 +1,8 @@
 ---
 # 1.8.7 - Wayland is not disabled in /etc/gdm/custom.conf.
 # Only when GDM is installed; without it the control is skipped with no finding.
-# Fix: removes WaylandEnable from [daemon] (GDM then uses its default).
+# Fix: cis_gdm_wayland_enable: absent (default) removes WaylandEnable from [daemon] (GDM then
+# uses its default); true sets it to true.
 # The logic, including the reboot flag, is shared in tasks/lib/gdm_custom.yml.
 
 - name: "1.8.7 - Ensure WaylandEnable is configured in /etc/gdm/custom.conf"
@@ -10,8 +11,8 @@
     cis_gc_id: "1.8.7"
     cis_gc_section: "daemon"
     cis_gc_key: "WaylandEnable"
-    cis_gc_bad: "false|0"
-    cis_gc_fix: "absent"
+    cis_gc_bad: "{{ cis_expect_gdm_wayland_bad }}"
+    cis_gc_fix: "{{ cis_gdm_wayland_enable | string | lower }}"
   when: "'gdm' in ansible_facts.packages"
   tags:
     - "1.8.7"

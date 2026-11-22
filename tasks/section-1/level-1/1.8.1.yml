@@ -12,9 +12,9 @@
     cis_dc_section: "org/gnome/login-screen"
     cis_dc_key: "banner-message-enable"
     cis_dc_kind: "eq"
-    cis_dc_a: "true"
+    cis_dc_a: "{{ cis_expect_gdm_banner_enable }}"
     cis_dc_b: ""
-    cis_dc_write: "true"
+    cis_dc_write: "{{ cis_gdm_banner_enable | bool | string | lower }}"
   when: "'gdm' in ansible_facts.packages"
   tags:
     - "1.8.1"
@@ -38,7 +38,8 @@
                 | replace(cis_dc_bs, cis_dc_bs ~ cis_dc_bs)
                 | replace("'", cis_dc_bs ~ "'")
                 | replace(cis_dc_nl, cis_dc_bs ~ "n")) ~ "'" }}
-    # A backslash and a newline for the escaping above: template string literals are not unescaped, so they are set here.
+    # A backslash and a newline for the escaping above: template string literals are not
+    # unescaped, so they are set here.
     cis_dc_bs: "\\"
     cis_dc_nl: "\n"
   when: "'gdm' in ansible_facts.packages"

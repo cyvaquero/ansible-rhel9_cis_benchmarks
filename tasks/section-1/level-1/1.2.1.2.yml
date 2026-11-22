@@ -1,13 +1,13 @@
 ---
-# 1.2.1.2 - package signature checking is on. [main] in /etc/dnf/dnf.conf must set
-# gpgcheck to a true value, and no repository file in /etc/yum.repos.d may turn it off for
-# a repository. The check prints "main" when dnf.conf does not, and one
-# "repo|<file>|<section>" line for each repository section with gpgcheck off. The fix sets
-# gpgcheck=1 in each of those places, except in redhat.repo: subscription-manager owns
-# that file and rewrites it, so an edit would not hold. A repository in redhat.repo with
-# gpgcheck off is therefore a finding in both modes and is never edited.
-# Remediate mode records a finding when anything else is still off after the fix; under
-# --check nothing is fixed, so nothing is recorded then.
+# 1.2.1.2 - package signature checking is on. [main] in /etc/dnf/dnf.conf must set gpgcheck to
+# a true value, and no repository file in /etc/yum.repos.d may turn it off for a repository
+# (the check always judges against that; the fix writes cis_dnf_gpgcheck). The check prints
+# "main" when dnf.conf does not, and one "repo|<file>|<section>" line for each repository
+# section with gpgcheck off. The fix sets gpgcheck=1 (cis_dnf_gpgcheck) in each of those
+# places, except in redhat.repo: subscription-manager owns that file and rewrites it, so an
+# edit would not hold. A repository in redhat.repo with gpgcheck off is therefore a finding in
+# both modes and is never edited. Remediate mode records a finding when anything else is still
+# off after the fix; under --check nothing is fixed, so nothing is recorded then.
 
 - name: "1.2.1.2 - Check gpgcheck in dnf.conf and the repository files"
   ansible.builtin.command:
@@ -67,7 +67,7 @@
     path: /etc/dnf/dnf.conf
     section: main
     option: gpgcheck
-    value: "1"
+    value: "{{ '1' if cis_dnf_gpgcheck | bool else '0' }}"
     no_extra_spaces: true
     mode: "0644"
   failed_when: false
@@ -81,7 +81,7 @@
     path: "{{ item[1] }}"
     section: "{{ item[2] }}"
     option: gpgcheck
-    value: "1"
+    value: "{{ '1' if cis_dnf_gpgcheck | bool else '0' }}"
     no_extra_spaces: true
     mode: "0644"
   failed_when: false

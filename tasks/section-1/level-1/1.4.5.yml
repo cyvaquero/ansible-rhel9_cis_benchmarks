@@ -1,15 +1,15 @@
 ---
-# 1.4.5 - systemd cannot be told to ask before starting each service at boot. Two places
-# can do that: a systemd.confirm_spawn argument on a boot entry, and ConfirmSpawn set to a
-# true value in /etc/systemd/system.conf or /etc/systemd/system.conf.d. The check lists
-# the distinct arguments from grubby (BLS entries on RHEL 9) as "arg|<token>" and the
-# configuration files as "conf|<file>". The fix removes exactly those arguments with
-# grubby (which also keeps /etc/default/grub in line) and sets ConfirmSpawn=no in each
-# file. A running kernel that still has the argument stays that way until the next boot, so
-# the control sets cis_reboot_required when /proc/cmdline holds it and the entries are clean.
-# The configuration files take effect at the next boot or daemon-reexec, which the role
-# does not run.
-# Remediate mode records a finding when the entries or files are still not clean after
+# 1.4.5 - systemd cannot be told to ask before starting each service at boot. Two places can
+# do that: a systemd.confirm_spawn argument on a boot entry, and ConfirmSpawn set to a true
+# value in /etc/systemd/system.conf or /etc/systemd/system.conf.d. The check lists the
+# distinct arguments from grubby (BLS entries on RHEL 9) as "arg|<token>" and the
+# configuration files as "conf|<file>". The fix removes exactly those arguments with grubby
+# (which also keeps /etc/default/grub in line; only when cis_remove_confirm_spawn_boot_arg is
+# true) and sets ConfirmSpawn to cis_systemd_confirm_spawn (no by default) in each file. A
+# running kernel that still has the argument stays that way until the next boot, so the
+# control sets cis_reboot_required when /proc/cmdline holds it and the entries are clean. The
+# configuration files take effect at the next boot or daemon-reexec, which the role does not
+# run. Remediate mode records a finding when the entries or files are still not clean after
 # the fix (the entries are read again after grubby); under --check nothing is fixed, so
 # nothing is recorded then.
 
@@ -71,6 +71,7 @@
   failed_when: false
   when:
     - not (cis_audit_only | bool)
+    - cis_remove_confirm_spawn_boot_arg | bool
     - cis_check_1_4_5.stdout_lines | select('match', '^arg[|]') | list | length > 0
   tags: *cis_tags_1_4_5
 
@@ -78,7 +79,7 @@
   ansible.builtin.replace:
     path: "{{ item | regex_replace('^conf[|]', '') }}"
     regexp: '^([ \t]*ConfirmSpawn[ \t]*=[ \t]*)(?i:yes|true|1|on)([ \t]*)$'
-    replace: '\1no\2'
+    replace: '\1{{ "yes" if cis_systemd_confirm_spawn | bool else "no" }}\2'
   loop: "{{ cis_check_1_4_5.stdout_lines | select('match', '^conf[|]') | list }}"
   failed_when: false
   when: not (cis_audit_only | bool)

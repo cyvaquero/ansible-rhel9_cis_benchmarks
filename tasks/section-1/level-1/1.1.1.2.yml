@@ -6,6 +6,7 @@
   vars:
     cis_km_id: "1.1.1.2"
     cis_km_module: "freevxfs"
+    cis_km_fix: "{{ cis_module_freevxfs_blocked }}"
   tags:
     - "1.1.1.2"
     - section-1

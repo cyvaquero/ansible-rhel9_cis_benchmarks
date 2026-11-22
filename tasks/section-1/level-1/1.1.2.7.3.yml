@@ -7,6 +7,7 @@
     cis_mo_id: "1.1.2.7.3"
     cis_mo_path: "/var/log/audit"
     cis_mo_option: "nosuid"
+    cis_mo_options: "{{ cis_var_log_audit_mount_options }}"
   tags:
     - "1.1.2.7.3"
     - section-1

@@ -7,7 +7,7 @@
   ansible.builtin.import_tasks: ../../lib/banner_access.yml
   vars:
     cis_ba_id: "1.7.4"
-    cis_ba_path: "/etc/motd"
+    cis_ba_path: "{{ cis_motd_path }}"
   tags:
     - "1.7.4"
     - section-1

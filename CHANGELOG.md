@@ -8,6 +8,25 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.32]
+
+### Changed
+
+- Section 1: every value a control writes or expects now comes from an overridable role variable
+  whose default is the benchmark value (`defaults/main.yml`, grouped by control ID). New variables
+  cover the kernel modules (`cis_module_<name>_blocked`), `/tmp` mounting and the mount options of
+  each mount point, `gpgcheck` and weak dependencies, whether `libselinux`, `mcstrans` and
+  `setroubleshoot` are installed, the SELinux policy, mode and boot arguments, the boot loader file
+  owner, group and mode and the `/boot/efi` options, the rescue and emergency commands,
+  `ConfirmSpawn`, the sysctl values of 1.5.1 to 1.5.7, the core file limit, the coredump settings,
+  the crypto policy base, modules and removed algorithms, the banner paths, owner, group and mode,
+  and the GDM values. Overriding a value changes what the role writes; the checks still judge the
+  benchmark value, now kept as `cis_expect_*` constants in `vars/main.yml`, so a weaker value is
+  written and reported as a finding. With default values nothing changes. Preflight validates only
+  the type and format of the new variables. The README has an "Overriding values" section and a
+  table per group of controls. The shared `tasks/lib/` helpers take the new inputs as optional
+  parameters, so sections 2 to 5 behave as before. Part of #58 (sections 2 to 5 follow).
+
 ## [3.0.0_0.0.31]
 
 ### Added

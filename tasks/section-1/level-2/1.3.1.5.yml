@@ -1,25 +1,25 @@
 ---
-# 1.3.1.5 - SELinux is enforcing, both in /etc/selinux/config and at runtime. The state
-# comes from the shared read in tasks/section-1/level-1.yml (cis_selinux_*), which 1.3.1.4
-# (Level 1) keeps current, so the two never undo each other: this control only raises the
-# mode. ansible.posix.selinux sets the configuration and switches a running SELinux to
-# enforcing at once. A host that is not running SELinux cannot be switched: it must boot
-# once, with the relabeling that 1.3.1.4 requests, before enforcing is safe. Until then
-# this control changes nothing there, sets cis_reboot_required when the configuration is
-# already on, and stays a finding unless the configuration already says enforcing. Run the
-# role again after that reboot to raise the mode.
-# Remediate mode records a finding when it is still not enforcing after the fix; under
-# --check nothing is fixed, so nothing is recorded then.
+# 1.3.1.5 - SELinux is enforcing, both in /etc/selinux/config and at runtime (the check always
+# judges cis_expect_selinux_mode; the fix sets cis_selinux_target_mode, enforcing by default).
+# The state comes from the shared read in tasks/section-1/level-1.yml (cis_selinux_*), which
+# 1.3.1.4 (Level 1) keeps current, so the two never undo each other: this control only raises
+# the mode. ansible.posix.selinux sets the configuration and switches a running SELinux to
+# enforcing at once. A host that is not running SELinux cannot be switched: it must boot once,
+# with the relabeling that 1.3.1.4 requests, before enforcing is safe. Until then this control
+# changes nothing there, sets cis_reboot_required when the configuration is already on, and
+# stays a finding unless the configuration already says enforcing. Run the role again after
+# that reboot to raise the mode. Remediate mode records a finding when it is still not
+# enforcing after the fix; under --check nothing is fixed, so nothing is recorded then.
 
 - name: "1.3.1.5 - Set SELinux to enforcing"
   ansible.posix.selinux:
-    state: enforcing
-    policy: "{{ cis_selinux_type if cis_selinux_type != '' else 'targeted' }}"
+    state: "{{ cis_selinux_target_mode }}"
+    policy: "{{ cis_selinux_type if cis_selinux_type != '' else cis_selinux_policy }}"
   failed_when: false
   when:
     - not (cis_audit_only | bool)
     - cis_selinux_runtime != 'disabled'
-    - cis_selinux_mode != 'enforcing' or cis_selinux_runtime != 'enforcing'
+    - cis_selinux_mode != cis_selinux_target_mode or cis_selinux_runtime != cis_selinux_target_mode
   tags: &cis_tags_1_3_1_5
     - "1.3.1.5"
     - section-1
@@ -53,7 +53,7 @@
     - not (cis_audit_only | bool)
     - not ansible_check_mode
     - cis_selinux_runtime != 'disabled'
-    - cis_selinux_mode != 'enforcing' or cis_selinux_runtime != 'enforcing'
+    - cis_selinux_mode != cis_selinux_target_mode or cis_selinux_runtime != cis_selinux_target_mode
   tags: *cis_tags_1_3_1_5
 
 - name: "1.3.1.5 - Keep the SELinux state facts current"
@@ -68,7 +68,7 @@
     cis_reboot_required: true
   when:
     - cis_selinux_runtime == 'disabled'
-    - cis_selinux_mode == 'enforcing'
+    - cis_selinux_mode == cis_expect_selinux_mode
   tags: *cis_tags_1_3_1_5
 
 - name: "1.3.1.5 - Report that enforcing starts at the next reboot"
@@ -76,7 +76,7 @@
     msg: "A reboot is pending: SELinux is configured as enforcing and starts at the next boot."
   when:
     - cis_selinux_runtime == 'disabled'
-    - cis_selinux_mode == 'enforcing'
+    - cis_selinux_mode == cis_expect_selinux_mode
   tags: *cis_tags_1_3_1_5
 
 # Under --check the fix does not happen, so remediate mode records nothing then.
@@ -85,7 +85,7 @@
   vars:
     cis_finding_id: "1.3.1.5"
   when:
-    - cis_selinux_mode != 'enforcing' or cis_selinux_runtime not in ['enforcing', 'disabled']
+    - cis_selinux_mode != cis_expect_selinux_mode or cis_selinux_runtime not in [cis_expect_selinux_mode, 'disabled']
     - (cis_audit_only | bool) or not ansible_check_mode
   tags: *cis_tags_1_3_1_5
 ...

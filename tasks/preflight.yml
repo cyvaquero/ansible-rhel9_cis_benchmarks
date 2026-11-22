@@ -339,6 +339,161 @@
     - always
     - preflight
 
+# Section 1 override variables (defaults/main.yml). Only the type and format are checked, never
+# the benchmark bounds: a site may choose a weaker value, which the role writes and the check
+# still reports (see README, "Overriding values").
+- name: "Preflight - Validate the section 1 yes/no values"
+  ansible.builtin.assert:
+    that:
+      - vars[item] is boolean or (vars[item] | string | lower) in ['true', 'false']
+    fail_msg: "{{ item }} must be true or false (got {{ vars[item] | to_json }})."
+    quiet: true
+  loop:
+    - cis_module_cramfs_blocked
+    - cis_module_freevxfs_blocked
+    - cis_module_hfs_blocked
+    - cis_module_hfsplus_blocked
+    - cis_module_jffs2_blocked
+    - cis_module_overlay_blocked
+    - cis_module_squashfs_blocked
+    - cis_module_udf_blocked
+    - cis_module_firewire_core_blocked
+    - cis_module_usb_storage_blocked
+    - cis_tmp_mount_enabled
+    - cis_dnf_gpgcheck
+    - cis_dnf_install_weak_deps
+    - cis_libselinux_installed
+    - cis_mcstrans_installed
+    - cis_setroubleshoot_installed
+    - cis_systemd_confirm_spawn
+    - cis_remove_confirm_spawn_boot_arg
+    - cis_gdm_banner_enable
+    - cis_gdm_disable_user_list
+    - cis_gdm_automount
+    - cis_gdm_automount_open
+    - cis_gdm_autorun_never
+    - cis_gdm_xdmcp_enable
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Validate the section 1 whole numbers"
+  ansible.builtin.assert:
+    that:
+      - vars[item] is not boolean
+      - vars[item] | string is match('^[0-9]+$')
+    fail_msg: "{{ item }} must be a whole number of 0 or more (got {{ vars[item] | to_json }})."
+    quiet: true
+  loop:
+    - cis_bootloader_efi_uid
+    - cis_bootloader_efi_gid
+    - cis_sysctl_fs_protected_hardlinks
+    - cis_sysctl_fs_protected_symlinks
+    - cis_sysctl_fs_suid_dumpable
+    - cis_sysctl_kernel_dmesg_restrict
+    - cis_sysctl_kernel_kptr_restrict
+    - cis_sysctl_kernel_randomize_va_space
+    - cis_sysctl_kernel_yama_ptrace_scope
+    - cis_core_hard_limit
+    - cis_gdm_idle_delay
+    - cis_gdm_lock_delay
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Validate the section 1 file modes"
+  ansible.builtin.assert:
+    that:
+      - vars[item] is string
+      - vars[item] is match('^0?[0-7]{3,4}$')
+    fail_msg: >-
+      {{ item }} must be a quoted string of three or four octal digits, for example "0600"
+      (got {{ vars[item] | to_json }}).
+    quiet: true
+  loop:
+    - cis_bootloader_file_mode
+    - cis_bootloader_efi_umask
+    - cis_banner_file_mode
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Validate the section 1 names, paths and choices"
+  ansible.builtin.assert:
+    that:
+      - vars[item.key] is string
+      - (vars[item.key] | lower) is match(item.pattern)
+    fail_msg: "{{ item.key }} must be {{ item.what }} (got {{ vars[item.key] | to_json }})."
+    quiet: true
+  loop:
+    - {key: cis_bootloader_file_owner, pattern: '^[a-z_][a-z0-9_.-]*[$]?$', what: a plain account name}
+    - {key: cis_bootloader_file_group, pattern: '^[a-z_][a-z0-9_.-]*[$]?$', what: a plain group name}
+    - {key: cis_banner_file_owner, pattern: '^[a-z_][a-z0-9_.-]*[$]?$', what: a plain account name}
+    - {key: cis_banner_file_group, pattern: '^[a-z_][a-z0-9_.-]*[$]?$', what: a plain group name}
+    - {key: cis_motd_path, pattern: '^/[a-z0-9_./-]+$', what: an absolute path of letters, digits, underscore, dot, hyphen and slash}
+    - {key: cis_issue_path, pattern: '^/[a-z0-9_./-]+$', what: an absolute path of letters, digits, underscore, dot, hyphen and slash}
+    - {key: cis_issue_net_path, pattern: '^/[a-z0-9_./-]+$', what: an absolute path of letters, digits, underscore, dot, hyphen and slash}
+    - {key: cis_selinux_policy, pattern: '^[a-z0-9_-]+$', what: a policy name of letters, digits, underscore and hyphen}
+    - {key: cis_selinux_target_mode, pattern: '^(enforcing|permissive|disabled)$', what: enforcing, permissive or disabled}
+    - {key: cis_coredump_process_size_max, pattern: '^([0-9]+[kmgtpe]?|infinity)$', what: a whole number with an optional K, M, G, T, P or E suffix}
+    - {key: cis_coredump_storage, pattern: '^(none|external|journal)$', what: none, external or journal}
+    - {key: cis_crypto_policy_base, pattern: '^[a-z0-9_-]+$', what: a policy name of letters, digits, underscore and hyphen}
+    - {key: cis_crypto_policy_module_sha1, pattern: '^[a-z0-9_-]+$', what: a policy module name of letters, digits, underscore and hyphen}
+    - {key: cis_crypto_policy_module_mac, pattern: '^[a-z0-9_-]+$', what: a policy module name of letters, digits, underscore and hyphen}
+    - {key: cis_crypto_policy_module_sshcbc, pattern: '^[a-z0-9_-]+$', what: a policy module name of letters, digits, underscore and hyphen}
+    - {key: cis_crypto_policy_module_pq, pattern: '^[a-z0-9_-]+$', what: a policy module name of letters, digits, underscore and hyphen}
+    - {key: cis_rescue_exec_start, pattern: '^[^ ].*$', what: a one-line ExecStart value}
+    - {key: cis_emergency_exec_start, pattern: '^[^ ].*$', what: a one-line ExecStart value}
+  loop_control:
+    label: "{{ item.key }}"
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Validate cis_banner_text"
+  ansible.builtin.assert:
+    that:
+      - cis_banner_text is string
+      - cis_banner_text | trim | length > 0
+    fail_msg: "cis_banner_text must be text that is not empty (got {{ cis_banner_text | to_json }})."
+    quiet: true
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Validate cis_gdm_wayland_enable"
+  ansible.builtin.assert:
+    that:
+      - (cis_gdm_wayland_enable | string | lower) in ['absent', 'true', 'false']
+    fail_msg: "cis_gdm_wayland_enable must be absent, true or false (got {{ cis_gdm_wayland_enable | to_json }})."
+    quiet: true
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Validate the section 1 lists"
+  ansible.builtin.assert:
+    that:
+      - vars[item] is sequence and vars[item] is not string and vars[item] is not mapping
+      - vars[item] | reject('string') | list | length == 0
+      - vars[item] | reject('regex', '^[^ ]+$') | list | length == 0
+    fail_msg: "{{ item }} must be a list of strings without spaces (got {{ vars[item] | to_json }})."
+    quiet: true
+  loop:
+    - cis_tmp_mount_options
+    - cis_dev_shm_mount_options
+    - cis_home_mount_options
+    - cis_var_mount_options
+    - cis_var_tmp_mount_options
+    - cis_var_log_mount_options
+    - cis_var_log_audit_mount_options
+    - cis_selinux_remove_boot_args
+    - cis_crypto_policy_mac_excluded
+    - cis_crypto_policy_ssh_ciphers_excluded
+  tags:
+    - always
+    - preflight
+
 - name: "Preflight - Compute the selected controls"
   ansible.builtin.set_fact:
     # The single list every control task or include tests with

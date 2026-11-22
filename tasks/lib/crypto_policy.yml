@@ -6,7 +6,9 @@
 #   cis_cp_module      the policy module that fixes it: a shipped one (NO-SHA1, PQ) or the
 #                      role's own (CIS-NO-WEAKMAC, CIS-NO-SSHCBC); empty for legacy
 #   cis_cp_pmod_body   the text of the role's own module, or empty for a shipped one
-#   cis_cp_drop_legacy true to replace a LEGACY base with DEFAULT (1.6.1 only)
+#   cis_cp_drop_legacy true to replace a forbidden base (cis_expect_crypto_policy_forbidden_base,
+#                      LEGACY) with cis_cp_base (1.6.1 only)
+#   cis_cp_base        optional, default DEFAULT: the base policy that replaces the forbidden one
 # and puts the tags on the import.
 #
 # Compliance is judged on the effective policy, /etc/crypto-policies/state/CURRENT.pol, and for
@@ -33,6 +35,7 @@
         set -u
         kind=$1
         mod=$2
+        forbidden=$3
         pol=/etc/crypto-policies/state/CURRENT.pol
         show=$(update-crypto-policies --show 2>/dev/null | head -n 1)
         printf 'show=%s\n' "$show"
@@ -50,7 +53,7 @@
         bad=0
         if [ "$kind" = legacy ]; then
           base=$(printf '%s' "${show%%:*}" | tr '[:lower:]' '[:upper:]')
-          [ "$base" = LEGACY ] && bad=1
+          [ "$base" = "$(printf '%s' "$forbidden" | tr '[:lower:]' '[:upper:]')" ] && bad=1
         fi
         if [ "$kind" != legacy ]; then
           bad=$(awk -v kind="$kind" '
@@ -91,6 +94,7 @@
       - bash
       - "{{ cis_cp_kind }}"
       - "{{ cis_cp_module }}"
+      - "{{ cis_expect_crypto_policy_forbidden_base }}"
   register: cis_cp_check
   changed_when: false
   check_mode: false
@@ -132,7 +136,9 @@
 - name: "{{ cis_cp_id ~ ' - Work out the new crypto policy string' }}"
   ansible.builtin.set_fact:
     cis_cp_new: >-
-      {{ ([('DEFAULT' if (cis_cp_drop_legacy | default(false) | bool) and cis_cp_show.split(':')[0] | upper == 'LEGACY'
+      {{ ([(cis_cp_base | default('DEFAULT')
+            if (cis_cp_drop_legacy | default(false) | bool)
+               and cis_cp_show.split(':')[0] | upper == cis_expect_crypto_policy_forbidden_base | upper
             else cis_cp_show.split(':')[0])]
           + cis_cp_show.split(':')[1:]
           + ([cis_cp_module]

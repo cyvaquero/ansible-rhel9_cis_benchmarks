@@ -7,6 +7,7 @@
     cis_mo_id: "1.1.2.2.3"
     cis_mo_path: "/dev/shm"
     cis_mo_option: "nosuid"
+    cis_mo_options: "{{ cis_dev_shm_mount_options }}"
     cis_mo_fstab_create:
       src: "tmpfs"
       fstype: "tmpfs"

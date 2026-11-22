@@ -9,7 +9,8 @@
 #   cis_dc_kind     how the effective value is judged: eq, nonempty or range
 #   cis_dc_a        eq: the required value as dconf prints it ("true"); range: the minimum
 #   cis_dc_b        range: the maximum
-#   cis_dc_write    the value the fix writes, as GVariant text (true, uint32 900, 'text')
+#                   (a and b are benchmark constants, cis_expect_gdm_*)
+#   cis_dc_write    the value the fix writes (a role variable), as GVariant text (true, uint32 900, 'text')
 # and puts the tags and a gdm-installed condition on the import.
 #
 # The effective value is read from the compiled databases with dconf read, under the profile

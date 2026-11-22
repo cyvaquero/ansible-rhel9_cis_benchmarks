@@ -4,7 +4,7 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.31).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.32).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and these controls are implemented:
 
 - kernel modules, 1.1.1.1 to 1.1.1.11;
@@ -80,7 +80,9 @@ example `cis_rhel_minor_release | int >= 4`.
 It then validates the selection variables below and fails with a clear message on an
 invalid `cis_profile`, a `cis_apply_level_2`, `cis_audit_only` or `cis_fail_on_findings`
 that is not true or false, a `cis_firewalld_zone_target` other than `default`, `REJECT` or
-`DROP`, or a CIS ID in `cis_exclusions` that is not in the benchmark.
+`DROP`, or a CIS ID in `cis_exclusions` that is not in the benchmark. The section 1 variables
+below are checked for type and format only (a yes/no value, a whole number, a quoted octal mode,
+a name, a path, a list), never against the benchmark's bounds; see "Overriding values".
 
 ## Usage (planned)
 
@@ -126,19 +128,84 @@ ansible-playbook -i inventory site.yml -e target=webservers
 - Tags: run a section, level or single control, for example `-t section-5` or
   `-t 5.1.21`.
 
-### Boot loader password (1.4.1)
+### Overriding values
+
+Every value a control writes or expects comes from a role variable whose default is the
+benchmark value; the variables for section 1 are listed below, and each has a comment in
+`defaults/main.yml`. Set one at any Ansible precedence level above the role defaults:
+inventory or `group_vars` / `host_vars`, play `vars`, role parameters, `set_fact` and `-e`.
+Do not edit the role's own files.
+
+```yaml
+roles:
+  - role: rhel9_cis_benchmarks
+    vars:
+      cis_sysctl_kernel_kptr_restrict: 2
+      cis_tmp_mount_options: [nodev, nosuid]
+      cis_libselinux_installed: true
+```
+
+- The role writes your value. The checks always judge against the benchmark value (constants in
+  `vars/main.yml`, named `cis_expect_*`, which are not meant to be overridden). A stricter value
+  than the benchmark's passes and is kept. A weaker one is written and the control still
+  reports a finding, in remediate and audit mode; a site that accepts the weaker value lists the
+  control in `cis_exclusions`.
+- For a package, the variable is whether it should be installed: the role installs or removes
+  the package to match it, and the control reports a finding while the host differs from the
+  benchmark.
+- Preflight checks only the type and format of each value (a yes/no value, a whole number, a
+  quoted octal mode such as `"0640"`, a name, a path, a list) and stops the run on anything
+  else. Quote file modes: an unquoted `0600` is a number in YAML. Values passed with `-e` are
+  strings; use JSON (`-e '{"cis_tmp_mount_options": ["nodev"]}'`) for lists.
+
+### Kernel modules, mounts, package manager and SELinux (1.1 to 1.3)
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `cis_grub_password_hash` | `""` | A `grub.pbkdf2.sha512...` hash from `grub2-mkpasswd-pbkdf2`. Empty: 1.4.1 only reports a missing boot loader password and changes nothing. Set: the role writes it to `/boot/grub2/user.cfg` (mode 0600). The hash is a secret: keep it in Ansible Vault. A value that is not in the hash format is a finding and is not written. |
+| `cis_module_<name>_blocked` | `true` | 1.1.1.1 to 1.1.1.10: whether the role blocks (install line to `/bin/false` plus blacklist) and unloads the module. `<name>` is `cramfs`, `freevxfs`, `hfs`, `hfsplus`, `jffs2`, `overlay`, `squashfs`, `udf`, `firewire_core` or `usb_storage`. `false` leaves the module alone and the control still reports it. |
+| `cis_tmp_mount_enabled` | `true` | 1.1.2.1.1: enable `tmp.mount` (for the next boot) when `/tmp` is not a mount point. |
+| `cis_tmp_mount_options`, `cis_dev_shm_mount_options`, `cis_home_mount_options`, `cis_var_mount_options`, `cis_var_tmp_mount_options`, `cis_var_log_mount_options`, `cis_var_log_audit_mount_options` | `/tmp`, `/dev/shm`, `/var/tmp`, `/var/log`, `/var/log/audit`: `[nodev, nosuid, noexec]`; `/home`, `/var`: `[nodev, nosuid]` | 1.1.2.x.2 to 1.1.2.x.4: the options the role adds to that mount point. An option left out of the list is not added by its control, which then reports a finding while the mount lacks it. |
+| `cis_dnf_gpgcheck` | `true` | 1.2.1.2: the `gpgcheck` value written to `dnf.conf` and to each repository file (except `redhat.repo`) where it is off. |
+| `cis_dnf_install_weak_deps` | `false` | 1.2.1.5 (Level 2): the `install_weak_deps` value written to `dnf.conf`. |
+| `cis_libselinux_installed` | `true` | 1.3.1.1: whether `libselinux` should be installed. `false` removes it; leave it `true` unless the host does not need SELinux tooling. |
+| `cis_selinux_remove_boot_args` | `["selinux=0", "enforcing=0"]` | 1.3.1.2: the kernel arguments removed from every boot entry. |
+| `cis_selinux_policy` | `targeted` | 1.3.1.3: the `SELINUXTYPE` written to `/etc/selinux/config`; the policy must be installed. |
+| `cis_selinux_target_mode` | `enforcing` | 1.3.1.5 (Level 2): the SELinux mode set in the configuration and at runtime (`enforcing`, `permissive` or `disabled`). |
+| `cis_mcstrans_installed` | `false` | 1.3.1.7: whether `mcstrans` should be installed. |
+| `cis_setroubleshoot_installed` | `false` | 1.3.1.8 (Server profile): whether `setroubleshoot` and `setroubleshoot-server` should be installed. |
+
+### Boot loader, kernel and crypto policy (1.4 to 1.6)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `cis_grub_password_hash` | `""` | 1.4.1: a `grub.pbkdf2.sha512...` hash from `grub2-mkpasswd-pbkdf2`. Empty: 1.4.1 only reports a missing boot loader password and changes nothing. Set: the role writes it to `/boot/grub2/user.cfg`. The hash is a secret: keep it in Ansible Vault. A value that is not in the hash format is a finding and is not written. |
+| `cis_bootloader_file_owner`, `cis_bootloader_file_group`, `cis_bootloader_file_mode` | `root`, `root`, `"0600"` | 1.4.1, 1.4.2: the owner, group and mode set on `user.cfg` and on `grub.cfg`, `grubenv` and `user.cfg`. |
+| `cis_bootloader_efi_uid`, `cis_bootloader_efi_gid`, `cis_bootloader_efi_umask` | `0`, `0`, `"0077"` | 1.4.2: the `uid`, `gid` and `umask` options set on the `/boot/efi` vfat fstab entry. |
+| `cis_rescue_exec_start`, `cis_emergency_exec_start` | `-/usr/lib/systemd/systemd-sulogin-shell rescue` and `... emergency` | 1.4.3, 1.4.4 (Level 2): the `ExecStart` written in the drop-in of `rescue.service` and `emergency.service`. |
+| `cis_systemd_confirm_spawn` | `false` | 1.4.5: the `ConfirmSpawn` value written where it is on. |
+| `cis_remove_confirm_spawn_boot_arg` | `true` | 1.4.5: whether `systemd.confirm_spawn` is removed from the boot entries. |
+| `cis_sysctl_fs_protected_hardlinks`, `cis_sysctl_fs_protected_symlinks`, `cis_sysctl_fs_suid_dumpable`, `cis_sysctl_kernel_dmesg_restrict`, `cis_sysctl_kernel_kptr_restrict`, `cis_sysctl_kernel_randomize_va_space`, `cis_sysctl_kernel_yama_ptrace_scope` | `1`, `1`, `0`, `1`, `1`, `2`, `1` | 1.5.1 to 1.5.7: the value written to `/etc/sysctl.d/99-zz-cis-benchmarks.conf` and set live when the configured value is not accepted. |
+| `cis_core_hard_limit` | `0` | 1.5.8: the `* hard core` value written to the role's `limits.d` file. |
+| `cis_coredump_process_size_max`, `cis_coredump_storage` | `"0"`, `none` | 1.5.9, 1.5.10: the `ProcessSizeMax` and `Storage` written to the role's `coredump.conf.d` drop-in. |
+| `cis_crypto_policy_base` | `DEFAULT` | 1.6.1: the base policy that replaces `LEGACY`. |
+| `cis_crypto_policy_module_sha1`, `cis_crypto_policy_module_pq` | `NO-SHA1`, `PQ` | 1.6.2, 1.6.7 (Level 2): the shipped policy module appended to the policy. |
+| `cis_crypto_policy_module_mac`, `cis_crypto_policy_mac_excluded` | `CIS-NO-WEAKMAC`, `["*-64", "*-MD5"]` | 1.6.3: the role's own module and the MAC patterns it removes. |
+| `cis_crypto_policy_module_sshcbc`, `cis_crypto_policy_ssh_ciphers_excluded` | `CIS-NO-SSHCBC`, `["*-CBC"]` | 1.6.4: the role's own module and the SSH cipher patterns it removes. |
 
 ### Banners and GDM (1.7, 1.8)
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `cis_banner_text` | a short notice that the computer is for approved users and use may be logged | The text 1.7.1 to 1.7.3 write to `/etc/motd`, `/etc/issue` and `/etc/issue.net`, and 1.8.1 sets as the GDM login banner, when the current content is not compliant. Keep it free of the escapes `\m`, `\r`, `\s`, `\v` and of the operating system name, or the controls cannot pass. |
-| `cis_gdm_idle_delay` | `900` | 1.8.3: the longest idle time in seconds before the GDM session blanks. Any idle-delay from 1 to this value is accepted (0, never, is not); the role sets this value otherwise. |
-| `cis_gdm_lock_delay` | `5` | 1.8.3: the longest delay in seconds between blanking and locking. Any lock-delay from 0 to this value is accepted; the role sets this value otherwise. |
+| `cis_motd_path`, `cis_issue_path`, `cis_issue_net_path` | `/etc/motd`, `/etc/issue`, `/etc/issue.net` | 1.7.1 to 1.7.6: the banner files. |
+| `cis_banner_text` | a short notice that the computer is for approved users and use may be logged | The text 1.7.1 to 1.7.3 write to the three banner files, and 1.8.1 sets as the GDM login banner, when the current content is not compliant. Keep it free of the escapes `\m`, `\r`, `\s`, `\v` and of the operating system name, or the controls cannot pass. |
+| `cis_banner_file_owner`, `cis_banner_file_group`, `cis_banner_file_mode` | `root`, `root`, `"0644"` | 1.7.1 to 1.7.6: the owner, group and mode of a new banner file; 1.7.4 to 1.7.6 set the owner and group and remove the permissions the mode lacks (a stricter mode stays). |
+| `cis_gdm_banner_enable`, `cis_gdm_disable_user_list` | `true`, `true` | 1.8.1, 1.8.2: the `banner-message-enable` and `disable-user-list` values. |
+| `cis_gdm_idle_delay` | `900` | 1.8.3: the idle time in seconds the role writes when the configured one is not accepted. The check accepts 1 to 900 (0, never, is not). |
+| `cis_gdm_lock_delay` | `5` | 1.8.3: the lock delay in seconds the role writes when the configured one is not accepted. The check accepts 0 to 5. |
+| `cis_gdm_automount`, `cis_gdm_automount_open` | `false`, `false` | 1.8.4: the `automount` and `automount-open` values. |
+| `cis_gdm_autorun_never` | `true` | 1.8.5: the `autorun-never` value. |
+| `cis_gdm_xdmcp_enable` | `false` | 1.8.6: the `Enable` value written in `[xdmcp]` when it is true or 1. |
+| `cis_gdm_wayland_enable` | `absent` | 1.8.7: `absent` removes a `WaylandEnable` of false or 0 from `[daemon]`; `true` sets it to true. |
 
 ### Services (2.1.1 to 2.1.22 and 3.1.3)
 
@@ -250,15 +317,17 @@ Values outside these ranges stop the run at preflight.
   summary prints `Reboot required`. The variable defaults to `false` and is an output:
   read it after the role runs (for example to schedule a reboot) rather than setting it.
   Audit mode sets it too, from the state it finds.
+- Section 1 values below are the defaults of the variables in the tables above; an override
+  changes what is written, and the check still judges the benchmark value ("Overriding values").
 - Mount controls (1.1.2): the `nodev`, `nosuid` and `noexec` controls act only when the
   mount exists, or for `/tmp`, will exist once `tmp.mount` is enabled. They add the option
   to `/etc/fstab` (adding a `/dev/shm` entry if there is none) or, for `/tmp` provided by
   `tmp.mount`, to a drop-in under `/etc/systemd/system/tmp.mount.d/`, and remount the live
   mount. The audit compares the live options. The separate-partition controls (1.1.2.x.1)
   only report.
-- Boot loader and kernel controls (1.4, 1.5): 1.4.2 sets 0600 root:root on `grub.cfg`,
-  `grubenv` and `user.cfg` (stricter modes stay) and, on UEFI hosts, makes sure the
-  `/boot/efi` fstab entry has `uid=0`, `gid=0` and `umask=0077`. 1.4.3 and 1.4.4 (Level 2)
+- Boot loader and kernel controls (1.4, 1.5): 1.4.2 sets 0600 root:root (`cis_bootloader_file_*`)
+  on `grub.cfg`, `grubenv` and `user.cfg` (stricter modes stay) and, on UEFI hosts, makes sure the
+  `/boot/efi` fstab entry has `uid=0`, `gid=0` and `umask=0077` (`cis_bootloader_efi_*`). 1.4.3 and 1.4.4 (Level 2)
   add a drop-in to `rescue.service` or `emergency.service` only when their effective
   command no longer asks for the root password. The sysctl controls (1.5.1 to 1.5.7,
   3.3.1 and 3.3.2) write `/etc/sysctl.d/99-zz-cis-benchmarks.conf`, named to sort after the vendor

@@ -1,9 +1,11 @@
 ---
 # 1.3.1.8 (Server profile only) - the setroubleshoot and setroubleshoot-server packages are
-# not installed. The check reads the package facts from preflight; the fix removes them
-# with dnf and reads the facts again to confirm.
-# Remediate mode records a finding when one is still installed after the fix; under
-# --check nothing is removed, so nothing is recorded then.
+# not installed. The check reads the package facts from preflight and always judges that they
+# are absent (cis_expect_setroubleshoot_installed); the fix brings both packages to the state
+# cis_setroubleshoot_installed asks for with dnf (remove by default, install when the site set
+# it to true) and reads the facts again to confirm.
+# Remediate mode records a finding when the state is still not the benchmark's after the fix;
+# under --check nothing is changed, so nothing is recorded then.
 
 - name: "1.3.1.8 - Remove the setroubleshoot packages"
   ansible.builtin.dnf:
@@ -14,12 +16,26 @@
     cis_state_1_3_1_8_installed: "{{ ['setroubleshoot', 'setroubleshoot-server'] | select('in', ansible_facts.packages) | list }}"
   when:
     - not (cis_audit_only | bool)
+    - not (cis_setroubleshoot_installed | bool)
     - cis_state_1_3_1_8_installed | length > 0
   tags: &cis_tags_1_3_1_8
     - "1.3.1.8"
     - section-1
     - level-1
     - server
+
+- name: "1.3.1.8 - Install the setroubleshoot packages"
+  ansible.builtin.dnf:
+    name: "{{ cis_state_1_3_1_8_missing }}"
+    state: present
+  failed_when: false
+  vars:
+    cis_state_1_3_1_8_missing: "{{ ['setroubleshoot', 'setroubleshoot-server'] | reject('in', ansible_facts.packages) | list }}"
+  when:
+    - not (cis_audit_only | bool)
+    - cis_setroubleshoot_installed | bool
+    - cis_state_1_3_1_8_missing | length > 0
+  tags: *cis_tags_1_3_1_8
 
 - name: "1.3.1.8 - Gather the installed packages again after the fix"
   ansible.builtin.package_facts:
@@ -29,7 +45,9 @@
   when:
     - not (cis_audit_only | bool)
     - not ansible_check_mode
-    - cis_state_1_3_1_8_installed | length > 0
+    - >-
+      (cis_state_1_3_1_8_installed | length > 0) != (cis_setroubleshoot_installed | bool)
+      or (cis_setroubleshoot_installed | bool and cis_state_1_3_1_8_installed | length < 2)
   tags: *cis_tags_1_3_1_8
 
 # Under --check the fix does not happen, so remediate mode records nothing then.
@@ -39,7 +57,9 @@
     cis_finding_id: "1.3.1.8"
     cis_state_1_3_1_8_installed: "{{ ['setroubleshoot', 'setroubleshoot-server'] | select('in', ansible_facts.packages) | list }}"
   when:
-    - cis_state_1_3_1_8_installed | length > 0
+    - >-
+      (cis_state_1_3_1_8_installed | length > 0) != (cis_expect_setroubleshoot_installed | bool)
+      or (cis_expect_setroubleshoot_installed | bool and cis_state_1_3_1_8_installed | length < 2)
     - (cis_audit_only | bool) or not ansible_check_mode
   tags: *cis_tags_1_3_1_8
 ...
