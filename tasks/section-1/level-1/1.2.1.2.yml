@@ -1,13 +1,16 @@
 ---
 # 1.2.1.2 - package signature checking is on. [main] in /etc/dnf/dnf.conf must set gpgcheck to
-# a true value, and no repository file in /etc/yum.repos.d may turn it off for a repository
-# (the check always judges against that; the fix writes cis_dnf_gpgcheck). The check prints
-# "main" when dnf.conf does not, and one "repo|<file>|<section>" line for each repository
-# section with gpgcheck off. The fix sets gpgcheck=1 (cis_dnf_gpgcheck) in each of those
-# places, except in redhat.repo: subscription-manager owns that file and rewrites it, so an
-# edit would not hold. A repository in redhat.repo with gpgcheck off is therefore a finding in
-# both modes and is never edited. Remediate mode records a finding when anything else is still
-# off after the fix; under --check nothing is fixed, so nothing is recorded then.
+# a true value, and no repository file in /etc/yum.repos.d may turn it off for a repository;
+# the check always judges that benchmark state. The fix makes the files match
+# cis_dnf_gpgcheck exactly: it writes the value to [main] and to every repository section that
+# sets gpgcheck to something else (also a stricter value than the benchmark's), except in
+# redhat.repo: subscription-manager owns that file and rewrites it, so an edit would not hold.
+# A repository in redhat.repo with gpgcheck off is therefore a finding in both modes and is
+# never edited. The check prints "main=<1, 0, ? or empty>" and one
+# "repo|<file>|<section>|<1, 0 or ?>" line for each repository section that sets gpgcheck.
+# Remediate mode records a finding when the benchmark state is still not met after the fix
+# (a site value that is weaker than the benchmark's ends here); under --check nothing is
+# fixed, so nothing is recorded then.
 
 - name: "1.2.1.2 - Check gpgcheck in dnf.conf and the repository files"
   ansible.builtin.command:
@@ -16,16 +19,27 @@
       - -c
       - |
         set -eu
-        awk '
-        function trim(s) { gsub(/^[ \t]+|[ \t\r]+$/, "", s); return s }
-        /^[ \t]*[#;]/ { next }
-        /^[ \t]*\[/ { sec = trim($0); sub(/^\[/, "", sec); sub(/\].*$/, "", sec); next }
-        sec == "main" && index($0, "=") {
-          i = index($0, "=")
-          k = trim(substr($0, 1, i - 1)); v = tolower(trim(substr($0, i + 1)))
-          if (k == "gpgcheck") ok = (v == "1" || v == "true" || v == "yes")
+        norm() {
+          case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+            1|true|yes) echo 1 ;;
+            0|false|no) echo 0 ;;
+            *) echo '?' ;;
+          esac
         }
-        END { if (!ok) print "main" }' /etc/dnf/dnf.conf 2>/dev/null || echo main
+        main=
+        if [ -r /etc/dnf/dnf.conf ]; then
+          raw=$(awk '
+          function trim(s) { gsub(/^[ \t]+|[ \t\r]+$/, "", s); return s }
+          /^[ \t]*[#;]/ { next }
+          /^[ \t]*\[/ { sec = trim($0); sub(/^\[/, "", sec); sub(/\].*$/, "", sec); next }
+          sec == "main" && index($0, "=") {
+            i = index($0, "=")
+            if (trim(substr($0, 1, i - 1)) == "gpgcheck") { v = trim(substr($0, i + 1)); set = 1 }
+          }
+          END { if (set) print v }' /etc/dnf/dnf.conf)
+          [ -n "$raw" ] && main=$(norm "$raw")
+        fi
+        echo "main=$main"
         for f in /etc/yum.repos.d/*.repo; do
           [ -f "$f" ] || continue
           awk -v f="$f" '
@@ -34,9 +48,10 @@
           /^[ \t]*\[/ { sec = trim($0); sub(/^\[/, "", sec); sub(/\].*$/, "", sec); next }
           index($0, "=") {
             i = index($0, "=")
-            k = trim(substr($0, 1, i - 1)); v = tolower(trim(substr($0, i + 1)))
-            if (k == "gpgcheck" && (v == "0" || v == "false" || v == "no")) print "repo|" f "|" sec
-          }' "$f"
+            if (trim(substr($0, 1, i - 1)) == "gpgcheck") print f "|" sec "|" trim(substr($0, i + 1))
+          }' "$f" | while IFS='|' read -r rf rs rv; do
+            echo "repo|$rf|$rs|$(norm "$rv")"
+          done
         done
   register: cis_check_1_2_1_2
   changed_when: false
@@ -49,43 +64,53 @@
     - server
     - workstation
 
-# repo_off holds [repo, file, section] lists for the repositories this role may edit;
-# redhat_off the ones in redhat.repo, which it only reports.
-- name: "1.2.1.2 - Work out what has gpgcheck off"
+# main_val is 1, 0, ? or empty (not set). repo_diff holds [repo, file, section, value] lists for
+# the repositories this role may edit that do not hold the site value; redhat_off the ones in
+# redhat.repo with gpgcheck off, which it only reports.
+- name: "1.2.1.2 - Work out what differs from cis_dnf_gpgcheck"
   ansible.builtin.set_fact:
-    cis_state_1_2_1_2_main_off: "{{ 'main' in cis_check_1_2_1_2.stdout_lines }}"
-    cis_state_1_2_1_2_repo_off: >-
-      {{ cis_check_1_2_1_2.stdout_lines | select('match', '^repo[|]') | map('split', '|') | list
-         | rejectattr('1', 'equalto', '/etc/yum.repos.d/redhat.repo') | list }}
-    cis_state_1_2_1_2_redhat_off: >-
-      {{ cis_check_1_2_1_2.stdout_lines | select('match', '^repo[|]') | map('split', '|') | list
-         | selectattr('1', 'equalto', '/etc/yum.repos.d/redhat.repo') | list }}
+    cis_state_1_2_1_2_want: "{{ '1' if cis_dnf_gpgcheck | bool else '0' }}"
+    cis_state_1_2_1_2_main_val: >-
+      {{ cis_check_1_2_1_2.stdout_lines | select('match', '^main=') | first | default('main=') | regex_replace('^main=', '') }}
+    cis_state_1_2_1_2_repos: >-
+      {{ cis_check_1_2_1_2.stdout_lines | select('match', '^repo[|]') | map('split', '|') | list }}
   tags: *cis_tags_1_2_1_2
 
-- name: "1.2.1.2 - Turn on gpgcheck in dnf.conf"
+- name: "1.2.1.2 - Work out which files the role edits and which it only reports"
+  ansible.builtin.set_fact:
+    cis_state_1_2_1_2_main_diff: "{{ cis_state_1_2_1_2_main_val != cis_state_1_2_1_2_want }}"
+    cis_state_1_2_1_2_repo_diff: >-
+      {{ cis_state_1_2_1_2_repos | rejectattr('1', 'equalto', '/etc/yum.repos.d/redhat.repo')
+         | rejectattr('3', 'equalto', cis_state_1_2_1_2_want) | list }}
+    cis_state_1_2_1_2_redhat_off: >-
+      {{ cis_state_1_2_1_2_repos | selectattr('1', 'equalto', '/etc/yum.repos.d/redhat.repo')
+         | selectattr('3', 'equalto', '0') | list }}
+  tags: *cis_tags_1_2_1_2
+
+- name: "1.2.1.2 - Set gpgcheck in dnf.conf"
   community.general.ini_file:
     path: /etc/dnf/dnf.conf
     section: main
     option: gpgcheck
-    value: "{{ '1' if cis_dnf_gpgcheck | bool else '0' }}"
+    value: "{{ cis_state_1_2_1_2_want }}"
     no_extra_spaces: true
     mode: "0644"
   failed_when: false
   when:
     - not (cis_audit_only | bool)
-    - cis_state_1_2_1_2_main_off | bool
+    - cis_state_1_2_1_2_main_diff | bool
   tags: *cis_tags_1_2_1_2
 
-- name: "1.2.1.2 - Turn on gpgcheck in the repository files"
+- name: "1.2.1.2 - Set gpgcheck in the repository files"
   community.general.ini_file:
     path: "{{ item[1] }}"
     section: "{{ item[2] }}"
     option: gpgcheck
-    value: "{{ '1' if cis_dnf_gpgcheck | bool else '0' }}"
+    value: "{{ cis_state_1_2_1_2_want }}"
     no_extra_spaces: true
     mode: "0644"
   failed_when: false
-  loop: "{{ cis_state_1_2_1_2_repo_off }}"
+  loop: "{{ cis_state_1_2_1_2_repo_diff }}"
   loop_control:
     label: "{{ item[1] }} [{{ item[2] }}]"
   when: not (cis_audit_only | bool)
@@ -101,15 +126,19 @@
   when:
     - not (cis_audit_only | bool)
     - not ansible_check_mode
-    - cis_state_1_2_1_2_main_off | bool or cis_state_1_2_1_2_repo_off | length > 0
+    - cis_state_1_2_1_2_main_diff | bool or cis_state_1_2_1_2_repo_diff | length > 0
   tags: *cis_tags_1_2_1_2
 
-- name: "1.2.1.2 - Work out whether gpgcheck is still off"
+# The benchmark state: [main] true and no repository (redhat.repo excluded: it is judged above)
+# with gpgcheck off.
+- name: "1.2.1.2 - Work out whether gpgcheck is still not on"
   ansible.builtin.set_fact:
     cis_state_1_2_1_2_left: >-
-      {{ (cis_recheck_1_2_1_2.stdout_lines | default(cis_check_1_2_1_2.stdout_lines))
-         | reject('equalto', '')
-         | reject('match', '^repo[|]/etc/yum[.]repos[.]d/redhat[.]repo[|]') | list | length > 0 }}
+      {%- set lines = cis_recheck_1_2_1_2.stdout_lines | default(cis_check_1_2_1_2.stdout_lines) -%}
+      {%- set main = (lines | select('match', '^main=') | first | default('main=') | regex_replace('^main=', '')) -%}
+      {%- set off = lines | select('match', '^repo[|]') | reject('match', '^repo[|]/etc/yum[.]repos[.]d/redhat[.]repo[|]')
+                    | select('match', '^.*[|]0$') | list -%}
+      {{ main != '1' or off | length > 0 }}
   tags: *cis_tags_1_2_1_2
 
 # The redhat.repo case is a finding even though the role never edits that file.

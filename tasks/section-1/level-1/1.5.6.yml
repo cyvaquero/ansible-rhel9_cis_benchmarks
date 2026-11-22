@@ -1,6 +1,6 @@
 ---
 # 1.5.6 - kernel.randomize_va_space is set to an accepted value, both running and in the
-# configuration. Accepted: 2 (cis_expect_sysctl). The fix writes
+# configuration. Accepted: 2 (cis_expect_sysctl). The fix makes the host hold
 # cis_sysctl_kernel_randomize_va_space. The logic is shared in tasks/lib/sysctl.yml.
 
 - name: "1.5.6 - Ensure kernel.randomize_va_space is configured"
@@ -9,6 +9,7 @@
     cis_sc_id: "1.5.6"
     cis_sc_key: "kernel.randomize_va_space"
     cis_sc_ok: "{{ cis_expect_sysctl['kernel.randomize_va_space'] }}"
+    cis_sc_enforce: true
     cis_sc_set: "{{ cis_sysctl_kernel_randomize_va_space }}"
   tags:
     - "1.5.6"

@@ -41,16 +41,18 @@ cis_default_exclusions:
 # it, and a value you pass in is overwritten when a control needs a reboot.
 cis_reboot_required: false
 
-# Section 1 variables. Each one is the value the role writes (or, for a package, the state it
-# converges to). The default is the benchmark value. The checks always judge against the
-# benchmark value (vars/main.yml, cis_expect_*), so a weaker value of yours is written but the
-# control still reports a finding; exclude the control in cis_exclusions to accept that. A
-# stricter value is accepted by the checks and kept. Preflight checks only the type and format
-# of each value, not the benchmark bounds.
+# Section 1 variables. Each one is the value the role enforces exactly (for a package, the state
+# it converges to): whenever the host differs from it, the role changes the host to it, also
+# when the host is stricter than the benchmark. The default is the benchmark value. The checks
+# always judge against the benchmark value (vars/main.yml, cis_expect_*), so a value of yours
+# that is weaker than the benchmark's is written and the control reports a finding; exclude the
+# control in cis_exclusions to accept that. A value stricter than the benchmark's passes.
+# Preflight checks only the type and format of each value, not the benchmark bounds.
 
 # 1.1.1.1 to 1.1.1.10: whether the role blocks (install line to /bin/false plus blacklist) and
-# unloads each filesystem or device kernel module. false: the role leaves the module alone and
-# the control still judges it as not blocked.
+# unloads each filesystem or device kernel module. false: the role removes its own modprobe.d
+# drop-in for the module (one it did not write is left alone) and the control reports it as not
+# blocked.
 cis_module_cramfs_blocked: true             # 1.1.1.1
 cis_module_freevxfs_blocked: true           # 1.1.1.2
 cis_module_hfs_blocked: true                # 1.1.1.3
@@ -66,10 +68,12 @@ cis_module_usb_storage_blocked: true        # 1.1.1.10
 # /tmp is not a mount point. false: the role does not enable it.
 cis_tmp_mount_enabled: true
 
-# 1.1.2.1.2 to 1.1.2.7.4: the mount options the role adds to each mount point (to its fstab entry,
-# the systemd unit drop-in for /tmp, or a new /dev/shm fstab entry) and remounts with. Only
-# nodev, nosuid and noexec are acted on, one per control: an option missing from a list is not
-# added by its control, which then reports a finding while the mount lacks it.
+# 1.1.2.1.2 to 1.1.2.7.4: the mount options each mount point holds. Only nodev, nosuid and
+# noexec are managed, one per control: a listed option is added (to the fstab entry, the systemd
+# unit drop-in for /tmp, or a new /dev/shm fstab entry) and remounted in; an option of the three
+# that is not listed is removed from the fstab entry or drop-in and remounted out (nodev to
+# dev, nosuid to suid, noexec to exec), and its control reports a finding while the mount
+# lacks it. Other options in the fstab entry are never touched.
 cis_tmp_mount_options: [nodev, nosuid, noexec]        # 1.1.2.1.2 to 1.1.2.1.4
 cis_dev_shm_mount_options: [nodev, nosuid, noexec]    # 1.1.2.2.2 to 1.1.2.2.4
 cis_home_mount_options: [nodev, nosuid]               # 1.1.2.3.2, 1.1.2.3.3
@@ -78,11 +82,11 @@ cis_var_tmp_mount_options: [nodev, nosuid, noexec]    # 1.1.2.5.2 to 1.1.2.5.4
 cis_var_log_mount_options: [nodev, nosuid, noexec]    # 1.1.2.6.2 to 1.1.2.6.4
 cis_var_log_audit_mount_options: [nodev, nosuid, noexec]  # 1.1.2.7.2 to 1.1.2.7.4
 
-# 1.2.1.2: the gpgcheck value the role writes to dnf.conf and to each repository file (except
-# redhat.repo) that has it off. true writes 1, false writes 0.
+# 1.2.1.2: the gpgcheck value the role holds in dnf.conf and in every repository file (except
+# redhat.repo) that sets it. true writes 1, false writes 0.
 cis_dnf_gpgcheck: true
 
-# 1.2.1.5 (Level 2): the install_weak_deps value the role writes to dnf.conf. false writes
+# 1.2.1.5 (Level 2): the install_weak_deps value the role holds in dnf.conf. false writes
 # False, true writes True.
 cis_dnf_install_weak_deps: false
 
@@ -90,13 +94,13 @@ cis_dnf_install_weak_deps: false
 # breaks SELinux tooling; leave it true unless you know the host does not need it.
 cis_libselinux_installed: true
 
-# 1.3.1.2: the kernel arguments the role removes from every boot entry with grubby. An
-# empty list removes nothing.
+# 1.3.1.2: the kernel arguments the role removes from every boot entry that holds one, with
+# grubby. An empty list removes nothing.
 cis_selinux_remove_boot_args:
   - "selinux=0"
   - "enforcing=0"
 
-# 1.3.1.3: the SELinux policy type the role writes as SELINUXTYPE in /etc/selinux/config (and
+# 1.3.1.3: the SELinux policy type the role holds as SELINUXTYPE in /etc/selinux/config (and
 # gives ansible.posix.selinux when 1.3.1.4 moves a disabled configuration). It must be
 # installed under /etc/selinux/<name>.
 cis_selinux_policy: targeted
@@ -119,33 +123,31 @@ cis_setroubleshoot_installed: false
 cis_grub_password_hash: ""
 
 # 1.4.1, 1.4.2: the owner, group and mode the role sets on /boot/grub2/user.cfg (1.4.1) and on
-# grub.cfg, grubenv and user.cfg (1.4.2). The mode is a string in quotes. 1.4.2 only changes a
-# file whose owner or group differs from the benchmark's or that has group, other or execute
-# permissions; a stricter mode already there is kept.
+# grub.cfg, grubenv and user.cfg (1.4.2). The mode is a string in quotes. 1.4.2 sets exactly
+# these on each of the files that differs, also when its mode is stricter.
 cis_bootloader_file_owner: root
 cis_bootloader_file_group: root
 cis_bootloader_file_mode: "0600"
 
-# 1.4.2: the options the role sets on the /boot/efi vfat fstab entry (UEFI hosts): uid, gid and
-# umask (a string in quotes), in place of any it finds.
+# 1.4.2: the options the role holds on the /boot/efi vfat fstab entry (UEFI hosts): uid, gid and
+# umask (a string in quotes), in place of any uid, gid, umask, fmask or dmask it finds.
 cis_bootloader_efi_uid: 0
 cis_bootloader_efi_gid: 0
 cis_bootloader_efi_umask: "0077"
 
 # 1.4.3 (Level 2), 1.4.4 (Level 2): the ExecStart line the role writes in its drop-in for
-# rescue.service and emergency.service when the effective command does not ask for the root
-# password.
+# rescue.service and emergency.service when the effective command is not this one.
 cis_rescue_exec_start: "-/usr/lib/systemd/systemd-sulogin-shell rescue"
 cis_emergency_exec_start: "-/usr/lib/systemd/systemd-sulogin-shell emergency"
 
-# 1.4.5: the ConfirmSpawn value the role writes to each systemd configuration file that has it
-# on (false writes no, true writes yes), and whether it removes the systemd.confirm_spawn
+# 1.4.5: the ConfirmSpawn value the role holds in each systemd configuration file that sets it
+# (false writes no, true writes yes), and whether it removes the systemd.confirm_spawn
 # argument from every boot entry with grubby.
 cis_systemd_confirm_spawn: false
 cis_remove_confirm_spawn_boot_arg: true
 
-# 1.5.1 to 1.5.7: the value the role writes to its sysctl file and sets live when the configured
-# value is not accepted by the benchmark. A whole number.
+# 1.5.1 to 1.5.7: the value the role holds, in its sysctl file and live, whenever the configured
+# or the running value is another one (a stricter value is replaced too). A whole number.
 cis_sysctl_fs_protected_hardlinks: 1       # 1.5.1
 cis_sysctl_fs_protected_symlinks: 1        # 1.5.2 (Level 2)
 cis_sysctl_fs_suid_dumpable: 0             # 1.5.3
@@ -154,37 +156,38 @@ cis_sysctl_kernel_kptr_restrict: 1         # 1.5.5
 cis_sysctl_kernel_randomize_va_space: 2    # 1.5.6
 cis_sysctl_kernel_yama_ptrace_scope: 1     # 1.5.7
 
-# 1.5.8: the core file size hard limit the role writes for every user ("* hard core <value>") in
-# its own limits.d file. A whole number.
+# 1.5.8: the core file size hard limit the role holds for every user ("* hard core <value>"),
+# in its own limits.d file, whenever the effective wildcard limit is another one. A whole number.
 cis_core_hard_limit: 0
 
-# 1.5.9: the ProcessSizeMax the role writes to its coredump.conf.d drop-in. A whole number or a
-# size such as 2G.
+# 1.5.9: the ProcessSizeMax the role holds, in its coredump.conf.d drop-in, whenever the effective
+# value is another one. A whole number or a size such as 2G.
 cis_coredump_process_size_max: "0"
 
-# 1.5.10: the Storage the role writes to its coredump.conf.d drop-in (none, external, journal).
+# 1.5.10: the Storage the role holds, in its coredump.conf.d drop-in (none, external, journal).
 cis_coredump_storage: none
 
-# 1.6.1: the base crypto policy that replaces LEGACY. Modules already in the policy are kept.
+# 1.6.1: the base crypto policy the role holds: a different base (not a FIPS one) is replaced with
+# it. Modules already in the policy are kept.
 cis_crypto_policy_base: DEFAULT
 
-# 1.6.2: the shipped policy module appended to the policy string when SHA-1 is allowed.
+# 1.6.2: the shipped policy module the role keeps in the policy string (appended when missing).
 cis_crypto_policy_module_sha1: NO-SHA1
 
-# 1.6.3: the policy module the role writes and appends when weak MACs are allowed, and the MAC
-# patterns it removes (each is written with a leading minus into the module's mac line).
+# 1.6.3: the policy module the role writes and keeps in the policy string, and the MAC patterns
+# it removes (each is written with a leading minus into the module's mac line).
 cis_crypto_policy_module_mac: CIS-NO-WEAKMAC
 cis_crypto_policy_mac_excluded:
   - "*-64"
   - "*-MD5"
 
-# 1.6.4: the policy module the role writes and appends when SSH offers CBC ciphers, and the
-# cipher patterns it removes (each with a leading minus, in the module's cipher@SSH line).
+# 1.6.4: the policy module the role writes and keeps in the policy string, and the cipher
+# patterns it removes (each with a leading minus, in the module's cipher@SSH line).
 cis_crypto_policy_module_sshcbc: CIS-NO-SSHCBC
 cis_crypto_policy_ssh_ciphers_excluded:
   - "*-CBC"
 
-# 1.6.7 (Level 2): the shipped policy module appended to the policy string to offer
+# 1.6.7 (Level 2): the shipped policy module the role keeps in the policy string, to offer
 # post-quantum key exchange groups.
 cis_crypto_policy_module_pq: PQ
 
@@ -201,9 +204,8 @@ cis_issue_net_path: /etc/issue.net
 cis_banner_text: "This computer is for approved users and purposes only. Use of it may be logged and reviewed."
 
 # 1.7.1 to 1.7.6: the owner, group and mode of the banner files. 1.7.1 to 1.7.3 give a new
-# file this owner, group and mode; 1.7.4 to 1.7.6 remove from an existing file the group, other
-# and execute permissions this mode lacks (a stricter mode stays). The mode is a string in
-# quotes.
+# file this owner, group and mode; 1.7.4 to 1.7.6 set exactly these on an existing file that
+# differs (a stricter mode is replaced too). The mode is a string in quotes.
 cis_banner_file_owner: root
 cis_banner_file_group: root
 cis_banner_file_mode: "0644"
@@ -215,11 +217,11 @@ cis_gdm_banner_enable: true
 # 1.8.2: the disable-user-list value the role writes.
 cis_gdm_disable_user_list: true
 
-# 1.8.3: the idle-delay, in seconds, the role writes when the configured one is not accepted
+# 1.8.3: the idle-delay, in seconds, the role holds whenever the configured one is another one
 # (the benchmark accepts 1 to 900; 0 means never and is not accepted).
 cis_gdm_idle_delay: 900
 
-# 1.8.3: the lock-delay, in seconds, the role writes when the configured one is not accepted
+# 1.8.3: the lock-delay, in seconds, the role holds whenever the configured one is another one
 # (the benchmark accepts 0 to 5).
 cis_gdm_lock_delay: 5
 
@@ -230,13 +232,12 @@ cis_gdm_automount_open: false
 # 1.8.5: the autorun-never value the role writes.
 cis_gdm_autorun_never: true
 
-# 1.8.6: the Enable value the role writes in the [xdmcp] section of /etc/gdm/custom.conf when it
-# is true or 1.
+# 1.8.6: the Enable value the role holds in the [xdmcp] section of /etc/gdm/custom.conf (not set
+# counts as false).
 cis_gdm_xdmcp_enable: false
 
-# 1.8.7: what the role does with a WaylandEnable of false or 0 in the [daemon] section of
-# /etc/gdm/custom.conf: "absent" removes the line (GDM then uses its default), "true" sets it to
-# true.
+# 1.8.7: what the role holds for WaylandEnable in the [daemon] section of /etc/gdm/custom.conf:
+# "absent" removes the line (GDM then uses its default), "true" sets it to true.
 cis_gdm_wayland_enable: absent
 
 # Services (2.1.1 to 2.1.22, and 3.1.3 for bluetooth): CIS IDs of the service controls whose

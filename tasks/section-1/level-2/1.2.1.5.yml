@@ -1,9 +1,11 @@
 ---
 # 1.2.1.5 - dnf does not pull in weak dependencies. [main] in /etc/dnf/dnf.conf must set
-# install_weak_deps to a false value (0, false or no); a missing setting counts as off because
-# dnf's own default is on. The fix writes install_weak_deps from cis_dnf_install_weak_deps
-# (False by default). Remediate mode records a finding when it is still not off after the fix;
-# under --check nothing is fixed, so nothing is recorded then.
+# install_weak_deps to a false value (0, false or no); a missing setting is not compliant
+# either. The check prints "val=<1, 0, ? or empty>". The fix makes the file match
+# cis_dnf_install_weak_deps exactly (False by default, also when the host holds a stricter or
+# a different value), writing only when the value differs. Remediate mode records a finding when
+# the value is still not off after the fix (a site value of true ends here); under --check
+# nothing is fixed, so nothing is recorded then.
 
 - name: "1.2.1.5 - Check install_weak_deps in dnf.conf"
   ansible.builtin.command:
@@ -19,9 +21,9 @@
         sec == "main" && index($0, "=") {
           i = index($0, "=")
           k = trim(substr($0, 1, i - 1)); v = tolower(trim(substr($0, i + 1)))
-          if (k == "install_weak_deps") ok = (v == "0" || v == "false" || v == "no")
+          if (k == "install_weak_deps") n = (v == "0" || v == "false" || v == "no") ? "0" : ((v == "1" || v == "true" || v == "yes") ? "1" : "?")
         }
-        END { if (!ok) print "on" }' /etc/dnf/dnf.conf 2>/dev/null || echo on
+        END { print "val=" n }' /etc/dnf/dnf.conf 2>/dev/null || echo val=
   register: cis_check_1_2_1_5
   changed_when: false
   check_mode: false
@@ -44,7 +46,7 @@
   failed_when: false
   when:
     - not (cis_audit_only | bool)
-    - cis_check_1_2_1_5.stdout | trim == 'on'
+    - (cis_check_1_2_1_5.stdout | trim | regex_replace('^val=', '')) != ('1' if cis_dnf_install_weak_deps | bool else '0')
   tags: *cis_tags_1_2_1_5
 
 - name: "1.2.1.5 - Check install_weak_deps again after the fix"
@@ -57,7 +59,7 @@
   when:
     - not (cis_audit_only | bool)
     - not ansible_check_mode
-    - cis_check_1_2_1_5.stdout | trim == 'on'
+    - (cis_check_1_2_1_5.stdout | trim | regex_replace('^val=', '')) != ('1' if cis_dnf_install_weak_deps | bool else '0')
   tags: *cis_tags_1_2_1_5
 
 # Under --check the fix does not happen, so remediate mode records nothing then.
@@ -66,7 +68,7 @@
   vars:
     cis_finding_id: "1.2.1.5"
   when:
-    - (cis_recheck_1_2_1_5.stdout | default(cis_check_1_2_1_5.stdout)) | trim == 'on'
+    - (cis_recheck_1_2_1_5.stdout | default(cis_check_1_2_1_5.stdout)) | trim != 'val=0'
     - (cis_audit_only | bool) or not ansible_check_mode
   tags: *cis_tags_1_2_1_5
 ...

@@ -9,6 +9,7 @@
     cis_sc_id: "1.5.7"
     cis_sc_key: "kernel.yama.ptrace_scope"
     cis_sc_ok: "{{ cis_expect_sysctl['kernel.yama.ptrace_scope'] }}"
+    cis_sc_enforce: true
     cis_sc_set: "{{ cis_sysctl_kernel_yama_ptrace_scope }}"
   tags:
     - "1.5.7"

@@ -5,7 +5,9 @@
 #   cis_gc_key      the option
 #   cis_gc_bad      the values (lowercase, "|" separated) that are not compliant
 #   cis_gc_fix      "absent" to remove the option, any other value (for example "false") is
-#                   written as its new value
+#                   written as its new value whenever the option holds something else (a value
+#                   stricter than the benchmark's is replaced too)
+#   cis_gc_default  optional, default "false": what GDM uses when the option is not set
 # and puts the tags and a gdm-installed condition on the import.
 #
 # The check prints "val=<value>" for the last assignment of the option in the section
@@ -60,6 +62,16 @@
   check_mode: false
   failed_when: false
 
+# The value the option has to hold: empty means the option is absent. An option that is not set
+# counts as holding cis_gc_default (what GDM uses then), so it is not added for nothing.
+- name: "{{ cis_gc_id ~ ' - Work out whether ' ~ cis_gc_key ~ ' differs from the configured value' }}"
+  ansible.builtin.set_fact:
+    cis_gc_differs: >-
+      {%- set cur = cis_gc_check.stdout_lines | select('match', '^val=') | first | default('val=') | regex_replace('^val=', '') -%}
+      {%- set target = '' if cis_gc_fix == 'absent' else cis_gc_fix | lower -%}
+      {%- set eff = cur if cur != '' or cis_gc_fix == 'absent' else (cis_gc_default | default('false')) -%}
+      {{ eff != target }}
+
 - name: "{{ cis_gc_id ~ ' - Set ' ~ cis_gc_key ~ ' to ' ~ cis_gc_fix }}"
   community.general.ini_file:
     path: /etc/gdm/custom.conf
@@ -71,7 +83,7 @@
   when:
     - not (cis_audit_only | bool)
     - cis_gc_fix != 'absent'
-    - (cis_gc_check.stdout_lines | select('match', '^val=') | first | default('val=') | regex_replace('^val=', '')) in cis_gc_bad.split('|')
+    - cis_gc_differs | bool
 
 - name: "{{ cis_gc_id ~ ' - Remove ' ~ cis_gc_key ~ ' from /etc/gdm/custom.conf' }}"
   community.general.ini_file:
@@ -83,7 +95,7 @@
   when:
     - not (cis_audit_only | bool)
     - cis_gc_fix == 'absent'
-    - (cis_gc_check.stdout_lines | select('match', '^val=') | first | default('val=') | regex_replace('^val=', '')) in cis_gc_bad.split('|')
+    - cis_gc_differs | bool
 
 - name: "{{ cis_gc_id ~ ' - Read ' ~ cis_gc_key ~ ' in /etc/gdm/custom.conf again after the fix' }}"
   ansible.builtin.command:
@@ -95,7 +107,7 @@
   when:
     - not (cis_audit_only | bool)
     - not ansible_check_mode
-    - (cis_gc_check.stdout_lines | select('match', '^val=') | first | default('val=') | regex_replace('^val=', '')) in cis_gc_bad.split('|')
+    - cis_gc_differs | bool
 
 - name: "{{ cis_gc_id ~ ' - Work out the state of ' ~ cis_gc_key }}"
   ansible.builtin.set_fact:

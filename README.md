@@ -145,11 +145,16 @@ roles:
       cis_libselinux_installed: true
 ```
 
-- The role writes your value. The checks always judge against the benchmark value (constants in
-  `vars/main.yml`, named `cis_expect_*`, which are not meant to be overridden). A stricter value
-  than the benchmark's passes and is kept. A weaker one is written and the control still
-  reports a finding, in remediate and audit mode; a site that accepts the weaker value lists the
-  control in `cis_exclusions`.
+- The role enforces the configured value exactly: whenever the host differs from it, the role
+  changes the host to it, also when the host is stricter than the benchmark (with the defaults, a
+  `kernel.kptr_restrict` of 2 becomes 1, a screen lock delay of 0 becomes 5 and a banner file of
+  mode 0600 becomes 0644). A second run with the same values changes nothing. The checks always
+  judge against the benchmark value (constants in `vars/main.yml`, named `cis_expect_*`, which are
+  not meant to be overridden): a configured value stricter than the benchmark's passes, a weaker
+  one is written and the control reports a finding, in remediate and audit mode; a site that
+  accepts the weaker value lists the control in `cis_exclusions`. In audit mode nothing is
+  written and a host that differs from the configured value but meets the benchmark is not a
+  finding.
 - For a package, the variable is whether it should be installed: the role installs or removes
   the package to match it, and the control reports a finding while the host differs from the
   benchmark.
@@ -162,9 +167,9 @@ roles:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `cis_module_<name>_blocked` | `true` | 1.1.1.1 to 1.1.1.10: whether the role blocks (install line to `/bin/false` plus blacklist) and unloads the module. `<name>` is `cramfs`, `freevxfs`, `hfs`, `hfsplus`, `jffs2`, `overlay`, `squashfs`, `udf`, `firewire_core` or `usb_storage`. `false` leaves the module alone and the control still reports it. |
-| `cis_tmp_mount_enabled` | `true` | 1.1.2.1.1: enable `tmp.mount` (for the next boot) when `/tmp` is not a mount point. |
-| `cis_tmp_mount_options`, `cis_dev_shm_mount_options`, `cis_home_mount_options`, `cis_var_mount_options`, `cis_var_tmp_mount_options`, `cis_var_log_mount_options`, `cis_var_log_audit_mount_options` | `/tmp`, `/dev/shm`, `/var/tmp`, `/var/log`, `/var/log/audit`: `[nodev, nosuid, noexec]`; `/home`, `/var`: `[nodev, nosuid]` | 1.1.2.x.2 to 1.1.2.x.4: the options the role adds to that mount point. An option left out of the list is not added by its control, which then reports a finding while the mount lacks it. |
+| `cis_module_<name>_blocked` | `true` | 1.1.1.1 to 1.1.1.10: whether the role blocks (install line to `/bin/false` plus blacklist) and unloads the module. `<name>` is `cramfs`, `freevxfs`, `hfs`, `hfsplus`, `jffs2`, `overlay`, `squashfs`, `udf`, `firewire_core` or `usb_storage`. `false` removes the role's own `/etc/modprobe.d/<module>.conf` (a file it did not write stays) and the control reports the module as not blocked. |
+| `cis_tmp_mount_enabled` | `true` | 1.1.2.1.1: enable `tmp.mount` (for the next boot) when `/tmp` is not a mount point. `false` does not enable it; the role never disables a unit. |
+| `cis_tmp_mount_options`, `cis_dev_shm_mount_options`, `cis_home_mount_options`, `cis_var_mount_options`, `cis_var_tmp_mount_options`, `cis_var_log_mount_options`, `cis_var_log_audit_mount_options` | `/tmp`, `/dev/shm`, `/var/tmp`, `/var/log`, `/var/log/audit`: `[nodev, nosuid, noexec]`; `/home`, `/var`: `[nodev, nosuid]` | 1.1.2.x.2 to 1.1.2.x.4: the options that mount point holds. A listed option is added (fstab entry, unit drop-in, remount); one of `nodev`, `nosuid`, `noexec` left out of the list is removed from the fstab entry or drop-in and remounted out, and its control reports a finding while the mount lacks it. Other fstab options are never touched. |
 | `cis_dnf_gpgcheck` | `true` | 1.2.1.2: the `gpgcheck` value written to `dnf.conf` and to each repository file (except `redhat.repo`) where it is off. |
 | `cis_dnf_install_weak_deps` | `false` | 1.2.1.5 (Level 2): the `install_weak_deps` value written to `dnf.conf`. |
 | `cis_libselinux_installed` | `true` | 1.3.1.1: whether `libselinux` should be installed. `false` removes it; leave it `true` unless the host does not need SELinux tooling. |
@@ -198,7 +203,7 @@ roles:
 |---|---|---|
 | `cis_motd_path`, `cis_issue_path`, `cis_issue_net_path` | `/etc/motd`, `/etc/issue`, `/etc/issue.net` | 1.7.1 to 1.7.6: the banner files. |
 | `cis_banner_text` | a short notice that the computer is for approved users and use may be logged | The text 1.7.1 to 1.7.3 write to the three banner files, and 1.8.1 sets as the GDM login banner, when the current content is not compliant. Keep it free of the escapes `\m`, `\r`, `\s`, `\v` and of the operating system name, or the controls cannot pass. |
-| `cis_banner_file_owner`, `cis_banner_file_group`, `cis_banner_file_mode` | `root`, `root`, `"0644"` | 1.7.1 to 1.7.6: the owner, group and mode of a new banner file; 1.7.4 to 1.7.6 set the owner and group and remove the permissions the mode lacks (a stricter mode stays). |
+| `cis_banner_file_owner`, `cis_banner_file_group`, `cis_banner_file_mode` | `root`, `root`, `"0644"` | 1.7.1 to 1.7.6: the owner, group and mode of a new banner file; 1.7.4 to 1.7.6 set exactly this owner, group and mode on an existing file that differs (a stricter mode is replaced). |
 | `cis_gdm_banner_enable`, `cis_gdm_disable_user_list` | `true`, `true` | 1.8.1, 1.8.2: the `banner-message-enable` and `disable-user-list` values. |
 | `cis_gdm_idle_delay` | `900` | 1.8.3: the idle time in seconds the role writes when the configured one is not accepted. The check accepts 1 to 900 (0, never, is not). |
 | `cis_gdm_lock_delay` | `5` | 1.8.3: the lock delay in seconds the role writes when the configured one is not accepted. The check accepts 0 to 5. |
@@ -317,22 +322,25 @@ Values outside these ranges stop the run at preflight.
   summary prints `Reboot required`. The variable defaults to `false` and is an output:
   read it after the role runs (for example to schedule a reboot) rather than setting it.
   Audit mode sets it too, from the state it finds.
-- Section 1 values below are the defaults of the variables in the tables above; an override
-  changes what is written, and the check still judges the benchmark value ("Overriding values").
+- Section 1 values below are the defaults of the variables in the tables above; the role
+  enforces the configured value exactly (also on a host that is stricter) and the check still
+  judges the benchmark value ("Overriding values").
 - Mount controls (1.1.2): the `nodev`, `nosuid` and `noexec` controls act only when the
   mount exists, or for `/tmp`, will exist once `tmp.mount` is enabled. They add the option
   to `/etc/fstab` (adding a `/dev/shm` entry if there is none) or, for `/tmp` provided by
   `tmp.mount`, to a drop-in under `/etc/systemd/system/tmp.mount.d/`, and remount the live
-  mount. The audit compares the live options. The separate-partition controls (1.1.2.x.1)
+  mount; an option left out of the site's list is removed the same way. The audit compares the live options. The separate-partition controls (1.1.2.x.1)
   only report.
 - Boot loader and kernel controls (1.4, 1.5): 1.4.2 sets 0600 root:root (`cis_bootloader_file_*`)
-  on `grub.cfg`, `grubenv` and `user.cfg` (stricter modes stay) and, on UEFI hosts, makes sure the
-  `/boot/efi` fstab entry has `uid=0`, `gid=0` and `umask=0077` (`cis_bootloader_efi_*`). 1.4.3 and 1.4.4 (Level 2)
-  add a drop-in to `rescue.service` or `emergency.service` only when their effective
-  command no longer asks for the root password. The sysctl controls (1.5.1 to 1.5.7,
-  3.3.1 and 3.3.2) write `/etc/sysctl.d/99-zz-cis-benchmarks.conf`, named to sort after the vendor
-  and admin files, only when the configured value is not accepted, and also set the running
-  value; a value that a later file still overrides is a finding. 1.5.8 writes
+  on `grub.cfg`, `grubenv` and `user.cfg` (also a stricter mode is set to it) and, on UEFI hosts,
+  makes sure the `/boot/efi` fstab entry has `uid=0`, `gid=0` and `umask=0077`
+  (`cis_bootloader_efi_*`, replacing any `fmask` and `dmask`). 1.4.3 and 1.4.4 (Level 2)
+  add a drop-in to `rescue.service` or `emergency.service` when their effective
+  command is not the configured one. The sysctl controls of section 1 (1.5.1 to 1.5.7) write
+  `/etc/sysctl.d/99-zz-cis-benchmarks.conf`, named to sort after the vendor
+  and admin files, whenever the configured or the running value is not the configured one; those
+  of section 3 only when the configured value is not accepted. A value that a later file
+  still overrides is a finding. 1.5.8 writes
   `/etc/security/limits.d/99-zz-cis-benchmarks.conf` (`* hard core 0`); entries for other
   users or groups are a finding. 1.5.9 and 1.5.10 write
   `/etc/systemd/coredump.conf.d/99-zz-cis-benchmarks.conf`.
@@ -341,9 +349,10 @@ Values outside these ranges stop the run at preflight.
   generated OpenSSH back-ends. A fix changes the policy string with
   `update-crypto-policies --set`, never a generated file: it keeps the base policy and every
   module already in the string and appends the missing module (`NO-SHA1` for 1.6.2, `PQ` for
-  1.6.7). 1.6.1 replaces a LEGACY base with DEFAULT. 1.6.3 and 1.6.4 write the role's own
-  modules `CIS-NO-WEAKMAC` and `CIS-NO-SSHCBC` to `/etc/crypto-policies/policies/modules/`,
-  only on a host that needs them. 1.6.7 (Level 2) is a finding on a minor release without
+  1.6.7). 1.6.1 replaces a base other than `cis_crypto_policy_base` (not a FIPS one) with it.
+  The section 1 controls keep their module in the string even when the policy already passes.
+  1.6.3 and 1.6.4 write the role's own modules `CIS-NO-WEAKMAC` and `CIS-NO-SSHCBC` to
+  `/etc/crypto-policies/policies/modules/` and rewrite them when the variables change. 1.6.7 (Level 2) is a finding on a minor release without
   the `PQ` module. The role restarts no service and never touches FIPS mode; a reboot is
   flagged while the policy state is newer than the boot. 1.6.5 and 1.6.6 only report. A
   back-end edited by hand is a finding, as the role does not edit generated files.
@@ -359,7 +368,8 @@ Values outside these ranges stop the run at preflight.
   `/etc/issue` and `/etc/issue.net` must also hold text, while an empty or missing
   `/etc/motd` is compliant. The fix writes `cis_banner_text` only to a non-compliant file,
   so a site's own compliant banner stays. 1.7.4 to 1.7.6 require root:root and no write for
-  group or other and no execute bit (0644 or stricter); the fix keeps stricter modes. A
+  group or other and no execute bit (0644 or stricter); the fix sets exactly the configured owner,
+  group and mode, also on a stricter file. A
   symlink is a finding for all six and is never replaced or chmod-ed. `/etc/motd.d` and
   sshd's banner (section 5) are not touched.
 - GDM controls (1.8): they run only when the `gdm` package is installed; otherwise they are
@@ -372,7 +382,9 @@ Values outside these ranges stop the run at preflight.
   accepted and the key is locked; a correct but unlocked key only gets the lock. A site file
   that sorts later and overrides a key stays a finding, as does a `user` profile without
   `system-db:local`; the role creates `/etc/dconf/profile/user` only when it is missing.
-  1.8.4 sets `automount` and `automount-open` to false (Level 1 for Server, Level 2 for
+  The configured value is written whenever the effective one differs, also when it already
+  passes (a screen lock delay of 0 becomes 5 with the defaults); the banner text only when the
+  key has none. 1.8.4 sets `automount` and `automount-open` to false (Level 1 for Server, Level 2 for
   Workstation). 1.8.6 sets `Enable=false` in the `[xdmcp]` section of `/etc/gdm/custom.conf`
   when it is true, and 1.8.7 removes an active `WaylandEnable=false` from `[daemon]`. GDM
   reads `custom.conf` only when it starts, so while GDM is running and the file is newer

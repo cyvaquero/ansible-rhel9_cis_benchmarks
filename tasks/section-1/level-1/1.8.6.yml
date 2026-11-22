@@ -11,6 +11,7 @@
     cis_gc_section: "xdmcp"
     cis_gc_key: "Enable"
     cis_gc_bad: "{{ cis_expect_gdm_xdmcp_bad }}"
+    cis_gc_default: "false"
     cis_gc_fix: "{{ cis_gdm_xdmcp_enable | bool | string | lower }}"
   when: "'gdm' in ansible_facts.packages"
   tags:

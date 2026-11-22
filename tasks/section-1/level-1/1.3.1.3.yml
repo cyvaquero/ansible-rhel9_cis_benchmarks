@@ -1,6 +1,6 @@
 ---
 # 1.3.1.3 - the SELinux policy type in /etc/selinux/config is targeted (the check always
-# judges cis_expect_selinux_policy; the fix writes cis_selinux_policy, targeted by default).
+# judges cis_expect_selinux_policy; the fix makes the file hold cis_selinux_policy, targeted by default).
 # The state comes from the shared read in tasks/section-1/level-1.yml (cis_selinux_*). The fix
 # edits only the SELINUXTYPE line: ansible.posix.selinux sets the mode and the policy together
 # and would also change the runtime mode, which could lower an enforcing host to permissive.
@@ -31,7 +31,7 @@
   failed_when: false
   when:
     - not (cis_audit_only | bool)
-    - cis_selinux_type != cis_expect_selinux_policy
+    - cis_selinux_type != cis_selinux_policy
     - cis_check_1_3_1_3_policy.stat.isdir | default(false)
   tags: *cis_tags_1_3_1_3
 
@@ -54,7 +54,7 @@
   when:
     - not (cis_audit_only | bool)
     - not ansible_check_mode
-    - cis_selinux_type != cis_expect_selinux_policy
+    - cis_selinux_type != cis_selinux_policy
     - cis_check_1_3_1_3_policy.stat.isdir | default(false)
   tags: *cis_tags_1_3_1_3
 

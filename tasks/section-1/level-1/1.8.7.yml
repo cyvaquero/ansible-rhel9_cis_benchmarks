@@ -12,6 +12,7 @@
     cis_gc_section: "daemon"
     cis_gc_key: "WaylandEnable"
     cis_gc_bad: "{{ cis_expect_gdm_wayland_bad }}"
+    cis_gc_default: "true"
     cis_gc_fix: "{{ cis_gdm_wayland_enable | string | lower }}"
   when: "'gdm' in ansible_facts.packages"
   tags:

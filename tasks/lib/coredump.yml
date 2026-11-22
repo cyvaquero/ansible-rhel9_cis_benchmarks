@@ -9,11 +9,11 @@
 # and puts the tags on the import.
 #
 # The effective value is the last assignment in systemd-analyze cat-config of coredump.conf
-# (the main file, then the drop-ins in order). When it is wrong, the role sets the option in
-# its own drop-in /etc/systemd/coredump.conf.d/99-zz-cis-benchmarks.conf, which sorts after
+# (the main file, then the drop-ins in order). When it differs from cis_cd_value (also when it
+# is stricter than the benchmark), the role sets the option in its own drop-in /etc/systemd/coredump.conf.d/99-zz-cis-benchmarks.conf, which sorts after
 # the other drop-ins and overrides the main file. systemd-coredump reads its configuration
-# for every crash, so no reload is needed. Remediate mode records a finding when a later
-# drop-in still wins; under --check nothing is fixed, so nothing is recorded then.
+# for every crash, so no reload is needed. Remediate mode records a finding when the value is
+# still not cis_cd_expect afterwards (a later drop-in wins, or the site value is weaker); under --check nothing is fixed, so nothing is recorded then.
 
 - name: "{{ cis_cd_id ~ ' - Read the effective ' ~ cis_cd_key }}"
   ansible.builtin.command:
@@ -36,9 +36,9 @@
   check_mode: false
   failed_when: false
 
-- name: "{{ cis_cd_id ~ ' - Work out whether ' ~ cis_cd_key ~ ' is compliant' }}"
+- name: "{{ cis_cd_id ~ ' - Work out whether ' ~ cis_cd_key ~ ' differs from the configured value' }}"
   ansible.builtin.set_fact:
-    cis_cd_bad: "{{ (cis_cd_check.stdout | trim | regex_replace('^v=', '') | lower) != (cis_cd_expect | default(cis_cd_value) | lower) }}"
+    cis_cd_bad: "{{ (cis_cd_check.stdout | trim | regex_replace('^v=', '') | lower) != (cis_cd_value | string | lower) }}"
 
 - name: "{{ cis_cd_id ~ ' - Create the coredump.conf.d folder' }}"
   ansible.builtin.file:

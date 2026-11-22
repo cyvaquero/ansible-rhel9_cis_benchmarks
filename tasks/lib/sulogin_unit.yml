@@ -7,9 +7,10 @@
 # and puts the tags on the import.
 #
 # The check reads the effective ExecStart of the unit (vendor file plus every drop-in) and
-# wants it to run systemd-sulogin-shell or sulogin, which ask for the root password. When it
-# does not, the role writes a drop-in that resets ExecStart and sets cis_su_exec, then
-# reloads systemd. A compliant unit is never touched. Remediate mode records a finding when
+# wants it to run systemd-sulogin-shell or sulogin, which ask for the root password. When the
+# effective command is not exactly cis_su_exec (also when it is compliant but different), the
+# role writes a drop-in that resets ExecStart and sets cis_su_exec, then reloads systemd; a unit
+# that already runs it is never touched. The finding is judged on the benchmark pattern. Remediate mode records a finding when
 # the effective command is still wrong (a later drop-in wins); under --check nothing is fixed,
 # so nothing is recorded then.
 
@@ -26,6 +27,25 @@
   check_mode: false
   failed_when: false
 
+# Does the effective command hold exactly the configured one? The ExecStart prefix characters
+# ("-", "@", ":", "+", "!") are not part of the argv that systemd prints.
+- name: "{{ cis_su_id ~ ' - Compare the effective ExecStart of ' ~ cis_su_unit ~ ' with the configured one' }}"
+  ansible.builtin.command:
+    argv:
+      - /bin/sh
+      - -c
+      - |
+        want=$(printf '%s' "$2" | sed 's/^[-@:+!]*//')
+        systemctl show -p ExecStart --value "$1" | grep -Fq "argv[]=$want ;"
+      - sh
+      - "{{ cis_su_unit }}"
+      - "{{ cis_su_exec }}"
+  register: cis_su_match
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when: not (cis_audit_only | bool)
+
 - name: "{{ cis_su_id ~ ' - Create the drop-in folder of ' ~ cis_su_unit }}"
   ansible.builtin.file:
     path: "/etc/systemd/system/{{ cis_su_unit }}.d"
@@ -35,7 +55,7 @@
     mode: "0755"
   when:
     - not (cis_audit_only | bool)
-    - cis_su_check.rc != 0
+    - cis_su_match.rc != 0
 
 - name: "{{ cis_su_id ~ ' - Restore the password prompt of ' ~ cis_su_unit }}"
   ansible.builtin.copy:
@@ -51,7 +71,7 @@
   register: cis_su_dropin
   when:
     - not (cis_audit_only | bool)
-    - cis_su_check.rc != 0
+    - cis_su_match.rc != 0
 
 - name: "{{ cis_su_id ~ ' - Reload systemd after changing ' ~ cis_su_unit }}"
   ansible.builtin.systemd:
@@ -70,7 +90,7 @@
   when:
     - not (cis_audit_only | bool)
     - not ansible_check_mode
-    - cis_su_check.rc != 0
+    - cis_su_check.rc != 0 or cis_su_match.rc != 0
 
 - name: "{{ cis_su_id ~ ' - Record the finding' }}"
   ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"

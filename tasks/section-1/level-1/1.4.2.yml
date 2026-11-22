@@ -2,11 +2,14 @@
 # 1.4.2 - boot loader configuration is readable by root only. Two parts:
 #  - /boot/grub2/grub.cfg, grubenv and user.cfg (regular files, when present) must be
 #    owned by root:root with no group, other or execute bits (cis_expect_bootloader_file_*);
-#    the fix sets cis_bootloader_file_owner, _group and _mode (root:root 0600 by default).
+#    the fix sets every such file whose owner, group or mode is not exactly
+#    cis_bootloader_file_owner, _group and _mode (root:root 0600 by default) to them, so a
+#    stricter file is set to the configured mode too.
 #  - /boot/efi, when /etc/fstab mounts it as vfat (UEFI), must carry uid=0, gid=0 and a
 #    umask of 0077 (or fmask and dmask, each covering 077), because vfat has no file
 #    permissions. A host with no such entry (BIOS) skips this part. The fix rewrites the
-#    fstab options and reloads systemd. A vfat remount does not change these options, so a
+#    fstab options to uid, gid and umask from cis_bootloader_efi_* (dropping fmask and dmask)
+#    when they differ, and reloads systemd. A vfat remount does not change these options, so a
 #    live mount that differs from a compliant fstab entry waits for the next boot: the
 #    control sets cis_reboot_required, in audit mode too, and that is not a finding. The
 #    live check accepts a missing uid or gid (the kernel hides root).
@@ -55,7 +58,47 @@
     - server
     - workstation
 
-# Prints fstab=absent|ok|bad, opts=<fstab options>, maskok=yes|no and live=absent|ok|bad.
+# Files that are not exactly the site's owner, group and mode (exact -perm, not a bit test).
+- name: "1.4.2 - Find boot loader files that differ from the configured owner and mode"
+  ansible.builtin.command:
+    argv:
+      - find
+      - /boot/grub2
+      - -maxdepth
+      - "1"
+      - -type
+      - f
+      - "("
+      - -name
+      - grub.cfg
+      - -o
+      - -name
+      - grubenv
+      - -o
+      - -name
+      - user.cfg
+      - ")"
+      - "("
+      - "!"
+      - -user
+      - "{{ cis_bootloader_file_owner }}"
+      - -o
+      - "!"
+      - -group
+      - "{{ cis_bootloader_file_group }}"
+      - -o
+      - "!"
+      - -perm
+      - "{{ cis_bootloader_file_mode }}"
+      - ")"
+  register: cis_check_1_4_2_files_var
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  tags: *cis_tags_1_4_2
+
+# Prints fstab=absent|ok|bad, opts=<fstab options>, maskok=yes|no, varok=yes|no (fstab holds
+# exactly the site's uid, gid and umask) and live=absent|ok|bad.
 - name: "1.4.2 - Check the /boot/efi mount options"
   ansible.builtin.command:
     argv: &cis_argv_1_4_2_efi
@@ -63,7 +106,7 @@
       - -c
       - |
         set -u
-        want_uid=$1; want_gid=$2; want_umask=$3
+        want_uid=$1; want_gid=$2; want_umask=$3; site_uid=$4; site_gid=$5; site_umask=$6
         get() { tr ',' '\n' <<<"$2" | sed -n "s/^$1=//p" | tail -n 1; }
         six() { [[ "$1" =~ ^[0-7]+$ ]] && (( (8#$1 & 8#$want_umask) == 8#$want_umask )); }
         mask_ok() {
@@ -73,10 +116,13 @@
           six "$f" && six "$d"
         }
         read -r ftype fopts < <(awk '$0 !~ /^[ \t]*#/ && $2 == "/boot/efi" { print $3, $4; exit }' /etc/fstab)
-        fstab=absent; maskok=no
+        fstab=absent; maskok=no; varok=yes
         if [ "${ftype:-}" = vfat ]; then
-          fstab=bad
+          fstab=bad; varok=no
           mask_ok "$fopts" && maskok=yes
+          if [ "$(get uid "$fopts")" = "$site_uid" ] && [ "$(get gid "$fopts")" = "$site_gid" ] \
+             && [ -z "$(get fmask "$fopts")$(get dmask "$fopts")" ] && [[ "$(get umask "$fopts")" =~ ^[0-7]+$ ]] \
+             && (( 8#$(get umask "$fopts") == 8#$site_umask )); then varok=yes; fi
           if [ "$maskok" = yes ] && [ "$(get uid "$fopts")" = "$want_uid" ] && [ "$(get gid "$fopts")" = "$want_gid" ]; then fstab=ok; fi
         fi
         live=absent
@@ -85,11 +131,14 @@
           u=$(get uid "$lopts"); g=$(get gid "$lopts")
           if mask_ok "$lopts" && { [ -z "$u" ] || [ "$u" = "$want_uid" ]; } && { [ -z "$g" ] || [ "$g" = "$want_gid" ]; }; then live=ok; fi
         fi
-        echo "fstab=$fstab"; echo "opts=${fopts:-}"; echo "maskok=$maskok"; echo "live=$live"
+        echo "fstab=$fstab"; echo "opts=${fopts:-}"; echo "maskok=$maskok"; echo "varok=$varok"; echo "live=$live"
       - bash
       - "{{ cis_expect_bootloader_efi_uid }}"
       - "{{ cis_expect_bootloader_efi_gid }}"
       - "{{ cis_expect_bootloader_efi_umask }}"
+      - "{{ cis_bootloader_efi_uid }}"
+      - "{{ cis_bootloader_efi_gid }}"
+      - "{{ cis_bootloader_efi_umask }}"
   register: cis_check_1_4_2_efi
   changed_when: false
   check_mode: false
@@ -105,6 +154,9 @@
     cis_state_1_4_2_maskok: >-
       {{ cis_check_1_4_2_efi.stdout_lines | select('match', '^maskok=') | first
          | default('maskok=no') | regex_replace('^maskok=', '') == 'yes' }}
+    cis_state_1_4_2_varok: >-
+      {{ cis_check_1_4_2_efi.stdout_lines | select('match', '^varok=') | first
+         | default('varok=yes') | regex_replace('^varok=', '') == 'yes' }}
     cis_state_1_4_2_live: >-
       {{ cis_check_1_4_2_efi.stdout_lines | select('match', '^live=') | first
          | default('live=bad') | regex_replace('^live=', '') }}
@@ -117,11 +169,11 @@
     owner: "{{ cis_bootloader_file_owner }}"
     group: "{{ cis_bootloader_file_group }}"
     mode: "{{ cis_bootloader_file_mode }}"
-  loop: "{{ cis_check_1_4_2_files.stdout_lines }}"
+  loop: "{{ cis_check_1_4_2_files_var.stdout_lines }}"
   failed_when: false
   when:
     - not (cis_audit_only | bool)
-    - cis_check_1_4_2_files.rc == 0
+    - cis_check_1_4_2_files_var.rc == 0
   tags: *cis_tags_1_4_2
 
 - name: "1.4.2 - Rewrite the fstab options of /boot/efi"
@@ -134,15 +186,15 @@
   vars:
     cis_state_1_4_2_kept: >-
       {{ cis_state_1_4_2_opts.split(',')
-         | reject('match', '^(uid|gid)=')
-         | reject('match', '^(umask|fmask|dmask)=' if not cis_state_1_4_2_maskok else '^$')
+         | reject('match', '^(uid|gid|umask|fmask|dmask)=')
          | list }}
     cis_state_1_4_2_new_opts: >-
-      {{ (cis_state_1_4_2_kept + ['uid=' ~ cis_bootloader_efi_uid, 'gid=' ~ cis_bootloader_efi_gid]
-          + ([] if cis_state_1_4_2_maskok else ['umask=' ~ cis_bootloader_efi_umask])) | join(',') }}
+      {{ (cis_state_1_4_2_kept + ['uid=' ~ cis_bootloader_efi_uid, 'gid=' ~ cis_bootloader_efi_gid,
+                                  'umask=' ~ cis_bootloader_efi_umask]) | join(',') }}
   when:
     - not (cis_audit_only | bool)
-    - cis_state_1_4_2_fstab == 'bad'
+    - cis_state_1_4_2_fstab != 'absent'
+    - not (cis_state_1_4_2_varok | bool)
   tags: *cis_tags_1_4_2
 
 - name: "1.4.2 - Reload systemd after changing fstab"
