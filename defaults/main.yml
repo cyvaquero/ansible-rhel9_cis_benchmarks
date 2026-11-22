@@ -307,17 +307,21 @@ cis_postfix_inet_interfaces: loopback-only
 cis_gui_installed: false
 cis_default_target: multi-user.target
 
-# 2.3.1: whether chrony should be installed. false removes it when no other installed package
+# 2.3.1: whether chrony should be installed. true also makes chronyd unmasked, enabled and
+# running (undoing an earlier mask by the role). false removes it when no other installed package
 # needs it; one that another package needs stays installed and chronyd is stopped and masked
 # instead. The benchmark wants it installed, so false is reported as a finding on every run.
 cis_chrony_installed: true
 
-# Time synchronization (2.3.2): chrony directive lines to add to /etc/chrony.conf when chrony
-# has no time source at all (no server or pool line there or in the files it includes).
-# Each item is a full directive line, for example "server time.example.com iburst" or
-# "pool pool.example.com iburst". Existing lines are never edited or removed, and chronyd is
-# restarted only when it is running. An item that is not a server or pool line stops the
-# fix. Empty (default): a host with no time source is only reported.
+# Time synchronization (2.3.2): the time sources chrony should have. Each item is a full directive
+# line, for example "server time.example.com iburst" or "pool pool.example.com iburst". Empty
+# (default): the host's sources are left alone, and a host with no source at all is only
+# reported. Non-empty: the role enforces the list exactly. The server and pool lines in
+# /etc/chrony.conf and in the files it includes (include, confdir, and the sourcedir *.sources
+# files; never the DHCP directory) become exactly the list: other server and pool lines are
+# removed, missing ones are appended to /etc/chrony.conf, and nothing else is touched. chronyd
+# is restarted only on a change and when it is running. An item that is not a server or pool
+# line stops the fix.
 cis_time_sources: []
 
 # 2.3.2: the owner and group the role sets on /etc/chrony.conf when it adds a time source from
@@ -330,6 +334,12 @@ cis_chrony_conf_group: root
 # option. The benchmark wants false, so true is reported as a finding on every run. chronyd is
 # restarted only when it is running.
 cis_chronyd_run_as_root: false
+
+# 2.4.1.1: whether the cronie package should be installed. true installs it when missing (a host
+# without cron gets it, then crond and an empty cron.allow); false removes it when no other
+# installed package needs it, otherwise it stays and crond is stopped and masked. The cron
+# controls judge the benchmark as before (without cronie they pass).
+cis_cronie_installed: true
 
 # 2.4.1.1: whether crond is enabled and whether it is active. The role unmasks, enables and
 # starts it, or stops and disables it, to match; a value of false is reported as a finding.
@@ -361,6 +371,12 @@ cis_at_allow_mode: "0640"
 # for example ["backup", "appuser"]. Must be a list of plain login names; preflight stops
 # the run on anything else.
 cis_cron_allow_users: []
+
+# 2.4.2.1: whether the at package should be installed. null (default) leaves it alone: the control
+# applies only when at is installed. true installs it when missing; false removes it when no
+# other installed package needs it, otherwise it stays and atd is stopped and masked. true or
+# false or null only.
+cis_at_installed: null
 
 # Job schedulers (2.4.2.1): users to add to /etc/at.allow, with the same rules as
 # cis_cron_allow_users. IMPORTANT: with the default empty list, a host that had no

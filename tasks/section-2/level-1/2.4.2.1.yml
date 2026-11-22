@@ -7,6 +7,85 @@
 # cis_at_allow_users lists users to add to the allow file; with the default empty list a new allow file is
 # empty, so only root can use at.
 
+# The at package (cis_at_installed): null (default) leaves it alone; true installs it when missing;
+# false removes it if no installed package needs it (an rpm erase test decides, dependents are
+# never removed), otherwise it stays and atd is stopped and masked. The control then judges the
+# benchmark as usual (without the package it passes).
+- name: "2.4.2.1 - Check at is installed"
+  ansible.builtin.command:
+    argv:
+      - rpm
+      - -q
+      - at
+  register: cis_check_2_4_2_1_pkg
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when: cis_at_installed is not none
+  tags: &cis_tags_2_4_2_1
+    - "2.4.2.1"
+    - section-2
+    - level-1
+    - server
+    - workstation
+
+- name: "2.4.2.1 - Install at"
+  ansible.builtin.dnf:
+    name: at
+    state: present
+  when:
+    - not (cis_audit_only | bool)
+    - cis_at_installed is not none
+    - cis_at_installed | bool
+    - cis_check_2_4_2_1_pkg.rc != 0
+  tags: *cis_tags_2_4_2_1
+
+- name: "2.4.2.1 - Check whether another package needs at"
+  ansible.builtin.command:
+    argv:
+      - rpm
+      - -e
+      - --test
+      - at
+  register: cis_check_2_4_2_1_erase
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - cis_at_installed is not none
+    - not (cis_at_installed | bool)
+    - cis_check_2_4_2_1_pkg.rc == 0
+  tags: *cis_tags_2_4_2_1
+
+- name: "2.4.2.1 - Remove at"
+  ansible.builtin.dnf:
+    name: at
+    state: absent
+  when:
+    - cis_check_2_4_2_1_erase is not skipped
+    - cis_check_2_4_2_1_erase.rc == 0
+  tags: *cis_tags_2_4_2_1
+
+- name: "2.4.2.1 - Stop and mask atd because another package needs at"
+  ansible.builtin.systemd:
+    name: atd
+    state: stopped
+    masked: true
+  failed_when: false
+  when:
+    - cis_check_2_4_2_1_erase is not skipped
+    - cis_check_2_4_2_1_erase.rc != 0
+  tags: *cis_tags_2_4_2_1
+
+- name: "2.4.2.1 - Report that at was kept"
+  ansible.builtin.debug:
+    msg: "at stays installed because another installed package needs it; atd is stopped and masked instead."
+  when:
+    - cis_check_2_4_2_1_erase is not skipped
+    - cis_check_2_4_2_1_erase.rc != 0
+  tags: *cis_tags_2_4_2_1
+
 - name: "2.4.2.1 - Ensure access to at is configured"
   ansible.builtin.import_tasks: ../../lib/job_allow.yml
   vars:
@@ -19,10 +98,5 @@
     cis_ja_mode: "{{ cis_at_allow_mode }}"
     cis_ja_xgroups: "{{ cis_expect_at_allow_groups }}"
     cis_ja_users: "{{ cis_at_allow_users }}"
-  tags:
-    - "2.4.2.1"
-    - section-2
-    - level-1
-    - server
-    - workstation
+  tags: *cis_tags_2_4_2_1
 ...

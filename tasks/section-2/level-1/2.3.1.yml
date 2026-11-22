@@ -4,7 +4,8 @@
 # asks for: it installs it with dnf, or, when the site set it to false, removes it when no other
 # installed package needs it (an rpm erase test decides, dependents are never removed). A
 # package that something else needs stays installed and chronyd is stopped and masked instead,
-# with a message; that state passes, because chrony is installed. The service state and the
+# with a message; that state passes, because chrony is installed. With the package wanted the
+# role also makes chronyd unmasked, enabled and running, undoing an earlier mask. The service state and the
 # configuration are for 2.3.2 and 2.3.3 and the host's own setup. Audit mode only records a
 # finding. A control that is not compliant with the benchmark after the fix is a finding (a
 # removed chrony is found on every run); under --check nothing changes and nothing is recorded
@@ -37,6 +38,38 @@
         - not (cis_audit_only | bool)
         - cis_chrony_installed | bool
         - cis_check_2_3_1.rc != 0
+
+    # With the package wanted, chronyd is enforced exactly: unmasked (undoing a mask this role
+    # set earlier), enabled and running. Not under --check on a host that lacks the package.
+    - name: "2.3.1 - Check chronyd is enabled and running"
+      ansible.builtin.command:
+        argv:
+          - /bin/sh
+          - -c
+          - |
+            if [ "$(systemctl is-enabled chronyd 2>/dev/null)" = enabled ] && systemctl is-active --quiet chronyd 2>/dev/null; then
+              echo "site=ok"
+            else
+              echo "site=bad"
+            fi
+      register: cis_check_2_3_1_svc
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - cis_chrony_installed | bool
+        - cis_check_2_3_1.rc == 0 or not ansible_check_mode
+
+    - name: "2.3.1 - Unmask, enable and start chronyd"
+      ansible.builtin.systemd:
+        name: chronyd
+        masked: false
+        enabled: true
+        state: started
+      when:
+        - cis_check_2_3_1_svc is not skipped
+        - "'site=bad' in cis_check_2_3_1_svc.stdout_lines"
 
     # Read-only: it only asks rpm whether nothing installed needs chrony.
     - name: "2.3.1 - Check whether another package needs chrony"

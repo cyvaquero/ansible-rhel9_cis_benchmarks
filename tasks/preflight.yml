@@ -176,9 +176,20 @@
     - cis_tftp_client_installed
     - cis_gui_installed
     - cis_chrony_installed
+    - cis_cronie_installed
     - cis_chronyd_run_as_root
     - cis_crond_enabled
     - cis_crond_active
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Validate cis_at_installed"
+  ansible.builtin.assert:
+    that:
+      - cis_at_installed is none or cis_at_installed is boolean or (cis_at_installed | string | lower) in ['true', 'false']
+    fail_msg: "cis_at_installed must be true, false or null (got {{ cis_at_installed | to_json }})."
+    quiet: true
   tags:
     - always
     - preflight

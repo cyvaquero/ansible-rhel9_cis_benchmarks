@@ -235,10 +235,12 @@ roles:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `cis_chrony_installed` | `true` | 2.3.1: whether `chrony` should be installed. `false` removes it when no other installed package needs it; one that is needed stays installed and `chronyd` is stopped and masked instead. `false` is reported as a finding when chrony is gone. |
-| `cis_time_sources` | `[]` | 2.3.2: full chrony directive lines, for example `["server time.example.com iburst"]`, appended to `/etc/chrony.conf` only when chrony has no `server` or `pool` source at all. Existing lines are never edited or removed. Empty: a host with no source is a finding and nothing changes. |
+| `cis_chrony_installed` | `true` | 2.3.1: whether `chrony` should be installed. `false` removes it when no other installed package needs it; one that is needed stays installed and `chronyd` is stopped and masked instead. `true` also makes `chronyd` unmasked, enabled and running (undoing an earlier mask by the role). `false` is reported as a finding when chrony is gone. |
+| `cis_time_sources` | `[]` | 2.3.2: the time sources, as full chrony directive lines, for example `["server time.example.com iburst"]`. Empty: the host's sources are left alone (a host with no source is a finding). Non-empty: the role enforces the list exactly. The `server` and `pool` lines in `/etc/chrony.conf` and in the files it includes (`include`, `confdir`, and the `sourcedir` `*.sources` files, never the DHCP directory) become exactly the list: other such lines are removed, missing ones are appended to `/etc/chrony.conf`, nothing else is touched, and `chronyd` restarts only on a change. |
 | `cis_chrony_conf_owner`, `cis_chrony_conf_group` | `root`, `root` | 2.3.2: the owner and group set on `/etc/chrony.conf` when the role adds a time source to it (never otherwise; the mode is not changed). |
 | `cis_chronyd_run_as_root` | `false` | 2.3.3: whether `chronyd` runs as root. `false` removes the `-u root` option from `OPTIONS` in `/etc/sysconfig/chronyd` and keeps the others; `true` drops every `-u` option and sets `-u root` (creating the file or the line when missing). `true` is reported as a finding. |
+| `cis_cronie_installed` | `true` | 2.4.1.1: whether `cronie` should be installed. `true` installs it when missing (a host without cron then gets `crond` and an empty `cron.allow`, so only root can use `crontab`); `false` removes it when no other installed package needs it, otherwise it stays and `crond` is stopped and masked. The cron controls still judge the benchmark (they pass without `cronie`). |
+| `cis_at_installed` | `null` | 2.4.2.1: whether `at` should be installed. `null` leaves it alone (the control applies only when it is installed); `true` installs it, `false` removes it with the same rules as `cronie`. |
 | `cis_crond_enabled`, `cis_crond_active` | `true`, `true` | 2.4.1.1: whether `crond` is enabled and whether it is running. The role unmasks, enables and starts it, or stops and disables it, to match; `false` is reported as a finding. |
 | `cis_cron_owner`, `cis_cron_group` | `root`, `root` | 2.4.1.2 to 2.4.1.8: the owner and group set on `/etc/crontab` and the `/etc/cron.*` directories. |
 | `cis_cron_file_mode`, `cis_cron_dir_mode` | `"0600"`, `"0700"` | 2.4.1.2: the mode of `/etc/crontab`; 2.4.1.3 to 2.4.1.8: the mode of the directories. A stricter mode is replaced. |
@@ -527,12 +529,12 @@ Values outside these ranges stop the run at preflight.
   run the role again.
 - Time synchronization (2.3): 2.3.1 installs `chrony` (or removes it when
   `cis_chrony_installed` is `false` and nothing needs it; if something does, it stops and masks
-  `chronyd` instead). 2.3.2 looks for a `server` or `pool`
+  `chronyd` instead) and, when it is wanted, unmasks, enables and starts `chronyd`. 2.3.2 looks for a `server` or `pool`
   line in `/etc/chrony.conf` and in the files its `include`, `confdir` and `sourcedir`
   directives pull in; `sourcedir /run/chrony-dhcp` is ignored because DHCP sources exist
-  only at run time. With none, it appends `cis_time_sources` (when set) and restarts
-  `chronyd` only if it is running; with chrony not installed, or no sources configured, it
-  is a finding and nothing is installed or guessed. 2.3.3 removes only the `-u root` option
+  only at run time. A non-empty `cis_time_sources` is enforced exactly (see its table row) and
+  `chronyd` restarts only on a change and if it is running; with chrony not installed, or no
+  source at all and an empty list, it is a finding and nothing is installed or guessed. 2.3.3 removes only the `-u root` option
   from the `OPTIONS` value in `/etc/sysconfig/chronyd` (restarting `chronyd` only if it is
   running); a missing file is compliant. With `cis_chronyd_run_as_root: true` it sets `-u root`
   instead, and that is a finding.

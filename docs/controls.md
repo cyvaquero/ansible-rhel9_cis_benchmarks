@@ -155,7 +155,7 @@ yet. `implemented`: the control has its task file at
 | 2.2.3 | Ensure telnet client is not installed | L1 Server, L1 Workstation | Automated | implement | implemented | As for 2.2.1 |
 | 2.2.4 | Ensure tftp client is not installed | L1 Server, L1 Workstation | Automated | implement | implemented | As for 2.2.1 |
 | 2.3.1 | Ensure time synchronization is in use | L1 Server, L1 Workstation | Automated | implement | implemented | Installs chrony, or removes it when `cis_chrony_installed` is false |
-| 2.3.2 | Ensure chrony is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Adds cis_time_sources only when no source is configured; DHCP sources ignored |
+| 2.3.2 | Ensure chrony is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Non-empty cis_time_sources is enforced exactly (server and pool lines, including included files); empty leaves the host alone; DHCP sources ignored |
 | 2.3.3 | Ensure chrony is not run as the root user | L1 Server, L1 Workstation | Automated | implement | implemented | Removes only the -u root option (`cis_chronyd_run_as_root` true sets it instead); missing file is compliant |
 | 2.4.1.1 | Ensure cron daemon is enabled and active | L1 Server, L1 Workstation | Automated | implement | implemented | Only when cronie is installed |
 | 2.4.1.2 | Ensure access to /etc/crontab is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Only when cronie is installed; shared logic in tasks/lib/cron_access.yml |
