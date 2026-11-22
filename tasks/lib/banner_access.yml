@@ -5,13 +5,17 @@
 #   cis_ba_path  the file
 # and puts the tags, which every task here inherits, on the import.
 #
-# Compliant: a regular file owned by root:root with no write for group or other and no
-# execute bit (0644 or stricter). A missing file is compliant: whether it must exist is
-# for 1.7.1 to 1.7.3. A symlink or a file of another type is never changed (chmod would act
-# on the link target); it is a finding. The fix removes the offending bits and keeps
-# anything stricter. Remediate mode records a finding when the file is still not compliant
-# after the fix; under --check nothing is fixed, so nothing is recorded then.
-# Task names are one template expression because the CIS ID must come first.
+# Compliant: a regular file owned by cis_expect_banner_file_owner:cis_expect_banner_file_group
+# (root:root) with no permission bit that cis_expect_banner_file_mode (0644) lacks, so no
+# write for group or other and no execute bit, or stricter. A missing file is compliant:
+# whether it must exist is for 1.7.1 to 1.7.3. A symlink or a file of another type is never
+# changed (chmod would act on the link target); it is a finding. The fix sets the owner and
+# group of cis_banner_file_owner and cis_banner_file_group and the exact mode of cis_banner_file_mode
+# whenever the file differs from them (a stricter file is set to that mode too; a mode weaker
+# than the benchmark's is written and stays a finding). Remediate mode records a finding when
+# the file is still not compliant after the fix; under --check nothing is fixed, so
+# nothing is recorded then. Task names are one template expression because the CIS ID must
+# come first.
 
 - name: "{{ cis_ba_id ~ ' - Read the owner and mode of ' ~ cis_ba_path }}"
   ansible.builtin.command:
@@ -21,14 +25,22 @@
       - |
         set -u
         export LC_ALL=C
-        p=$1
+        p=$1; want_u=$2; want_g=$3; want_m=$4; site_u=$5; site_g=$6; site_m=$7
         if [ ! -e "$p" ] && [ ! -L "$p" ]; then echo "state=ok"; exit 0; fi
         if [ -L "$p" ]; then echo "state=link"; exit 0; fi
-        read -r u g m t < <(stat -c '%u %g %a %F' "$p")
+        read -r u g m t < <(stat -c '%U %G %a %F' "$p")
         case "$t" in regular*) ;; *) echo "state=odd"; exit 0 ;; esac
-        if [ "$u" = 0 ] && [ "$g" = 0 ] && (( (8#$m & 8#133) == 0 )); then echo "state=ok"; else echo "state=bad"; fi
+        if [ "$u" = "$want_u" ] && [ "$g" = "$want_g" ] && (( (8#$m & ~8#$want_m & 8#777) == 0 )); then echo "state=ok"; else echo "state=bad"; fi
+        # Exactly the site's owner, group and mode?
+        if [ "$u" = "$site_u" ] && [ "$g" = "$site_g" ] && (( 8#$m == 8#$site_m )); then echo "var=ok"; else echo "var=no"; fi
       - bash
       - "{{ cis_ba_path }}"
+      - "{{ cis_expect_banner_file_owner }}"
+      - "{{ cis_expect_banner_file_group }}"
+      - "{{ cis_expect_banner_file_mode }}"
+      - "{{ cis_banner_file_owner }}"
+      - "{{ cis_banner_file_group }}"
+      - "{{ cis_banner_file_mode }}"
   register: cis_ba_check
   changed_when: false
   check_mode: false
@@ -38,13 +50,13 @@
   ansible.builtin.file:
     path: "{{ cis_ba_path }}"
     state: file
-    owner: root
-    group: root
-    mode: "u-x,g-wx,o-wx"
+    owner: "{{ cis_banner_file_owner }}"
+    group: "{{ cis_banner_file_group }}"
+    mode: "{{ cis_banner_file_mode }}"
     follow: false
   when:
     - not (cis_audit_only | bool)
-    - "'state=bad' in cis_ba_check.stdout_lines"
+    - "'var=no' in cis_ba_check.stdout_lines"
 
 - name: "{{ cis_ba_id ~ ' - Read the owner and mode of ' ~ cis_ba_path ~ ' again after the fix' }}"
   ansible.builtin.command:
@@ -56,7 +68,7 @@
   when:
     - not (cis_audit_only | bool)
     - not ansible_check_mode
-    - "'state=bad' in cis_ba_check.stdout_lines"
+    - "'var=no' in cis_ba_check.stdout_lines"
 
 - name: "{{ cis_ba_id ~ ' - Record the finding' }}"
   ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"

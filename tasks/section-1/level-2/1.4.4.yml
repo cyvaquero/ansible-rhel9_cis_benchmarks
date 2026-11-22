@@ -1,12 +1,13 @@
 ---
-# 1.4.4 - emergency.service asks for the root password. The logic is shared in tasks/lib/sulogin_unit.yml.
+# 1.4.4 - emergency.service asks for the root password. The logic is shared in
+# tasks/lib/sulogin_unit.yml.
 
 - name: "1.4.4 - Ensure authentication is required in emergency mode"
   ansible.builtin.import_tasks: ../../lib/sulogin_unit.yml
   vars:
     cis_su_id: "1.4.4"
     cis_su_unit: "emergency.service"
-    cis_su_mode: "emergency"
+    cis_su_exec: "{{ cis_emergency_exec_start }}"
   tags:
     - "1.4.4"
     - section-1

@@ -8,6 +8,48 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.32]
+
+### Changed
+
+- Section 1: every value a control writes or expects now comes from an overridable role variable
+  whose default is the benchmark value (`defaults/main.yml`, grouped by control ID). New variables
+  cover the kernel modules (`cis_module_<name>_blocked`), `/tmp` mounting and the mount options of
+  each mount point, `gpgcheck` and weak dependencies, whether `libselinux`, `mcstrans` and
+  `setroubleshoot` are installed, the SELinux policy, mode and boot arguments, the boot loader file
+  owner, group and mode and the `/boot/efi` options, the rescue and emergency commands,
+  `ConfirmSpawn`, the sysctl values of 1.5.1 to 1.5.7, the core file limit, the coredump settings,
+  the crypto policy base, modules and removed algorithms, the banner paths, owner, group and mode,
+  and the GDM values. Overriding a value changes what the role writes; the checks still judge the
+  benchmark value, now kept as `cis_expect_*` constants in `vars/main.yml`, so a weaker value is
+  written and reported as a finding. The fix now enforces the configured value exactly: it
+  changes the host whenever the host differs from the variable, also when the host is stricter
+  than the benchmark. Behavior changes with the default values:
+  a host value that was stricter than the benchmark is set to the benchmark value. This covers
+  1.5.1 to 1.5.7 (`kernel.kptr_restrict` 2 and `kernel.yama.ptrace_scope` 2 or 3 become 1, in the
+  role's sysctl file and live), 1.8.3 (an idle delay below 900 becomes 900, a lock delay of 0
+  becomes 5), 1.4.1 and 1.4.2 (a boot loader file with a mode stricter than 0600, or a
+  `/boot/efi` entry using `fmask` and `dmask`, is rewritten to 0600 and `uid`, `gid` and `umask`),
+  1.7.4 to 1.7.6 (a banner file stricter than 0644 becomes 0644), 1.5.8, 1.5.9 and 1.5.10 (an
+  effective limit, `ProcessSizeMax` or `Storage` other than the configured one is replaced in
+  the role's drop-in), 1.6.1 (a base policy other than `DEFAULT`, FIPS excepted, becomes
+  `DEFAULT`), 1.6.2 to 1.6.4 and 1.6.7 (the role's module is appended to the policy string even
+  when the policy already passes, and a changed module text is applied), 1.2.1.2 and 1.2.1.5
+  (a `gpgcheck` or `install_weak_deps` value that differs from the variable is rewritten),
+  1.4.3 and 1.4.4 (a rescue or emergency `ExecStart` other than the configured one gets the
+  role's drop-in), 1.4.5 (a `ConfirmSpawn` setting other than the configured one is rewritten),
+  1.8.1, 1.8.2 and 1.8.4 to 1.8.7 (a different value is replaced; a `WaylandEnable` line of any
+  value is removed), and 1.3.1.2 and 1.3.1.3 (the arguments and the policy type of the
+  variables are enforced), and 1.7.1 to 1.7.3 and 1.8.1 (the three banner files and the GDM banner
+  text are replaced with `cis_banner_text` whenever they differ, also when the current text is
+  compliant: a site's own banner is overwritten on the first run, so sites set their text in
+  `cis_banner_text`). `cis_tmp_mount_enabled: false` only stops the role enabling `tmp.mount`; it
+  never disables one the host enabled. Also new: `cis_module_<name>_blocked: false` removes the role's own
+  modprobe.d drop-in, and a mount option left out of its list is removed from the fstab entry and
+  the live mount. Preflight validates only the type and format of the new variables. The README has an "Overriding values" section and a
+  table per group of controls. The shared `tasks/lib/` helpers take the new inputs as optional
+  parameters, so sections 2 to 5 behave as before. Part of #58 (sections 2 to 5 follow).
+
 ## [3.0.0_0.0.31]
 
 ### Added

@@ -7,7 +7,7 @@
   ansible.builtin.import_tasks: ../../lib/banner.yml
   vars:
     cis_bn_id: "1.7.3"
-    cis_bn_path: "/etc/issue.net"
+    cis_bn_path: "{{ cis_issue_net_path }}"
     cis_bn_emptyok: "no"
   tags:
     - "1.7.3"

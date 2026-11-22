@@ -7,10 +7,11 @@
   vars:
     cis_cp_id: "1.6.3"
     cis_cp_kind: "mac"
-    cis_cp_module: "CIS-NO-WEAKMAC"
+    cis_cp_enforce: true
+    cis_cp_module: "{{ cis_crypto_policy_module_mac }}"
     cis_cp_pmod_body: |
       # Added by the CIS RHEL 9 role: drop 64-bit tag and MD5 MACs.
-      mac = -*-64 -*-MD5
+      mac = {{ cis_crypto_policy_mac_excluded | map('regex_replace', '^', '-') | join(' ') }}
   tags:
     - "1.6.3"
     - section-1

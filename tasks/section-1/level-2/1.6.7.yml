@@ -8,7 +8,8 @@
   vars:
     cis_cp_id: "1.6.7"
     cis_cp_kind: "pq"
-    cis_cp_module: "PQ"
+    cis_cp_enforce: true
+    cis_cp_module: "{{ cis_crypto_policy_module_pq }}"
   tags:
     - "1.6.7"
     - section-1

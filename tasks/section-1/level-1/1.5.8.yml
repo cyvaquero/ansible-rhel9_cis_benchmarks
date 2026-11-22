@@ -1,5 +1,6 @@
 ---
-# 1.5.8 - core dumps are limited to zero for every user. The check reads limits.conf and
+# 1.5.8 - core dumps are limited to zero for every user (cis_expect_core_hard_limit; the fix
+# writes cis_core_hard_limit, 0 by default). The check reads limits.conf and
 # then limits.d/*.conf in order (a later wildcard entry wins) and prints "wild=<value>" for
 # the last "* hard core" or "* - core" entry and "other=<n>" for entries of other domains
 # (users, groups) that set a nonzero hard core limit. The fix writes the role file
@@ -18,13 +19,15 @@
         export LC_ALL=C
         shopt -s nullglob
         files=(/etc/security/limits.conf /etc/security/limits.d/*.conf)
-        awk '
+        awk -v want="$1" '
         { sub(/#.*/, "") }
         NF >= 4 && $3 == "core" && ($2 == "hard" || $2 == "-") {
           if ($1 == "*") wild = $4
-          else if ($4 != "0") other++
+          else if ($4 != want) other++
         }
         END { print "wild=" wild; print "other=" other + 0 }' "${files[@]}" 2>/dev/null
+      - bash
+      - "{{ cis_expect_core_hard_limit }}"
   register: cis_check_1_5_8
   changed_when: false
   check_mode: false
@@ -36,18 +39,18 @@
     - server
     - workstation
 
-- name: "1.5.8 - Set the hard core limit to 0 in the role limits file"
+- name: "1.5.8 - Set the hard core limit in the role limits file"
   ansible.builtin.copy:
     dest: /etc/security/limits.d/99-zz-cis-benchmarks.conf
     content: |
       # Managed by rhel9_cis_benchmarks.
-      * hard core 0
+      * hard core {{ cis_core_hard_limit }}
     owner: root
     group: root
     mode: "0644"
   when:
     - not (cis_audit_only | bool)
-    - "'wild=0' not in cis_check_1_5_8.stdout_lines"
+    - "('wild=' ~ cis_core_hard_limit) not in cis_check_1_5_8.stdout_lines"
   tags: *cis_tags_1_5_8
 
 - name: "1.5.8 - Read the core file size limits again after the fix"
@@ -60,7 +63,7 @@
   when:
     - not (cis_audit_only | bool)
     - not ansible_check_mode
-    - "'wild=0' not in cis_check_1_5_8.stdout_lines"
+    - "('wild=' ~ cis_core_hard_limit) not in cis_check_1_5_8.stdout_lines"
   tags: *cis_tags_1_5_8
 
 - name: "1.5.8 - Work out whether the limits are still not compliant"
@@ -74,7 +77,7 @@
   vars:
     cis_finding_id: "1.5.8"
   when:
-    - "'wild=0' not in cis_state_1_5_8_lines or 'other=0' not in cis_state_1_5_8_lines"
+    - "('wild=' ~ cis_expect_core_hard_limit) not in cis_state_1_5_8_lines or 'other=0' not in cis_state_1_5_8_lines"
     - (cis_audit_only | bool) or not ansible_check_mode
   tags: *cis_tags_1_5_8
 ...

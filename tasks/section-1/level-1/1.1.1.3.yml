@@ -6,6 +6,7 @@
   vars:
     cis_km_id: "1.1.1.3"
     cis_km_module: "hfs"
+    cis_km_fix: "{{ cis_module_hfs_blocked }}"
   tags:
     - "1.1.1.3"
     - section-1

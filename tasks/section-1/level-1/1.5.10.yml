@@ -6,7 +6,8 @@
   vars:
     cis_cd_id: "1.5.10"
     cis_cd_key: "Storage"
-    cis_cd_value: "none"
+    cis_cd_value: "{{ cis_coredump_storage }}"
+    cis_cd_expect: "{{ cis_expect_coredump_storage }}"
   tags:
     - "1.5.10"
     - section-1

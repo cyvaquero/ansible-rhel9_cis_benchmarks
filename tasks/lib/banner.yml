@@ -9,10 +9,13 @@
 # case) or the operating system name (ID in /etc/os-release, any case), or, when emptyok is
 # "no", when it is missing or holds nothing but whitespace. An empty /etc/motd is compliant:
 # it discloses nothing. The check reads through a symlink; the fix never replaces one (the
-# link is a finding to resolve by hand). A compliant file is never rewritten, so a site's
-# own banner stays. The fix writes cis_banner_text, and gives a new file mode 0644 only
-# (an existing file keeps its mode: 1.7.4 to 1.7.6 own that). Remediate mode records a
-# finding when the file is still not compliant after the fix; under --check nothing is
+# link is a finding to resolve by hand). The check judges only those rules. The fix makes the
+# file hold exactly cis_banner_text and one final newline whenever it differs, also when its
+# current text is compliant (a site's own banner is replaced; sites set cis_banner_text). It
+# writes the file owned by cis_banner_file_owner and
+# cis_banner_file_group, and gives a new file mode cis_banner_file_mode only (an existing
+# file keeps its mode: 1.7.4 to 1.7.6 own that). Remediate mode records a finding when the
+# file is still not compliant after the fix; under --check nothing is
 # fixed, so nothing is recorded then.
 # Task names are one template expression because the CIS ID must come first.
 
@@ -24,15 +27,17 @@
       - |
         set -u
         export LC_ALL=C
-        p=$1; emptyok=$2
+        p=$1; emptyok=$2; text=$3
         if [ ! -e "$p" ] && [ ! -L "$p" ]; then
-          echo "exists=no"
+          echo "exists=no"; echo "exact=no"
           if [ "$emptyok" = yes ]; then echo "state=ok"; else echo "state=bad"; fi
           exit 0
         fi
         echo "exists=yes"
         if [ -L "$p" ]; then echo "link=yes"; else echo "link=no"; fi
         if [ ! -f "$p" ]; then echo "state=odd"; exit 0; fi
+        # Does the file hold exactly the configured text and one final newline?
+        if printf '%s\n' "$text" | cmp -s - "$p"; then echo "exact=yes"; else echo "exact=no"; fi
         osid=$(awk -F= '$1 == "ID" { gsub(/["'"'"']/, "", $2); print $2; exit }' /etc/os-release 2>/dev/null)
         if grep -Eiq '\\[mrsv]' "$p" || { [ -n "$osid" ] && grep -Fiq -- "$osid" "$p"; }; then
           echo "state=bad"; exit 0
@@ -42,6 +47,7 @@
       - bash
       - "{{ cis_bn_path }}"
       - "{{ cis_bn_emptyok }}"
+      - "{{ cis_banner_text | trim }}"
   register: cis_bn_check
   changed_when: false
   check_mode: false
@@ -51,12 +57,12 @@
   ansible.builtin.copy:
     dest: "{{ cis_bn_path }}"
     content: "{{ cis_banner_text | trim }}\n"
-    owner: root
-    group: root
-    mode: "{{ '0644' if 'exists=no' in cis_bn_check.stdout_lines else omit }}"
+    owner: "{{ cis_banner_file_owner }}"
+    group: "{{ cis_banner_file_group }}"
+    mode: "{{ cis_banner_file_mode if 'exists=no' in cis_bn_check.stdout_lines else omit }}"
   when:
     - not (cis_audit_only | bool)
-    - "'state=bad' in cis_bn_check.stdout_lines"
+    - "'exact=no' in cis_bn_check.stdout_lines"
     - "'link=yes' not in cis_bn_check.stdout_lines"
 
 - name: "{{ cis_bn_id ~ ' - Read the banner text of ' ~ cis_bn_path ~ ' again after the fix' }}"
@@ -69,7 +75,7 @@
   when:
     - not (cis_audit_only | bool)
     - not ansible_check_mode
-    - "'state=ok' not in cis_bn_check.stdout_lines"
+    - "'exact=no' in cis_bn_check.stdout_lines or 'state=ok' not in cis_bn_check.stdout_lines"
 
 - name: "{{ cis_bn_id ~ ' - Record the finding' }}"
   ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"

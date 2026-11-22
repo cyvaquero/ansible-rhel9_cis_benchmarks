@@ -3,17 +3,20 @@
 # imports this with:
 #   cis_km_id      the CIS ID, for the task names and the finding
 #   cis_km_module  the module name as the benchmark writes it, dash or underscore
+#   cis_km_fix     optional, default true: true blocks the module; false removes the role's
+#                  own modprobe.d drop-in (a file of the same name that the role did not write
+#                  is never touched) so the site's choice applies. The check still judges the
+#                  benchmark state and records a finding while the module is not blocked
 # and puts the tags, which every task here inherits, on the import.
 #
-# Compliant: the module is not shipped for the running kernel, or it is blocked from
-# loading (an install line pointing at /bin/false), blacklisted and not loaded.
-# Remediate: write one modprobe.d drop-in, then unload the module. A module that is in
-# use cannot be unloaded. After the fix the check runs again, and a control that still
-# fails (a module in use, or a conflicting install line elsewhere) is recorded as a
-# finding without failing the run.
-# Task names are one template expression because ansible-lint allows a template only at
-# the end of a name, and the CIS ID must come first.
-# Needs cis_selected_controls (preflight) and finding.yml.
+# Compliant: the module is not shipped for the running kernel, or it is blocked from loading
+# (an install line pointing at /bin/false), blacklisted and not loaded. Remediate (when
+# cis_km_fix is true): write one modprobe.d drop-in, then unload the module. A module that is
+# in use cannot be unloaded. After the fix the check runs again, and a control that still
+# fails (a module in use, or a conflicting install line elsewhere) is recorded as a finding
+# without failing the run. Task names are one template expression because ansible-lint allows
+# a template only at the end of a name, and the CIS ID must come first. Needs
+# cis_selected_controls (preflight) and finding.yml.
 
 - name: "{{ cis_km_id ~ ' - Check the ' ~ cis_km_module ~ ' module is not available' }}"
   ansible.builtin.command:
@@ -55,7 +58,31 @@
     mode: "0644"
   when:
     - not (cis_audit_only | bool)
+    - cis_km_fix | default(true) | bool
     - cis_km_check.rc != 0
+
+- name: "{{ cis_km_id ~ ' - Look for the role drop-in of the ' ~ cis_km_module ~ ' module' }}"
+  ansible.builtin.command:
+    argv:
+      - grep
+      - -qs
+      - "Managed by rhel9_cis_benchmarks"
+      - "/etc/modprobe.d/{{ cis_km_module | replace('-', '_') }}.conf"
+  register: cis_km_own
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when: not (cis_audit_only | bool)
+
+- name: "{{ cis_km_id ~ ' - Remove the role block of the ' ~ cis_km_module ~ ' module' }}"
+  ansible.builtin.file:
+    path: "/etc/modprobe.d/{{ cis_km_module | replace('-', '_') }}.conf"
+    state: absent
+  register: cis_km_unblock
+  when:
+    - not (cis_audit_only | bool)
+    - not (cis_km_fix | default(true) | bool)
+    - cis_km_own.rc == 0
 
 - name: "{{ cis_km_id ~ ' - Unload the ' ~ cis_km_module ~ ' module' }}"
   community.general.modprobe:
@@ -64,6 +91,7 @@
   failed_when: false
   when:
     - not (cis_audit_only | bool)
+    - cis_km_fix | default(true) | bool
     - cis_km_check.rc != 0
     - "'loaded' in cis_km_check.stdout_lines"
 
@@ -76,7 +104,8 @@
   failed_when: false
   when:
     - not (cis_audit_only | bool)
-    - cis_km_check.rc != 0
+    - not ansible_check_mode or cis_km_check.rc != 0
+    - cis_km_check.rc != 0 or cis_km_unblock is changed
 
 - name: "{{ cis_km_id ~ ' - Record the finding when the check fails in audit mode' }}"
   ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"

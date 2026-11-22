@@ -4,6 +4,11 @@
 #   cis_mo_id           the CIS ID, for the task names and the finding
 #   cis_mo_path         the mount point
 #   cis_mo_option       nodev, nosuid or noexec
+#   cis_mo_options      optional, default [cis_mo_option]: the options the site wants on this
+#                       mount point (a role variable). The control makes its own option match:
+#                       it adds the option when it is listed and removes it (fstab, unit
+#                       drop-in and a live remount with the opposite option) when it is not.
+#                       A mounted path without the option is recorded as a finding either way
 #   cis_mo_unit         optional: the systemd mount unit that provides the mount when
 #                       there is no fstab entry (tmp.mount for /tmp)
 #   cis_mo_fstab_create optional: {src, fstype} of an fstab entry to add when the path is
@@ -20,6 +25,8 @@
 #           set instead and the drop-in takes effect at boot.
 #   create  mounted with no fstab entry and cis_mo_fstab_create given: add the entry.
 #   none    mounted, but no way to persist the option: remediate mode records a finding.
+#           An option the site's list leaves out is only removed on the fstab and unit routes;
+#           a mount with no entry the role may edit keeps its live options.
 # The three option controls for one path each add their own option to what the earlier
 # ones left, so they compose in any order and a second run changes nothing.
 # Live mounts are remounted with the option added. The audit compares the live options,
@@ -84,6 +91,7 @@
     cis_mo_fstab_words: "{{ cis_mo_fstab.stdout.strip().split(',') if cis_mo_fstab.rc == 0 else [] }}"
     cis_mo_unit_info: "{{ ((cis_mo_unit_state.stdout | default('')).split('\n') + ['', '', ''])[0:3] }}"
     cis_mo_opposite: "{{ {'nodev': 'dev', 'nosuid': 'suid', 'noexec': 'exec'}[cis_mo_option] }}"
+    cis_mo_wanted: "{{ cis_mo_option in (cis_mo_options | default([cis_mo_option])) }}"
 
 - name: "{{ cis_mo_id ~ ' - Choose how to keep the ' ~ cis_mo_option ~ ' option for ' ~ cis_mo_path }}"
   ansible.builtin.set_fact:
@@ -93,7 +101,7 @@
          else 'unit' if (cis_mo_unit | default('')) != '' and not cis_mo_fstab_present
               and ((cis_mo_mounted and cis_mo_unit_info[1] == 'active')
                    or (not cis_mo_mounted and cis_mo_unit_info[0] == 'enabled'))
-         else 'create' if cis_mo_mounted and not cis_mo_fstab_present
+         else 'create' if cis_mo_mounted and not cis_mo_fstab_present and cis_mo_wanted | bool
               and (cis_mo_fstab_create | default({})) | length > 0
          else 'none' }}
 
@@ -109,9 +117,12 @@
   ansible.builtin.set_fact:
     cis_mo_new_words: >-
       {{ (cis_mo_base | reject('equalto', cis_mo_opposite) | list)
-         + ([] if cis_mo_option in cis_mo_base else [cis_mo_option]) }}
+         + ([] if cis_mo_option in cis_mo_base else [cis_mo_option]) if cis_mo_wanted | bool
+         else (cis_mo_base | reject('equalto', cis_mo_option) | list) }}
     cis_mo_persist_needed: >-
-      {{ cis_mo_route != 'none' and (cis_mo_option not in cis_mo_base or cis_mo_opposite in cis_mo_base) }}
+      {{ cis_mo_route != 'none' and
+         ((cis_mo_option not in cis_mo_base or cis_mo_opposite in cis_mo_base) if cis_mo_wanted | bool
+          else cis_mo_option in cis_mo_base) }}
 
 # The mount does not exist yet; the drop-in below takes effect at boot.
 - name: "{{ cis_mo_id ~ ' - Flag the reboot that brings up ' ~ cis_mo_path }}"
@@ -125,7 +136,7 @@
   ansible.builtin.lineinfile:
     path: /etc/fstab
     regexp: '^([^#\s]\S*\s+{{ cis_mo_path | regex_escape }}\s+\S+\s+)\S+(.*)$'
-    line: '\1{{ cis_mo_new_words | join(",") }}\2'
+    line: '\1{{ cis_mo_new_words | join(",") or "defaults" }}\2'
     backrefs: true
   register: cis_mo_fstab_edit
   when:
@@ -179,19 +190,19 @@
     - cis_mo_fstab_edit is changed or cis_mo_fstab_add is changed or cis_mo_dropin is changed
 
 # Skipped under --check by the command module itself.
-- name: "{{ cis_mo_id ~ ' - Remount ' ~ cis_mo_path ~ ' with ' ~ cis_mo_option }}"
+- name: "{{ cis_mo_id ~ ' - Remount ' ~ cis_mo_path ~ ' with ' ~ (cis_mo_option if cis_mo_wanted | bool else cis_mo_opposite) }}"
   ansible.builtin.command:
     argv:
       - mount
       - -o
-      - "remount,{{ cis_mo_option }}"
+      - "remount,{{ cis_mo_option if cis_mo_wanted | bool else cis_mo_opposite }}"
       - "{{ cis_mo_path }}"
   changed_when: true
   when:
     - not (cis_audit_only | bool)
     - cis_mo_mounted | bool
     - cis_mo_route != 'none'
-    - cis_mo_option not in cis_mo_live_words
+    - ((cis_mo_option not in cis_mo_live_words) if (cis_mo_wanted | bool) else (cis_mo_option in cis_mo_live_words))
 
 - name: "{{ cis_mo_id ~ ' - Check the live options of ' ~ cis_mo_path ~ ' again after the fix' }}"
   ansible.builtin.command:
@@ -210,7 +221,7 @@
     - not (cis_audit_only | bool)
     - not ansible_check_mode
     - cis_mo_mounted | bool
-    - cis_mo_option not in cis_mo_live_words
+    - (cis_mo_option not in cis_mo_live_words) or (cis_mo_option in cis_mo_live_words and not (cis_mo_wanted | bool))
 
 - name: "{{ cis_mo_id ~ ' - Record the finding when the live options fail in audit mode' }}"
   ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
@@ -238,5 +249,6 @@
     - not (cis_audit_only | bool)
     - cis_mo_mounted | bool
     - cis_mo_route == 'none'
+    - cis_mo_wanted | bool
     - cis_mo_option not in cis_mo_live_words
 ...

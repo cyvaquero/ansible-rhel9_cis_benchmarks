@@ -9,7 +9,10 @@
 #   cis_dc_kind     how the effective value is judged: eq, nonempty or range
 #   cis_dc_a        eq: the required value as dconf prints it ("true"); range: the minimum
 #   cis_dc_b        range: the maximum
-#   cis_dc_write    the value the fix writes, as GVariant text (true, uint32 900, 'text')
+#                   (a and b are benchmark constants, cis_expect_gdm_*)
+#   cis_dc_write    the value the fix writes (a role variable), whenever the effective value is
+#                   not exactly it (also when the effective value is stricter than the benchmark's,
+#                   and the GDM banner text), as GVariant text (true, uint32 900, 'text')
 # and puts the tags and a gdm-installed condition on the import.
 #
 # The effective value is read from the compiled databases with dconf read, under the profile
@@ -37,7 +40,7 @@
         set -u
         export LC_ALL=C
         shopt -s nullglob
-        profile=$1; path=$2; kind=$3; a=$4; b=$5
+        profile=$1; path=$2; kind=$3; a=$4; b=$5; site=$6
         tmp=$(mktemp -d) || { echo "value=bad"; echo "lock=bad"; exit 0; }
         trap 'rm -rf "$tmp"' EXIT
         raw=$(HOME="$tmp" XDG_CONFIG_HOME="$tmp/.config" DCONF_PROFILE="$profile" dconf read "$path" 2>/dev/null)
@@ -48,17 +51,27 @@
           nonempty) [ -n "$val" ] && [ "$val" != "''" ] && value=ok ;;
           range) [[ "$val" =~ ^[0-9]+$ ]] && (( 10#$val >= a && 10#$val <= b )) && value=ok ;;
         esac
+        # Is the value exactly the one the fix writes? A text value is compared without its
+        # quotes, because dconf may print it in double quotes where the fix writes single quotes.
+        unq() { local s=$1; s=${s#?}; s=${s%?}; s=${s//\\\'/\'}; s=${s//\\\"/\"}; printf '%s' "$s"; }
+        same=bad
+        if [ "$kind" = nonempty ]; then
+          [ "$(unq "$val")" = "$(unq "$site")" ] && same=ok
+        else
+          [ "$val" = "${site#uint32 }" ] && same=ok
+        fi
         lock=bad
         for f in /etc/dconf/db/*.d/locks/*; do
           if [ -f "$f" ] && grep -qxF -- "$path" "$f"; then lock=ok; break; fi
         done
-        echo "value=$value"; echo "lock=$lock"
+        echo "value=$value"; echo "same=$same"; echo "lock=$lock"
       - bash
       - "{{ cis_dc_db | replace('local', 'user') | string }}"
       - "/{{ cis_dc_section }}/{{ cis_dc_key }}"
       - "{{ cis_dc_kind }}"
       - "{{ cis_dc_a | default('') | string }}"
       - "{{ cis_dc_b | default('') | string }}"
+      - "{{ cis_dc_write | string }}"
   register: cis_dc_check
   changed_when: false
   check_mode: false
@@ -76,7 +89,7 @@
     - "/etc/dconf/db/{{ cis_dc_db }}.d/locks"
   when:
     - not (cis_audit_only | bool)
-    - "'value=ok' not in cis_dc_check.stdout_lines or 'lock=ok' not in cis_dc_check.stdout_lines"
+    - "'same=ok' not in cis_dc_check.stdout_lines or 'lock=ok' not in cis_dc_check.stdout_lines"
 
 - name: "{{ cis_dc_id ~ ' - Create the dconf profile folder' }}"
   ansible.builtin.file:
@@ -88,7 +101,7 @@
   when:
     - not (cis_audit_only | bool)
     - cis_dc_db == 'local'
-    - "'value=ok' not in cis_dc_check.stdout_lines or 'lock=ok' not in cis_dc_check.stdout_lines"
+    - "'same=ok' not in cis_dc_check.stdout_lines or 'lock=ok' not in cis_dc_check.stdout_lines"
 
 - name: "{{ cis_dc_id ~ ' - Create the dconf user profile when it is missing' }}"
   ansible.builtin.copy:
@@ -103,7 +116,7 @@
   when:
     - not (cis_audit_only | bool)
     - cis_dc_db == 'local'
-    - "'value=ok' not in cis_dc_check.stdout_lines or 'lock=ok' not in cis_dc_check.stdout_lines"
+    - "'same=ok' not in cis_dc_check.stdout_lines or 'lock=ok' not in cis_dc_check.stdout_lines"
 
 - name: "{{ cis_dc_id ~ ' - Set ' ~ cis_dc_key ~ ' in the role dconf file' }}"
   community.general.ini_file:
@@ -118,7 +131,7 @@
   register: cis_dc_fix_value
   when:
     - not (cis_audit_only | bool)
-    - "'value=ok' not in cis_dc_check.stdout_lines"
+    - "'same=ok' not in cis_dc_check.stdout_lines"
 
 - name: "{{ cis_dc_id ~ ' - Lock ' ~ cis_dc_key }}"
   ansible.builtin.lineinfile:
@@ -151,7 +164,7 @@
   when:
     - not (cis_audit_only | bool)
     - not ansible_check_mode
-    - "'value=ok' not in cis_dc_check.stdout_lines or 'lock=ok' not in cis_dc_check.stdout_lines"
+    - "'same=ok' not in cis_dc_check.stdout_lines or 'lock=ok' not in cis_dc_check.stdout_lines"
 
 - name: "{{ cis_dc_id ~ ' - Record the finding' }}"
   ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"

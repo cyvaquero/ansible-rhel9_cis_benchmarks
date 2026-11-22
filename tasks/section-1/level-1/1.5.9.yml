@@ -6,7 +6,8 @@
   vars:
     cis_cd_id: "1.5.9"
     cis_cd_key: "ProcessSizeMax"
-    cis_cd_value: "0"
+    cis_cd_value: "{{ cis_coredump_process_size_max }}"
+    cis_cd_expect: "{{ cis_expect_coredump_process_size_max }}"
   tags:
     - "1.5.9"
     - section-1

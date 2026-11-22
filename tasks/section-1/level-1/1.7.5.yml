@@ -7,7 +7,7 @@
   ansible.builtin.import_tasks: ../../lib/banner_access.yml
   vars:
     cis_ba_id: "1.7.5"
-    cis_ba_path: "/etc/issue"
+    cis_ba_path: "{{ cis_issue_path }}"
   tags:
     - "1.7.5"
     - section-1

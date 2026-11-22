@@ -7,6 +7,7 @@
     cis_mo_id: "1.1.2.6.4"
     cis_mo_path: "/var/log"
     cis_mo_option: "noexec"
+    cis_mo_options: "{{ cis_var_log_mount_options }}"
   tags:
     - "1.1.2.6.4"
     - section-1

@@ -1,12 +1,13 @@
 ---
-# 1.4.3 - rescue.service asks for the root password. The logic is shared in tasks/lib/sulogin_unit.yml.
+# 1.4.3 - rescue.service asks for the root password. The logic is shared in
+# tasks/lib/sulogin_unit.yml.
 
 - name: "1.4.3 - Ensure authentication is required in rescue mode"
   ansible.builtin.import_tasks: ../../lib/sulogin_unit.yml
   vars:
     cis_su_id: "1.4.3"
     cis_su_unit: "rescue.service"
-    cis_su_mode: "rescue"
+    cis_su_exec: "{{ cis_rescue_exec_start }}"
   tags:
     - "1.4.3"
     - section-1

@@ -4,7 +4,8 @@
 # superuser at boot, so no grub2-mkconfig is needed. The role cannot invent a password:
 # the hash comes from cis_grub_password_hash (output of grub2-mkpasswd-pbkdf2, keep it in
 # a vault). With the variable empty the control only reports; it never touches the host.
-# With a well-formed hash the role writes user.cfg (0600 root:root; the tasks that carry
+# With a well-formed hash the role writes user.cfg (owner, group and mode from
+# cis_bootloader_file_owner, _group and _mode: root:root 0600 by default; the tasks that carry
 # the hash use no_log). A malformed hash is a finding and nothing is written.
 # Remediate mode records a finding when no hash is in place after the fix; under --check
 # nothing is fixed, so nothing is recorded then.
@@ -31,9 +32,9 @@
   ansible.builtin.copy:
     dest: /boot/grub2/user.cfg
     content: "GRUB2_PASSWORD={{ cis_grub_password_hash }}\n"
-    owner: root
-    group: root
-    mode: "0600"
+    owner: "{{ cis_bootloader_file_owner }}"
+    group: "{{ cis_bootloader_file_group }}"
+    mode: "{{ cis_bootloader_file_mode }}"
   no_log: true
   vars:
     cis_state_1_4_1_valid: "{{ cis_grub_password_hash | default('') is match('^grub\\.pbkdf2\\.sha512\\.[0-9]+\\.[0-9A-Fa-f]+\\.[0-9A-Fa-f]+$') }}"

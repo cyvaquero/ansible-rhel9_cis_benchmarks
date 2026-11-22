@@ -7,10 +7,11 @@
   vars:
     cis_cp_id: "1.6.4"
     cis_cp_kind: "sshcbc"
-    cis_cp_module: "CIS-NO-SSHCBC"
+    cis_cp_enforce: true
+    cis_cp_module: "{{ cis_crypto_policy_module_sshcbc }}"
     cis_cp_pmod_body: |
       # Added by the CIS RHEL 9 role: drop CBC ciphers for SSH.
-      cipher@SSH = -*-CBC
+      cipher@SSH = {{ cis_crypto_policy_ssh_ciphers_excluded | map('regex_replace', '^', '-') | join(' ') }}
   tags:
     - "1.6.4"
     - section-1

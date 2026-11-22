@@ -13,9 +13,9 @@
     cis_dc_section: "org/gnome/desktop/media-handling"
     cis_dc_key: "automount"
     cis_dc_kind: "eq"
-    cis_dc_a: "false"
+    cis_dc_a: "{{ cis_expect_gdm_automount }}"
     cis_dc_b: ""
-    cis_dc_write: "false"
+    cis_dc_write: "{{ cis_gdm_automount | bool | string | lower }}"
   when: "'gdm' in ansible_facts.packages"
   tags:
     - "1.8.4"
@@ -33,9 +33,9 @@
     cis_dc_section: "org/gnome/desktop/media-handling"
     cis_dc_key: "automount-open"
     cis_dc_kind: "eq"
-    cis_dc_a: "false"
+    cis_dc_a: "{{ cis_expect_gdm_automount_open }}"
     cis_dc_b: ""
-    cis_dc_write: "false"
+    cis_dc_write: "{{ cis_gdm_automount_open | bool | string | lower }}"
   when: "'gdm' in ansible_facts.packages"
   tags:
     - "1.8.4"
