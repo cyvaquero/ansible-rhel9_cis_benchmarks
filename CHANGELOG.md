@@ -36,15 +36,15 @@ implements, then the role's own version.
   `multi-user.target`, not only `graphical.target`), 2.4.1.2 to 2.4.1.8 (a mode stricter than
   0600 on `/etc/crontab` or than 0700 on a cron directory is set to 0600 or 0700), and 2.4.1.9
   and 2.4.2.1 (an allow or deny file stricter than 0640 is set to 0640, and when the `crontab` or
-  `daemon` group exists on the host a file with group root gets that group), 2.4.1.1 (a host
-  without `cronie` gets it installed, because `cis_cronie_installed` is `true`; `crond` and an
-  empty `cron.allow` follow, so only root can then use `crontab`), and 2.3.1 (with chrony wanted,
-  a masked, disabled or stopped `chronyd` is unmasked, enabled and started). `cis_time_sources`
+  `daemon` group exists on the host a file with group root gets that group). `cis_time_sources`
   now enforces its list exactly when it is not empty: the `server` and `pool` lines in
   `/etc/chrony.conf` and in the files it includes (not the DHCP directory) become exactly the
   list; an empty list, the default, leaves the host's sources alone as before. New
-  `cis_cronie_installed` and `cis_at_installed` (default `null`, leave `at` alone) install or
-  remove the packages. Preflight validates
+  `cis_cronie_installed` and `cis_at_installed` (both default `null`, leave the package alone)
+  install or remove the packages. A package variable set to `true` only installs the package: the
+  role never touches its units or configuration beyond what the control says (2.3.1 does not
+  enable or start `chronyd`). Behavior change with the defaults: 2.1.20 no longer removes `gdm` and `gnome-shell`
+  beyond the group removal. Preflight validates
   only the type and format of the new variables. The README has a table per group of controls.
   The shared `tasks/lib/` helpers take the new inputs as optional parameters, so section 3 and
   the other users of `service_not_in_use.yml` behave as before. Part of #58 (sections 3 to 5

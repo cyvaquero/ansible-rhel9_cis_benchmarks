@@ -23,7 +23,8 @@
     - server
     - workstation
   block:
-    # The cronie package (cis_cronie_installed): installed when wanted and missing; when not
+    # The cronie package (cis_cronie_installed, default null: leave it alone, since the benchmark
+# judges cron only when it is installed): installed when wanted and missing; when not
     # wanted it is removed if no installed package needs it (an rpm erase test decides,
     # dependents are never removed), otherwise it stays and crond is stopped and masked, and the
     # fix below leaves that mask alone. The cron controls then judge the benchmark as usual.
@@ -44,6 +45,7 @@
         state: present
       when:
         - not (cis_audit_only | bool)
+        - cis_cronie_installed is not none
         - cis_cronie_installed | bool
         - cis_check_2_4_1_1_pkg.rc != 0
 
@@ -60,6 +62,7 @@
       failed_when: false
       when:
         - not (cis_audit_only | bool)
+        - cis_cronie_installed is not none
         - not (cis_cronie_installed | bool)
         - cis_check_2_4_1_1_pkg.rc == 0
 
@@ -129,7 +132,7 @@
         state: "{{ 'started' if cis_crond_active | bool else 'stopped' }}"
       when:
         - not (cis_audit_only | bool)
-        - cis_cronie_installed | bool
+        - cis_cronie_installed is none or cis_cronie_installed | bool
         - "'site=bad' in cis_check_2_4_1_1.stdout_lines"
 
     - name: "2.4.1.1 - Check again after the fix"
@@ -142,7 +145,7 @@
       when:
         - not (cis_audit_only | bool)
         - not ansible_check_mode
-        - cis_cronie_installed | bool
+        - cis_cronie_installed is none or cis_cronie_installed | bool
         - "'site=bad' in cis_check_2_4_1_1.stdout_lines"
 
     - name: "2.4.1.1 - Record the finding when the check fails in audit mode"

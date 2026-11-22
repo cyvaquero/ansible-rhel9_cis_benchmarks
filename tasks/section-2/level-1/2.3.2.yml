@@ -129,8 +129,6 @@
         path: /etc/chrony.conf
         line: "{{ item | regex_replace('^add:', '') }}"
         create: true  # a missing file is created only here, never edited otherwise
-        owner: "{{ cis_chrony_conf_owner }}"
-        group: "{{ cis_chrony_conf_group }}"
       loop: "{{ cis_check_2_3_2.stdout_lines | select('match', '^add:') | list }}"
       register: cis_add_2_3_2
       when:

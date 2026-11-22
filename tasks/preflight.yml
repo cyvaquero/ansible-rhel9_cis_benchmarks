@@ -176,7 +176,6 @@
     - cis_tftp_client_installed
     - cis_gui_installed
     - cis_chrony_installed
-    - cis_cronie_installed
     - cis_chronyd_run_as_root
     - cis_crond_enabled
     - cis_crond_active
@@ -184,12 +183,15 @@
     - always
     - preflight
 
-- name: "Preflight - Validate cis_at_installed"
+- name: "Preflight - Validate the optional package variables"
   ansible.builtin.assert:
     that:
-      - cis_at_installed is none or cis_at_installed is boolean or (cis_at_installed | string | lower) in ['true', 'false']
-    fail_msg: "cis_at_installed must be true, false or null (got {{ cis_at_installed | to_json }})."
+      - vars[item] is none or vars[item] is boolean or (vars[item] | string | lower) in ['true', 'false']
+    fail_msg: "{{ item }} must be true, false or null (got {{ vars[item] | to_json }})."
     quiet: true
+  loop:
+    - cis_cronie_installed
+    - cis_at_installed
   tags:
     - always
     - preflight
@@ -220,8 +222,6 @@
     fail_msg: "{{ item.key }} must be {{ item.what }} (got {{ vars[item.key] | to_json }})."
     quiet: true
   loop:
-    - {key: cis_chrony_conf_owner, pattern: '^[a-z_][a-z0-9_.-]*[$]?$', what: a plain account name}
-    - {key: cis_chrony_conf_group, pattern: '^[a-z_][a-z0-9_.-]*[$]?$', what: a plain group name}
     - {key: cis_cron_owner, pattern: '^[a-z_][a-z0-9_.-]*[$]?$', what: a plain account name}
     - {key: cis_cron_group, pattern: '^[a-z_][a-z0-9_.-]*[$]?$', what: a plain group name}
     - {key: cis_cron_allow_owner, pattern: '^[a-z_][a-z0-9_.-]*[$]?$', what: a plain account name}

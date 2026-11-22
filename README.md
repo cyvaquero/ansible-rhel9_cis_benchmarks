@@ -221,7 +221,7 @@ roles:
 | `cis_services_keep` | `[]` | CIS IDs of service controls whose service the site needs, for example `["2.1.1", "2.1.10"]`. A listed control (2.1.1 to 2.1.22, or 3.1.3 for bluetooth) is skipped with no change and no finding. It wins over the package variables below: nothing is installed or removed for a listed control, whatever they say. |
 | `cis_autofs_installed`, `cis_avahi_installed`, `cis_cockpit_installed`, `cis_cockpit_ws_installed`, `cis_dhcp_server_installed`, `cis_bind_installed`, `cis_dnsmasq_installed`, `cis_samba_installed`, `cis_vsftpd_installed`, `cis_dovecot_installed`, `cis_cyrus_imapd_installed`, `cis_nfs_utils_installed`, `cis_cups_installed`, `cis_rpcbind_installed`, `cis_rsync_daemon_installed`, `cis_net_snmp_installed`, `cis_telnet_server_installed`, `cis_tftp_server_installed`, `cis_squid_installed`, `cis_httpd_installed`, `cis_nginx_installed` | `false` | 2.1.1 to 2.1.18 (2.1.3 is Level 2): whether each service package should be installed, named after the package (`dhcp-server`, `bind`, `nfs-utils`, `cups`, ...). `false`: the role removes it when no other installed package needs it, otherwise stops and masks its units. `true`: the role installs it when missing and leaves its units alone, and the control reports a finding on every run, since the benchmark wants it absent. Set packages that depend on each other together (`cockpit` and `cockpit-ws`). |
 | `cis_x_server_installed`, `cis_xwayland_installed` | `false` | 2.1.21, 2.1.22 (Level 2, skipped by default): whether `xorg-x11-server-common` and `xorg-x11-server-Xwayland` should be installed. `false` removes them with everything that depends on them. `true` installs them when missing. |
-| `cis_gui_installed` | `false` | 2.1.20 (Level 2 Server, skipped by default): whether the graphical interface (the "Server with GUI" group, `gdm`, `gnome-shell`) should be installed. `false` removes it; `true` installs the group when it is missing and removes nothing, and the control reports a finding. |
+| `cis_gui_installed` | `false` | 2.1.20 (Level 2 Server, skipped by default): whether the graphical interface (the "Server with GUI" group) should be installed. `false` removes the group; `true` installs the group when it is missing and removes nothing, and the control reports a finding. |
 | `cis_default_target` | `multi-user.target` | 2.1.20: the default systemd target the role links `default.target` to whenever it is another one, also when it is not `graphical.target`. `graphical.target` is reported as a finding. |
 | `cis_postfix_inet_interfaces` | `loopback-only` | 2.1.19: the postfix `inet_interfaces` value the role sets (`postconf -e`) whenever the current one differs, also when it is already loopback only in another spelling (`localhost`). postfix restarts only when running. A value that is not loopback only is written and reported as a finding. |
 
@@ -235,11 +235,10 @@ roles:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `cis_chrony_installed` | `true` | 2.3.1: whether `chrony` should be installed. `false` removes it when no other installed package needs it; one that is needed stays installed and `chronyd` is stopped and masked instead. `true` also makes `chronyd` unmasked, enabled and running (undoing an earlier mask by the role). `false` is reported as a finding when chrony is gone. |
+| `cis_chrony_installed` | `true` | 2.3.1: whether `chrony` should be installed. `false` removes it when no other installed package needs it; one that is needed stays installed and `chronyd` is stopped and masked instead. `true` only installs it: the role never enables or starts `chronyd`. `false` is reported as a finding when chrony is gone. |
 | `cis_time_sources` | `[]` | 2.3.2: the time sources, as full chrony directive lines, for example `["server time.example.com iburst"]`. Empty: the host's sources are left alone (a host with no source is a finding). Non-empty: the role enforces the list exactly. The `server` and `pool` lines in `/etc/chrony.conf` and in the files it includes (`include`, `confdir`, and the `sourcedir` `*.sources` files, never the DHCP directory) become exactly the list: other such lines are removed, missing ones are appended to `/etc/chrony.conf`, nothing else is touched, and `chronyd` restarts only on a change. |
-| `cis_chrony_conf_owner`, `cis_chrony_conf_group` | `root`, `root` | 2.3.2: the owner and group set on `/etc/chrony.conf` when the role adds a time source to it (never otherwise; the mode is not changed). |
 | `cis_chronyd_run_as_root` | `false` | 2.3.3: whether `chronyd` runs as root. `false` removes the `-u root` option from `OPTIONS` in `/etc/sysconfig/chronyd` and keeps the others; `true` drops every `-u` option and sets `-u root` (creating the file or the line when missing). `true` is reported as a finding. |
-| `cis_cronie_installed` | `true` | 2.4.1.1: whether `cronie` should be installed. `true` installs it when missing (a host without cron then gets `crond` and an empty `cron.allow`, so only root can use `crontab`); `false` removes it when no other installed package needs it, otherwise it stays and `crond` is stopped and masked. The cron controls still judge the benchmark (they pass without `cronie`). |
+| `cis_cronie_installed` | `null` | 2.4.1.1: whether `cronie` should be installed. `null` leaves it alone (the benchmark judges cron only when it is installed); `true` installs it when missing (install only; the controls then enable and start `crond` as usual and create an empty `cron.allow`); `false` removes it when no other installed package needs it, otherwise it stays and `crond` is stopped and masked. The cron controls still judge the benchmark (they pass without `cronie`). |
 | `cis_at_installed` | `null` | 2.4.2.1: whether `at` should be installed. `null` leaves it alone (the control applies only when it is installed); `true` installs it, `false` removes it with the same rules as `cronie`. |
 | `cis_crond_enabled`, `cis_crond_active` | `true`, `true` | 2.4.1.1: whether `crond` is enabled and whether it is running. The role unmasks, enables and starts it, or stops and disables it, to match; `false` is reported as a finding. |
 | `cis_cron_owner`, `cis_cron_group` | `root`, `root` | 2.4.1.2 to 2.4.1.8: the owner and group set on `/etc/crontab` and the `/etc/cron.*` directories. |
@@ -430,12 +429,10 @@ Values outside these ranges stop the run at preflight.
   `loopback-only`) gets it (`postconf -e`) and is restarted only when it is running. Any other
   MTA that listens beyond loopback is a finding and is never edited.
 - Desktop and X server (2.1.20 to 2.1.22, Level 2 Server, skipped by default): 2.1.20 fails
-  while the "Server with GUI" environment group is installed, while `gdm` or `gnome-shell`
-  is installed, or while the default target is `graphical.target`. To fix it the role first
+  while the "Server with GUI" environment group is installed, or while the default target is `graphical.target`. To fix it the role first
   marks the minimal and Server environments as installed (so `openssh-server` and the other
   packages shared with a plain server stay wanted; nothing is installed, so packages other
-  controls removed do not come back), removes the GUI group, removes any leftover
-  `gdm` and `gnome-shell` with their dependents, and points the default target at
+  controls removed do not come back), removes the GUI group, and points the default target at
   `cis_default_target` (`multi-user.target`) whenever it is another one. With
   `cis_gui_installed: true` it installs the group instead and removes nothing. It records a finding if `openssh-server` is gone afterwards. 2.1.21
   and 2.1.22 remove `xorg-x11-server-common` and `xorg-x11-server-Xwayland` with dnf
@@ -529,7 +526,7 @@ Values outside these ranges stop the run at preflight.
   run the role again.
 - Time synchronization (2.3): 2.3.1 installs `chrony` (or removes it when
   `cis_chrony_installed` is `false` and nothing needs it; if something does, it stops and masks
-  `chronyd` instead) and, when it is wanted, unmasks, enables and starts `chronyd`. 2.3.2 looks for a `server` or `pool`
+  `chronyd` instead) 2.3.2 looks for a `server` or `pool`
   line in `/etc/chrony.conf` and in the files its `include`, `confdir` and `sourcedir`
   directives pull in; `sourcedir /run/chrony-dhcp` is ignored because DHCP sources exist
   only at run time. A non-empty `cis_time_sources` is enforced exactly (see its table row) and
