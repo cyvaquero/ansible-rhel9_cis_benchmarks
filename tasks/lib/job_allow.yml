@@ -1,29 +1,39 @@
 ---
 # Shared logic for the job scheduler allow-list controls (2.4.1.9 cron, 2.4.2.1 at). A
 # control file imports this with:
-#   cis_ja_id     the CIS ID
-#   cis_ja_pkg    the package that provides the scheduler (cronie, at)
-#   cis_ja_allow  the allow file
-#   cis_ja_deny   the deny file
-#   cis_ja_group  the group that may own the files besides root (crontab, daemon)
-#   cis_ja_users  users to add to the allow file (cis_cron_allow_users, cis_at_allow_users)
+#   cis_ja_id      the CIS ID
+#   cis_ja_pkg     the package that provides the scheduler (cronie, at)
+#   cis_ja_allow   the allow file
+#   cis_ja_deny    the deny file
+#   cis_ja_owner   the owner the role sets (cis_cron_allow_owner, cis_at_allow_owner)
+#   cis_ja_group   the group the role sets (cis_cron_allow_group, cis_at_allow_group); a group
+#                  that does not exist on the host is replaced by root
+#   cis_ja_mode    the mode the role sets (cis_cron_allow_mode, cis_at_allow_mode)
+#   cis_ja_xgroups the groups the benchmark accepts besides root (cis_expect_cron_allow_groups,
+#                  cis_expect_at_allow_groups)
+#   cis_ja_users   users to add to the allow file (cis_cron_allow_users, cis_at_allow_users)
 # and puts the tags, which every task here inherits, on the import.
 #
-# Without the package the control is compliant and nothing is installed. Compliant: the
-# allow file exists, owned by root, group root or the named group, mode 0640 or stricter,
-# and the deny file, when present, follows the same rules (it is never deleted). The fix
-# creates a missing allow file (empty, 0640), sets owner, group and mode on either file
-# (the named group when it exists, else root; stricter modes stay), and adds every listed
-# user that is not yet in the allow file. Users are only ever added, never removed. A
-# symlink or a file of another type is never changed; it is a finding. Preflight rejects a
-# user list with an item that is not a plain login name, so the filter on the last argument
-# below is only a guard. Remediate mode records a finding when something is
-# still not compliant after the fix; under --check nothing is fixed, so nothing is recorded.
+# Without the package the control is compliant and nothing is installed. The check judges the
+# benchmark: the allow file exists, owned by the expected id (cis_expect_job_allow_uid), group
+# root or one of cis_ja_xgroups, with none of the forbidden permission bits
+# (cis_expect_job_allow_forbidden_bits), and the deny file, when present, follows the same rules
+# (it is never deleted). The fix makes owner, group and mode exactly the site's on both files
+# whenever they differ, also when the host is stricter than the benchmark (a stricter mode is
+# replaced), creates a missing allow file (empty, with the site's owner, group and mode), and
+# adds every listed user that is not yet in the allow file. Users are only ever added, never
+# removed. A symlink or a file of another type is never changed; it is a finding. Preflight
+# rejects a user list with an item that is not a plain login name, so the filter on the last
+# argument below is only a guard. Remediate mode records a finding when something is still not
+# compliant with the benchmark after the fix (a weaker site mode is found on every run); under
+# --check nothing is fixed, so nothing is recorded then.
 #
 # The check prints group=<name> (the group the fix uses), allow=<state> and deny=<state>
-# (missing, ok, bad or odd; a missing deny file counts as ok) and adduser:<name> lines. Its
-# exit status is 1 unless allow and deny are ok and no adduser: line exists.
-# Task names are one template expression because the CIS ID must come first.
+# (missing, ok, bad or odd; a missing deny file counts as ok: the benchmark verdict),
+# siteallow=<state> and sitedeny=<state> (missing, ok, bad or odd: whether the file holds exactly
+# the site's owner, group and mode), adduser:<name> lines, and fix=yes when the role has
+# anything to change. Its exit status is 1 unless allow and deny are ok and no adduser: line
+# exists. Task names are one template expression because the CIS ID must come first.
 
 - name: "{{ cis_ja_id ~ ' - Read the owner and mode of ' ~ cis_ja_allow ~ ' and ' ~ cis_ja_deny }}"
   ansible.builtin.command:
@@ -34,33 +44,60 @@
         set -u
         export LC_ALL=C
         pkg=$1; allow=$2; deny=$3; pref=$4; users=$5
+        xuid=$6; xgroups=$7; bits=$8; owner=$9; mode=${10}
         rpm -q "$pkg" >/dev/null 2>&1 || { echo "state=ok"; exit 0; }
-        gid=0
         grp=root
+        gid=$(getent group root 2>/dev/null | cut -d: -f3)
+        gid=${gid:-0}
         if g=$(getent group "$pref"); then grp=$pref; gid=$(printf '%s' "$g" | cut -d: -f3); fi
         echo "group=$grp"
-        fstate() {
-          local p=$1 u g m t
-          if [ ! -e "$p" ] && [ ! -L "$p" ]; then echo missing; return; fi
-          if [ -L "$p" ]; then echo odd; return; fi
-          read -r u g m t < <(stat -c '%u %g %a %F' "$p")
-          case "$t" in regular*) ;; *) echo odd; return ;; esac
-          if [ "$u" = 0 ] && { [ "$g" = 0 ] || [ "$g" = "$gid" ]; } && (( (8#$m & 8#7137) == 0 )); then echo ok; else echo bad; fi
+        # The group ids the benchmark accepts: each listed group that exists (root is listed).
+        okgids=" "
+        for n in $xgroups; do
+          x=$(getent group "$n" 2>/dev/null | cut -d: -f3)
+          [ -z "$x" ] || okgids="$okgids$x "
+        done
+        su=$(id -u -- "$owner" 2>/dev/null) || su=-1
+        # kind <path>: missing, odd (a link or not a regular file) or file.
+        kind() {
+          if [ ! -e "$1" ] && [ ! -L "$1" ]; then echo missing; return; fi
+          if [ -L "$1" ]; then echo odd; return; fi
+          case "$(stat -c '%F' "$1")" in regular*) echo file ;; *) echo odd ;; esac
         }
-        a=$(fstate "$allow")
-        d=$(fstate "$deny")
+        # fstate <path>: the benchmark verdict (a missing file is reported as missing).
+        fstate() {
+          local k u g m t
+          k=$(kind "$1"); [ "$k" = file ] || { echo "$k"; return; }
+          read -r u g m t < <(stat -c '%u %g %a %F' "$1")
+          if [ "$u" = "$xuid" ] && case "$okgids" in *" $g "*) true ;; *) false ;; esac && (( (8#$m & 8#$bits) == 0 )); then echo ok; else echo bad; fi
+        }
+        # sstate <path>: whether the file holds exactly the site's owner, group and mode.
+        sstate() {
+          local k u g m t
+          k=$(kind "$1"); [ "$k" = file ] || { echo "$k"; return; }
+          read -r u g m t < <(stat -c '%u %g %a %F' "$1")
+          if [ "$u" = "$su" ] && [ "$g" = "$gid" ] && (( 8#$m == 8#$mode )); then echo ok; else echo bad; fi
+        }
+        a=$(fstate "$allow"); d=$(fstate "$deny")
+        sa=$(sstate "$allow"); sd=$(sstate "$deny")
         [ "$d" = missing ] && d=ok
         echo "allow=$a"
         echo "deny=$d"
+        echo "siteallow=$sa"
+        echo "sitedeny=$sd"
         bad=0
+        fix=no
         [ "$a" = ok ] || bad=1
         [ "$d" = ok ] || bad=1
+        [ "$sa" = bad ] || [ "$sa" = missing ] && fix=yes
+        [ "$sd" = bad ] && fix=yes
         if [ "$a" != odd ]; then
           set -f
           for u in $users; do
-            if [ "$a" = missing ] || ! grep -qxF -- "$u" "$allow"; then echo "adduser:$u"; bad=1; fi
+            if [ "$a" = missing ] || ! grep -qxF -- "$u" "$allow"; then echo "adduser:$u"; bad=1; fix=yes; fi
           done
         fi
+        echo "fix=$fix"
         exit $bad
       - bash
       - "{{ cis_ja_pkg }}"
@@ -68,6 +105,11 @@
       - "{{ cis_ja_deny }}"
       - "{{ cis_ja_group }}"
       - "{{ cis_ja_users | select('regex', '^[A-Za-z_][A-Za-z0-9_.-]*$', match_type='fullmatch') | join(' ') }}"
+      - "{{ cis_expect_job_allow_uid }}"
+      - "{{ cis_ja_xgroups | join(' ') }}"
+      - "{{ cis_expect_job_allow_forbidden_bits }}"
+      - "{{ cis_ja_owner }}"
+      - "{{ cis_ja_mode }}"
   register: cis_ja_check
   changed_when: false
   check_mode: false
@@ -78,9 +120,9 @@
     dest: "{{ cis_ja_allow }}"
     content: ""
     force: false
-    owner: root
+    owner: "{{ cis_ja_owner }}"
     group: "{{ cis_ja_check.stdout_lines | select('match', '^group=') | first | regex_replace('^group=', '') }}"
-    mode: "0640"
+    mode: "{{ cis_ja_mode }}"
   when:
     - not (cis_audit_only | bool)
     - "'allow=missing' in cis_ja_check.stdout_lines"
@@ -89,29 +131,29 @@
   ansible.builtin.file:
     path: "{{ cis_ja_allow }}"
     state: file
-    owner: root
+    owner: "{{ cis_ja_owner }}"
     group: "{{ cis_ja_check.stdout_lines | select('match', '^group=') | first | regex_replace('^group=', '') }}"
-    mode: "u-xs,g-wxs,o-rwxt"
+    mode: "{{ cis_ja_mode }}"
     follow: false
   when:
     - not (cis_audit_only | bool)
-    - "'allow=bad' in cis_ja_check.stdout_lines"
+    - "'siteallow=bad' in cis_ja_check.stdout_lines"
 
 - name: "{{ cis_ja_id ~ ' - Set the owner and mode of ' ~ cis_ja_deny }}"
   ansible.builtin.file:
     path: "{{ cis_ja_deny }}"
     state: file
-    owner: root
+    owner: "{{ cis_ja_owner }}"
     group: "{{ cis_ja_check.stdout_lines | select('match', '^group=') | first | regex_replace('^group=', '') }}"
-    mode: "u-xs,g-wxs,o-rwxt"
+    mode: "{{ cis_ja_mode }}"
     follow: false
   when:
     - not (cis_audit_only | bool)
-    - "'deny=bad' in cis_ja_check.stdout_lines"
+    - "'sitedeny=bad' in cis_ja_check.stdout_lines"
 
-# Add only: lines already in the file stay, and nothing is removed. No mode is set, so a
-# stricter existing mode stays; create: true only matters under --check, where the copy
-# above did not create the file.
+# Add only: lines already in the file stay, and nothing is removed. No mode is set (the file
+# tasks above own it); create: true only matters under --check, where the copy above did not
+# create the file.
 - name: "{{ cis_ja_id ~ ' - Add the listed users to ' ~ cis_ja_allow }}"
   ansible.builtin.lineinfile:  # noqa: risky-file-permissions
     path: "{{ cis_ja_allow }}"
@@ -130,7 +172,7 @@
   when:
     - not (cis_audit_only | bool)
     - not ansible_check_mode
-    - cis_ja_check.rc != 0
+    - "'fix=yes' in cis_ja_check.stdout_lines"
 
 - name: "{{ cis_ja_id ~ ' - Record the finding' }}"
   ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"

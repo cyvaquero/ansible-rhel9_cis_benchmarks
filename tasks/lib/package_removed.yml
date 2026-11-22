@@ -5,10 +5,15 @@
 #   cis_pkg_id        the CIS ID, for the task names and the finding
 #   cis_pkg_name      a short label for the task names
 #   cis_pkg_packages  the packages to remove
+#   cis_pkg_want      optional, default []: the listed packages the site wants installed (a
+#                     role variable). They are not removed, are installed with dnf when
+#                     missing, and are reported as a finding while installed, since the
+#                     benchmark wants them absent
 # and puts the tags, which every task here inherits, on the import.
 #
-# The check prints remove:<package> for each listed package that is installed and exits 1
-# when it printed any. Remediate mode removes them with dnf, which also removes every
+# The check prints remove:<package> for each listed package that is installed and not wanted,
+# want:<package> for a wanted one that is installed and install:<package> (information only)
+# for a wanted one that is missing, and exits 1 when it printed a remove: or want: line. Remediate mode removes them with dnf, which also removes every
 # installed package that depends on them (the desktop, for the X server): that is the
 # point of these controls, so they are skipped by default (cis_default_exclusions). It
 # then checks again; a control that still fails is recorded as a finding without failing
@@ -28,11 +33,16 @@
           - |
             bad=0
             for p in $1; do
-              if rpm -q "$p" >/dev/null 2>&1; then echo "remove:$p"; bad=1; fi
+              case " $2 " in
+                *" $p "*)
+                  if rpm -q "$p" >/dev/null 2>&1; then echo "want:$p"; bad=1; else echo "install:$p"; fi ;;
+                *) if rpm -q "$p" >/dev/null 2>&1; then echo "remove:$p"; bad=1; fi ;;
+              esac
             done
             exit $bad
           - sh
           - "{{ cis_pkg_packages | join(' ') }}"
+          - "{{ cis_pkg_want | default([]) | join(' ') }}"
       register: cis_pkg_check
       changed_when: false
       check_mode: false
@@ -45,7 +55,16 @@
       failed_when: false
       when:
         - not (cis_audit_only | bool)
-        - cis_pkg_check.rc != 0
+        - cis_pkg_check.stdout_lines | select('match', '^remove:') | list | length > 0
+
+    - name: "{{ cis_pkg_id ~ ' - Install the ' ~ cis_pkg_name ~ ' packages the site wants' }}"
+      ansible.builtin.dnf:
+        name: "{{ cis_pkg_check.stdout_lines | select('match', '^install:') | map('regex_replace', '^install:', '') | list }}"
+        state: present
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - cis_pkg_check.stdout_lines | select('match', '^install:') | list | length > 0
 
     - name: "{{ cis_pkg_id ~ ' - Check again after the fix' }}"
       ansible.builtin.command:
@@ -57,7 +76,7 @@
       when:
         - not (cis_audit_only | bool)
         - not ansible_check_mode
-        - cis_pkg_check.rc != 0
+        - cis_pkg_check.rc != 0 or (cis_pkg_check.stdout_lines | select('match', '^install:') | list | length > 0)
 
     - name: "{{ cis_pkg_id ~ ' - Record the finding when the check fails in audit mode' }}"
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"

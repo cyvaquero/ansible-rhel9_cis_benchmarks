@@ -1,5 +1,7 @@
 ---
 # 2.1.2 - avahi daemon service not in use. The logic is shared in tasks/lib/service_not_in_use.yml.
+# The package variables (cis_avahi_installed) say whether each package should be installed;
+# cis_services_keep skips the control.
 
 - name: "2.1.2 - Ensure avahi daemon services are not in use"
   ansible.builtin.import_tasks: ../../lib/service_not_in_use.yml
@@ -7,7 +9,8 @@
     cis_svc_id: "2.1.2"
     cis_svc_name: "avahi daemon"
     cis_svc_packages: [avahi]
-    cis_svc_units: [avahi-daemon.socket, avahi-daemon.service]
+    cis_svc_want: "{{ ['avahi'] if cis_avahi_installed | bool else [] }}"
+    cis_svc_units: "{{ [] if cis_avahi_installed | bool else ['avahi-daemon.socket', 'avahi-daemon.service'] }}"
   tags:
     - "2.1.2"
     - section-2

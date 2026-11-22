@@ -4,6 +4,10 @@
 #   cis_client_id        the CIS ID, for the task names and the finding
 #   cis_client_name      a short label for the task names
 #   cis_client_packages  the client packages
+#   cis_client_want      optional, default []: the listed packages the site wants installed (a
+#                        role variable). They are left out of the removal, installed with dnf
+#                        when missing, and reported as a finding while installed, since the
+#                        benchmark wants them absent
 # and puts the tags, which every task here inherits, on the import.
 #
 # Decision, made on the host at run time with read-only commands, with the same rpm erase
@@ -13,8 +17,10 @@
 #   removed with dnf. A package that something else needs is kept, because dependents are
 #   never removed, and that is a finding.
 #
-# The check prints remove:<package> (to be removed) and keep:<package> (needed by another
-# package); its exit status is 1 when it printed either. Audit mode only runs the check and
+# The check prints remove:<package> (to be removed), keep:<package> (needed by another
+# package), want:<package> (a wanted package that is installed) and install:<package>
+# (information only: a wanted package that is missing); its exit status is 1 when it printed
+# any of the first three. Audit mode only runs the check and
 # records a finding. Remediate mode removes the remove: packages, checks again, and records
 # a finding when anything still fails (always the case for a kept package), without failing
 # the run. Under --check nothing changes and nothing is recorded.
@@ -26,11 +32,19 @@
       - /bin/sh
       - -c
       - |
-        # $1: packages, space separated.
+        # $1: packages, $2: packages the site wants, space separated.
         pkgs=$1
+        want=$2
         erase=""
         blocked=""
+        wanted=""
+        install=""
         for p in $pkgs; do
+          case " $want " in
+            *" $p "*)
+              if rpm -q "$p" >/dev/null 2>&1; then wanted="$wanted $p"; else install="$install $p"; fi
+              continue ;;
+          esac
           rpm -q "$p" >/dev/null 2>&1 && erase="$erase $p"
         done
         while :; do
@@ -59,9 +73,12 @@
         bad=0
         for p in $erase; do echo "remove:$p"; bad=1; done
         for p in $blocked; do echo "keep:$p"; bad=1; done
+        for p in $wanted; do echo "want:$p"; bad=1; done
+        for p in $install; do echo "install:$p"; done
         exit $bad
       - sh
       - "{{ cis_client_packages | join(' ') }}"
+      - "{{ cis_client_want | default([]) | join(' ') }}"
   register: cis_client_check
   changed_when: false
   check_mode: false
@@ -76,6 +93,15 @@
     - not (cis_audit_only | bool)
     - cis_client_check.stdout_lines | select('match', '^remove:') | list | length > 0
 
+- name: "{{ cis_client_id ~ ' - Install the ' ~ cis_client_name ~ ' client the site wants' }}"
+  ansible.builtin.dnf:
+    name: "{{ cis_client_check.stdout_lines | select('match', '^install:') | map('regex_replace', '^install:', '') | list }}"
+    state: present
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - cis_client_check.stdout_lines | select('match', '^install:') | list | length > 0
+
 - name: "{{ cis_client_id ~ ' - Check again after the fix' }}"
   ansible.builtin.command:
     argv: *cis_client_argv
@@ -86,7 +112,7 @@
   when:
     - not (cis_audit_only | bool)
     - not ansible_check_mode
-    - cis_client_check.rc != 0
+    - cis_client_check.rc != 0 or (cis_client_check.stdout_lines | select('match', '^install:') | list | length > 0)
 
 - name: "{{ cis_client_id ~ ' - Report the client that another package needs' }}"
   ansible.builtin.debug:

@@ -4,16 +4,24 @@
 # is installed, its inet_interfaces is loopback only. The check reads the listening
 # sockets (ss) and the postfix configuration (postconf).
 #
-# Fix, for postfix only: postconf -e inet_interfaces=loopback-only when its configuration
-# is not loopback only, then restart postfix only when it is running (also when the
-# configuration was already right but a running postfix still listens elsewhere). Any
-# other MTA (sendmail, exim) that listens beyond loopback is a finding and is never edited.
-# A listener that is still there after the fix is a finding; under --check nothing changes
-# and nothing is recorded. cis_services_keep lists 2.1.19 to skip the control.
+# The check judges the benchmark: the mail ports (cis_expect_mta_ports), the listening
+# addresses (cis_expect_mta_addresses_ok) and the inet_interfaces tokens
+# (cis_expect_mta_interfaces_ok) that count as loopback only.
 #
-# The check prints one line per problem: config:<inet_interfaces value>,
-# listen:<address>:<port>:<process> and, as information, postfix:active. Its exit status
-# is 1 when a config: or listen: line exists.
+# Fix, for postfix only: postconf -e inet_interfaces=<cis_postfix_inet_interfaces> whenever its
+# configuration is not exactly that (blanks between the items are ignored), also when it is
+# already loopback only in another spelling, then restart postfix only when it is running
+# (also when the configuration is already loopback only but a running postfix still listens
+# elsewhere; not when the site's own value is the one that is not loopback only, or it would
+# restart on every run). Any other MTA (sendmail, exim) that listens beyond loopback is a finding and is
+# never edited. A configuration or listener that is not loopback only after the fix (a weaker
+# site value is found on every run) is a finding; under --check nothing changes and nothing
+# is recorded. cis_services_keep lists 2.1.19 to skip the control.
+#
+# The check prints one line per problem: config:<inet_interfaces value> (not loopback only),
+# listen:<address>:<port>:<process> and, as information, postfix:active and
+# set:<inet_interfaces value> (postfix is installed and its value differs from the site's).
+# Its exit status is 1 when a config: or listen: line exists.
 
 - name: "2.1.19 - Handle mail transfer agents unless the site keeps them"
   when: "'2.1.19' not in (cis_services_keep | default([]))"
@@ -30,17 +38,30 @@
           - /bin/sh
           - -c
           - |
+            # $1: mail ports, $2: inet_interfaces tokens and $3: addresses that are loopback
+            # only (a trailing * matches any suffix), space separated; $4: the site's value.
+            ports=$1; okif=$2; okaddr=$3; site=$4
+            set -f
             bad=0
+            # loopback <value> <patterns>: succeeds when the value equals a pattern or starts
+            # with the part of a pattern that ends in *.
+            loopback() {
+              for pat in $2; do
+                case "$pat" in
+                  *"*") case "$1" in "${pat%\*}"*) return 0 ;; esac ;;
+                  *) [ "$1" = "$pat" ] && return 0 ;;
+                esac
+              done
+              return 1
+            }
             # Listening TCP sockets on the mail ports that are not on a loopback address.
             lst=$(ss -H -ltnp 2>/dev/null | while read -r state rq sq local peer proc; do
               port=${local##*:}
-              case "$port" in (25|465|587) ;; (*) continue ;; esac
+              case " $ports " in (*" $port "*) ;; (*) continue ;; esac
               addr=${local%:*}
               addr=${addr#[}
               addr=${addr%]}
-              case "$addr" in
-                (127.*|::1|::ffff:127.*) continue ;;
-              esac
+              if loopback "$addr" "$okaddr"; then continue; fi
               name=$(printf '%s' "$proc" | sed -n 's/.*(("\([^"]*\)".*/\1/p')
               echo "listen:$addr:$port:${name:-unknown}"
             done)
@@ -49,32 +70,35 @@
               val=$(postconf -h inet_interfaces 2>/dev/null)
               ok=yes
               for v in $(printf '%s' "$val" | tr ',' ' '); do
-                case "$v" in
-                  loopback-only|localhost|127.*|::1|"[::1]") ;;
-                  *) ok=no ;;
-                esac
+                loopback "$v" "$okif" || ok=no
               done
               [ -n "$val" ] || ok=no
               if [ "$ok" = no ]; then echo "config:$val"; bad=1; fi
+              if [ "$(printf '%s' "$val" | tr -d ' ')" != "$(printf '%s' "$site" | tr -d ' ')" ]; then echo "set:$val"; fi
               if systemctl is-active --quiet postfix 2>/dev/null; then echo "postfix:active"; fi
             fi
             exit $bad
+          - sh
+          - "{{ cis_expect_mta_ports | join(' ') }}"
+          - "{{ cis_expect_mta_interfaces_ok | join(' ') }}"
+          - "{{ cis_expect_mta_addresses_ok | join(' ') }}"
+          - "{{ cis_postfix_inet_interfaces }}"
       register: cis_check_2_1_19
       changed_when: false
       check_mode: false
       failed_when: false
 
-    # Only postfix is edited; the config: line appears only when postfix is installed.
-    - name: "2.1.19 - Set postfix to listen on loopback only"
+    # Only postfix is edited; the set: line appears only when postfix is installed.
+    - name: "2.1.19 - Set the postfix interfaces as the site wants"
       ansible.builtin.command:
         argv:
           - postconf
           - -e
-          - inet_interfaces=loopback-only
+          - "inet_interfaces={{ cis_postfix_inet_interfaces }}"
       changed_when: true
       when:
         - not (cis_audit_only | bool)
-        - cis_check_2_1_19.stdout_lines | select('match', '^config:') | list | length > 0
+        - cis_check_2_1_19.stdout_lines | select('match', '^set:') | list | length > 0
 
     # A running postfix keeps its old sockets until it restarts. A stopped one is left
     # alone: it reads the new setting when it starts.
@@ -87,8 +111,9 @@
         - not (cis_audit_only | bool)
         - cis_check_2_1_19.stdout_lines | select('match', '^postfix:active') | list | length > 0
         - >-
-          (cis_check_2_1_19.stdout_lines | select('match', '^config:') | list | length > 0)
-          or (cis_check_2_1_19.stdout_lines | select('match', '^listen:.*:master$') | list | length > 0)
+          (cis_check_2_1_19.stdout_lines | select('match', '^set:') | list | length > 0)
+          or ((cis_check_2_1_19.stdout_lines | select('match', '^listen:.*:master$') | list | length > 0)
+              and (cis_check_2_1_19.stdout_lines | select('match', '^config:') | list | length == 0))
 
     - name: "2.1.19 - Check again after the fix"
       ansible.builtin.command:
@@ -100,7 +125,7 @@
       when:
         - not (cis_audit_only | bool)
         - not ansible_check_mode
-        - cis_check_2_1_19.rc != 0
+        - cis_check_2_1_19.rc != 0 or (cis_check_2_1_19.stdout_lines | select('match', '^set:') | list | length > 0)
 
     - name: "2.1.19 - Record the finding when the check fails in audit mode"
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"

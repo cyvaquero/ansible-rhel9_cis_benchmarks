@@ -1,5 +1,7 @@
 ---
 # 2.1.7 - samba file server service not in use. The logic is shared in tasks/lib/service_not_in_use.yml.
+# The package variables (cis_samba_installed) say whether each package should be installed;
+# cis_services_keep skips the control.
 
 - name: "2.1.7 - Ensure samba file server services are not in use"
   ansible.builtin.import_tasks: ../../lib/service_not_in_use.yml
@@ -7,7 +9,8 @@
     cis_svc_id: "2.1.7"
     cis_svc_name: "samba file server"
     cis_svc_packages: [samba]
-    cis_svc_units: [smb.service]
+    cis_svc_want: "{{ ['samba'] if cis_samba_installed | bool else [] }}"
+    cis_svc_units: "{{ [] if cis_samba_installed | bool else ['smb.service'] }}"
   tags:
     - "2.1.7"
     - section-2

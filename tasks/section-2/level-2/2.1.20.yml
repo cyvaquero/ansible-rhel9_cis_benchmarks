@@ -2,14 +2,24 @@
 # 2.1.20 - no graphical user interface. Server only, skipped by default
 # (cis_default_exclusions) because it removes the desktop.
 #
-# Check, one output line per reason, exit 1 when any line exists:
+# cis_gui_installed says whether the interface should be installed (default false: the benchmark
+# state) and cis_default_target which default target the role holds (default multi-user.target).
+# The check always judges the benchmark; the fix follows the variables:
+#   false: remove the interface as described below.
+#   true:  install the group (dnf) when it is missing and remove nothing; the control reports
+#          a finding while the interface is installed.
+# The default target is linked to cis_default_target whenever it is another one (the link
+# `systemctl set-default` makes), also when it is not graphical. A target the benchmark does not
+# accept (graphical.target) is a finding on every run.
+#
+# Check, one output line per reason, exit 1 when any line exists except the information lines:
 #   group:graphical-server-environment  the "Server with GUI" environment group is installed
 #                                       (dnf -q group list --ids)
 #   dnfgroups:unknown                   dnf could not list the groups: not compliant, and the
 #                                       group steps below do not run
-#   remove:<package>                    gdm or gnome-shell is installed (stricter than the
-#                                       group test, kept on purpose)
 #   target:graphical.target             the default systemd target is graphical
+#   install:group                       information only: the group is wanted and not installed
+#   settarget:<target>                  information only: the default target is not the site's
 #
 # Fix, remediate mode only, in this order:
 #   1. When the group is installed, mark the minimal and the Server environments as
@@ -17,11 +27,11 @@
 #      GUI group shares with a plain server, openssh-server above all, stay wanted and are
 #      not removed with it. Removing sshd would lock Ansible out. They are marked, not
 #      installed, so packages other controls removed (cockpit, for 2.1.3) do not come back.
-#   2. Remove the group (@graphical-server-environment). If step 1 fails, steps 2 to 4 are
+#   2. Remove the group (@graphical-server-environment). If step 1 fails, steps 2 and 3 are
 #      skipped, the group stays, and the control records a finding.
-#   3. Remove leftover gdm and gnome-shell with dnf, together with their dependents.
-#   4. Link default.target to multi-user.target when it is graphical (the link
-#      `systemctl set-default` makes; works under --check).
+#   3. Link default.target to cis_default_target when it is another target (the link
+#      `systemctl set-default` makes; works under --check). This step runs for either value
+#      of cis_gui_installed.
 # If openssh-server is gone afterwards the control records a finding and says so; that
 # should never happen.
 # Removal is immediate, but a running display stack keeps running and the target applies
@@ -56,18 +66,19 @@
                   in_sec && /\(graphical-server-environment\)/ { found = 1 }
                   END { exit !found }'; then
                 echo "group:graphical-server-environment"; bad=1
+              else
+                echo "install:group"
               fi
             else
               echo "dnfgroups:unknown"; bad=1
             fi
-            for p in $1; do
-              if rpm -q "$p" >/dev/null 2>&1; then echo "remove:$p"; bad=1; fi
-            done
             cur=$(systemctl get-default 2>/dev/null)
-            if [ "$cur" = graphical.target ]; then echo "target:$cur"; bad=1; fi
+            if [ "$cur" = "$1" ]; then echo "target:$cur"; bad=1; fi
+            if [ -n "$cur" ] && [ "$cur" != "$2" ]; then echo "settarget:$cur"; fi
             exit $bad
           - sh
-          - "gdm gnome-shell"
+          - "{{ cis_expect_gui_bad_target }}"
+          - "{{ cis_default_target }}"
       register: cis_check_2_1_20
       changed_when: false
       check_mode: false
@@ -80,6 +91,7 @@
     - name: "2.1.20 - Mark the minimal and Server environments, then remove the GUI group"
       when:
         - not (cis_audit_only | bool)
+        - not (cis_gui_installed | bool)
         - cis_check_2_1_20.stdout_lines | select('match', '^group:') | list | length > 0
       block:
         # Marked, not installed: the dnf module cannot mark, and installing them would bring
@@ -131,27 +143,23 @@
       when:
         - not (cis_audit_only | bool)
         - not ansible_check_mode
-        - cis_check_2_1_20.rc != 0
+        - cis_check_2_1_20.rc != 0 or (cis_gui_installed | bool and 'install:group' in cis_check_2_1_20.stdout_lines)
 
-    - name: "2.1.20 - Remove leftover gdm and gnome-shell and what depends on them"
+    - name: "2.1.20 - Install the graphical server environment group the site wants"
       ansible.builtin.dnf:
-        name: >-
-          {{ (cis_check_2_1_20_after.stdout_lines | default(cis_check_2_1_20.stdout_lines))
-             | select('match', '^remove:') | map('regex_replace', '^remove:', '') | list }}
-        state: absent
+        name: "@graphical-server-environment"
+        state: present
       failed_when: false
       when:
         - not (cis_audit_only | bool)
-        - not (cis_state_2_1_20_envs_failed | default(false) | bool)
-        - >-
-          (cis_check_2_1_20_after.stdout_lines | default(cis_check_2_1_20.stdout_lines))
-          | select('match', '^remove:') | list | length > 0
+        - cis_gui_installed | bool
+        - "'install:group' in cis_check_2_1_20.stdout_lines"
 
     # The link systemctl set-default makes; it works under --check and is idempotent.
-    - name: "2.1.20 - Set the default target to multi-user"
+    - name: "2.1.20 - Set the default target as the site wants"
       ansible.builtin.file:
         path: /etc/systemd/system/default.target
-        src: /usr/lib/systemd/system/multi-user.target
+        src: "/usr/lib/systemd/system/{{ cis_default_target }}"
         state: link
         force: true
       failed_when: false
@@ -160,7 +168,7 @@
         - not (cis_state_2_1_20_envs_failed | default(false) | bool)
         - >-
           (cis_check_2_1_20_after.stdout_lines | default(cis_check_2_1_20.stdout_lines))
-          | select('match', '^target:') | list | length > 0
+          | select('match', '^settarget:') | list | length > 0
 
     - name: "2.1.20 - Check again after the fix"
       ansible.builtin.command:
@@ -172,7 +180,7 @@
       when:
         - not (cis_audit_only | bool)
         - not ansible_check_mode
-        - cis_check_2_1_20.rc != 0
+        - cis_check_2_1_20.rc != 0 or (cis_gui_installed | bool and 'install:group' in cis_check_2_1_20.stdout_lines)
 
     - name: "2.1.20 - Check openssh-server survived the group removal"
       ansible.builtin.command:

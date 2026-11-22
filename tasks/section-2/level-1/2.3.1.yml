@@ -1,8 +1,15 @@
 ---
-# 2.3.1 - time synchronization is in use: chrony is installed. Remediate mode installs it
-# with dnf; audit mode records a finding. The service state and the configuration are for
-# 2.3.2 and 2.3.3 and the host's own setup. Under --check nothing changes and nothing is
-# recorded in remediate mode.
+# 2.3.1 - time synchronization is in use: chrony is installed. The check judges the benchmark
+# (cis_expect_chrony_installed). The fix brings the package to the state cis_chrony_installed
+# asks for: it installs it with dnf, or, when the site set it to false, removes it when no other
+# installed package needs it (an rpm erase test decides, dependents are never removed). A
+# package that something else needs stays installed and chronyd is stopped and masked instead,
+# with a message; that state passes, because chrony is installed. The role never enables or
+# starts chronyd: the package's own defaults stay. The service state and the
+# configuration are for 2.3.2 and 2.3.3 and the host's own setup. Audit mode only records a
+# finding. A control that is not compliant with the benchmark after the fix is a finding (a
+# removed chrony is found on every run); under --check nothing changes and nothing is recorded
+# in remediate mode.
 
 - name: "2.3.1 - Handle chrony"
   tags:
@@ -29,7 +36,52 @@
         state: present
       when:
         - not (cis_audit_only | bool)
+        - cis_chrony_installed | bool
         - cis_check_2_3_1.rc != 0
+
+    # Read-only: it only asks rpm whether nothing installed needs chrony.
+    - name: "2.3.1 - Check whether another package needs chrony"
+      ansible.builtin.command:
+        argv:
+          - rpm
+          - -e
+          - --test
+          - chrony
+      register: cis_check_2_3_1_erase
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - not (cis_chrony_installed | bool)
+        - cis_check_2_3_1.rc == 0
+
+    - name: "2.3.1 - Remove chrony"
+      ansible.builtin.dnf:
+        name: chrony
+        state: absent
+      when:
+        - cis_check_2_3_1_erase is not skipped
+        - cis_check_2_3_1_erase.rc == 0
+
+    - name: "2.3.1 - Stop and mask chronyd because another package needs chrony"
+      ansible.builtin.systemd:
+        name: chronyd
+        state: stopped
+        masked: true
+      failed_when: false
+      when:
+        - cis_check_2_3_1_erase is not skipped
+        - cis_check_2_3_1_erase.rc != 0
+
+    - name: "2.3.1 - Report that chrony was kept"
+      ansible.builtin.debug:
+        msg: >-
+          chrony stays installed because another installed package needs it; chronyd is
+          stopped and masked instead.
+      when:
+        - cis_check_2_3_1_erase is not skipped
+        - cis_check_2_3_1_erase.rc != 0
 
     - name: "2.3.1 - Check again after the fix"
       ansible.builtin.command:
@@ -41,7 +93,7 @@
       when:
         - not (cis_audit_only | bool)
         - not ansible_check_mode
-        - cis_check_2_3_1.rc != 0
+        - (cis_check_2_3_1.rc == 0) != (cis_chrony_installed | bool)
 
     - name: "2.3.1 - Record the finding when the check fails in audit mode"
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
@@ -49,15 +101,15 @@
         cis_finding_id: "2.3.1"
       when:
         - cis_audit_only | bool
-        - cis_check_2_3_1.rc != 0
+        - (cis_check_2_3_1.rc == 0) != (cis_expect_chrony_installed | bool)
 
-    # Under --check the fix does not happen, so the second check says nothing new.
+    # Under --check the fix does not happen, so remediate mode records nothing then.
     - name: "2.3.1 - Record the finding when the fix did not take effect"
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
       vars:
         cis_finding_id: "2.3.1"
       when:
-        - cis_recheck_2_3_1 is not skipped
+        - not (cis_audit_only | bool)
         - not ansible_check_mode
-        - cis_recheck_2_3_1.rc != 0
+        - ((cis_recheck_2_3_1.rc | default(cis_check_2_3_1.rc)) == 0) != (cis_expect_chrony_installed | bool)
 ...

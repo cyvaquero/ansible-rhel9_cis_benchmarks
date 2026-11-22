@@ -1,5 +1,7 @@
 ---
 # 2.1.8 - ftp server service not in use. The logic is shared in tasks/lib/service_not_in_use.yml.
+# The package variables (cis_vsftpd_installed) say whether each package should be installed;
+# cis_services_keep skips the control.
 
 - name: "2.1.8 - Ensure ftp server services are not in use"
   ansible.builtin.import_tasks: ../../lib/service_not_in_use.yml
@@ -7,7 +9,8 @@
     cis_svc_id: "2.1.8"
     cis_svc_name: "ftp server"
     cis_svc_packages: [vsftpd]
-    cis_svc_units: [vsftpd.service]
+    cis_svc_want: "{{ ['vsftpd'] if cis_vsftpd_installed | bool else [] }}"
+    cis_svc_units: "{{ [] if cis_vsftpd_installed | bool else ['vsftpd.service'] }}"
   tags:
     - "2.1.8"
     - section-2

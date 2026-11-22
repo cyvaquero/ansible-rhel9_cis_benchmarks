@@ -1,20 +1,32 @@
 ---
 # Shared logic for the cron file and directory access controls (2.4.1.2 to 2.4.1.8). A
 # control file imports this with:
-#   cis_ca_id    the CIS ID
-#   cis_ca_path  the file or directory
-#   cis_ca_type  file or directory, the type the path must have
+#   cis_ca_id          the CIS ID
+#   cis_ca_path        the file or directory
+#   cis_ca_type        file or directory, the type the path must have
 # and puts the tags, which every task here inherits, on the import.
 #
-# Compliant: the expected type, owned by root:root, with no permission for group or other
-# (mode 0600 or stricter for a file, 0700 or stricter for a directory). Without the cronie
-# package, or with the path missing, the control is compliant: nothing is installed or
-# created (RHEL 9 ships no /etc/cron.yearly). A symlink or a path of another type is never
-# changed (chown and chmod would act on the link target); it is a finding. The fix removes
-# the group and other bits, keeps the owner bits, and sets root:root. Remediate mode records
-# a finding when the path is still not compliant after the fix; under --check nothing is
-# fixed, so nothing is recorded then.
-# Task names are one template expression because the CIS ID must come first.
+# The owner, group and mode the role sets come from cis_cron_owner, cis_cron_group and
+# cis_cron_file_mode (a file) or cis_cron_dir_mode (a directory).
+#
+# The check judges the benchmark: the expected type, owned by the expected ids
+# (cis_expect_cron_uid and _gid), with none of the forbidden permission bits. Without the cronie
+# package, or with the path missing, the control is compliant: nothing is installed or created
+# (RHEL 9 ships no /etc/cron.yearly). A symlink or a path of another type is never changed
+# (chown and chmod would act on the link target); it is a finding.
+# The fix makes the owner, group and mode exactly the site's: it acts whenever they differ,
+# also when the host is stricter than the benchmark. Remediate mode records a finding when the
+# path is still not compliant with the benchmark after the fix (a weaker site mode is found
+# on every run); under --check nothing is fixed, so nothing is recorded then.
+#
+# The check prints state=ok, link, odd or bad (the benchmark verdict) and, for a path that
+# exists with the expected type, site=ok or site=bad (it holds exactly the site's owner, group
+# and mode). Task names are one template expression because the CIS ID must come first.
+
+- name: "{{ cis_ca_id ~ ' - Work out the owner, group and mode for ' ~ cis_ca_path }}"
+  ansible.builtin.set_fact:
+    cis_ca_mode: "{{ cis_cron_file_mode if cis_ca_type == 'file' else cis_cron_dir_mode }}"
+    cis_ca_expect_bits: "{{ cis_expect_cron_file_forbidden_bits if cis_ca_type == 'file' else cis_expect_cron_dir_forbidden_bits }}"
 
 - name: "{{ cis_ca_id ~ ' - Read the owner and mode of ' ~ cis_ca_path }}"
   ansible.builtin.command:
@@ -24,17 +36,25 @@
       - |
         set -u
         export LC_ALL=C
-        p=$1
-        want=$2
+        p=$1; want=$2; xuid=$3; xgid=$4; bits=$5; owner=$6; group=$7; mode=$8
         rpm -q cronie >/dev/null 2>&1 || { echo "state=ok"; exit 0; }
         if [ ! -e "$p" ] && [ ! -L "$p" ]; then echo "state=ok"; exit 0; fi
         if [ -L "$p" ]; then echo "state=link"; exit 0; fi
         read -r u g m t < <(stat -c '%u %g %a %F' "$p")
         case "$want:$t" in file:regular*|directory:directory) ;; *) echo "state=odd"; exit 0 ;; esac
-        if [ "$u" = 0 ] && [ "$g" = 0 ] && (( (8#$m & 8#077) == 0 )); then echo "state=ok"; else echo "state=bad"; fi
+        if [ "$u" = "$xuid" ] && [ "$g" = "$xgid" ] && (( (8#$m & 8#$bits) == 0 )); then echo "state=ok"; else echo "state=bad"; fi
+        su=$(id -u -- "$owner" 2>/dev/null) || su=-1
+        sg=$(getent group "$group" 2>/dev/null | cut -d: -f3) || sg=-1
+        if [ "$u" = "$su" ] && [ "$g" = "${sg:--1}" ] && (( 8#$m == 8#$mode )); then echo "site=ok"; else echo "site=bad"; fi
       - bash
       - "{{ cis_ca_path }}"
       - "{{ cis_ca_type }}"
+      - "{{ cis_expect_cron_uid }}"
+      - "{{ cis_expect_cron_gid }}"
+      - "{{ cis_ca_expect_bits }}"
+      - "{{ cis_cron_owner }}"
+      - "{{ cis_cron_group }}"
+      - "{{ cis_ca_mode }}"
   register: cis_ca_check
   changed_when: false
   check_mode: false
@@ -44,13 +64,13 @@
   ansible.builtin.file:
     path: "{{ cis_ca_path }}"
     state: "{{ cis_ca_type }}"
-    owner: root
-    group: root
-    mode: "go-rwx"
+    owner: "{{ cis_cron_owner }}"
+    group: "{{ cis_cron_group }}"
+    mode: "{{ cis_ca_mode }}"
     follow: false
   when:
     - not (cis_audit_only | bool)
-    - "'state=bad' in cis_ca_check.stdout_lines"
+    - "'site=bad' in cis_ca_check.stdout_lines"
 
 - name: "{{ cis_ca_id ~ ' - Read the owner and mode of ' ~ cis_ca_path ~ ' again after the fix' }}"
   ansible.builtin.command:
@@ -62,7 +82,7 @@
   when:
     - not (cis_audit_only | bool)
     - not ansible_check_mode
-    - "'state=bad' in cis_ca_check.stdout_lines"
+    - "'site=bad' in cis_ca_check.stdout_lines"
 
 - name: "{{ cis_ca_id ~ ' - Record the finding' }}"
   ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"

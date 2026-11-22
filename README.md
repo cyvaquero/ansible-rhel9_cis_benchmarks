@@ -4,7 +4,7 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.32).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.33).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and these controls are implemented:
 
 - kernel modules, 1.1.1.1 to 1.1.1.11;
@@ -80,7 +80,7 @@ example `cis_rhel_minor_release | int >= 4`.
 It then validates the selection variables below and fails with a clear message on an
 invalid `cis_profile`, a `cis_apply_level_2`, `cis_audit_only` or `cis_fail_on_findings`
 that is not true or false, a `cis_firewalld_zone_target` other than `default`, `REJECT` or
-`DROP`, or a CIS ID in `cis_exclusions` that is not in the benchmark. The section 1 variables
+`DROP`, or a CIS ID in `cis_exclusions` that is not in the benchmark. The section 1 and 2 variables
 below are checked for type and format only (a yes/no value, a whole number, a quoted octal mode,
 a name, a path, a list), never against the benchmark's bounds; see "Overriding values".
 
@@ -131,7 +131,7 @@ ansible-playbook -i inventory site.yml -e target=webservers
 ### Overriding values
 
 Every value a control writes or expects comes from a role variable whose default is the
-benchmark value; the variables for section 1 are listed below, and each has a comment in
+benchmark value; the variables for sections 1 and 2 are listed below, and each has a comment in
 `defaults/main.yml`. Set one at any Ansible precedence level above the role defaults:
 inventory or `group_vars` / `host_vars`, play `vars`, role parameters, `set_fact` and `-e`.
 Do not edit the role's own files.
@@ -157,7 +157,9 @@ roles:
   finding.
 - For a package, the variable is whether it should be installed: the role installs or removes
   the package to match it, and the control reports a finding while the host differs from the
-  benchmark.
+  benchmark. This holds for every package of section 2 (the service and client packages, chrony),
+  with its own variable (`cis_<name>_installed`); `cis_services_keep` wins over them: a control
+  listed there is skipped completely, so nothing is installed or removed for it.
 - Preflight checks only the type and format of each value (a yes/no value, a whole number, a
   quoted octal mode such as `"0640"`, a name, a path, a list) and stops the run on anything
   else. Quote file modes: an unquoted `0600` is a number in YAML. Values passed with `-e` are
@@ -216,13 +218,33 @@ roles:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `cis_services_keep` | `[]` | CIS IDs of service controls whose service the site needs, for example `["2.1.1", "2.1.10"]`. A listed control (2.1.1 to 2.1.22, or 3.1.3 for bluetooth) is skipped with no change and no finding. |
+| `cis_services_keep` | `[]` | CIS IDs of service controls whose service the site needs, for example `["2.1.1", "2.1.10"]`. A listed control (2.1.1 to 2.1.22, or 3.1.3 for bluetooth) is skipped with no change and no finding. It wins over the package variables below: nothing is installed or removed for a listed control, whatever they say. |
+| `cis_autofs_installed`, `cis_avahi_installed`, `cis_cockpit_installed`, `cis_cockpit_ws_installed`, `cis_dhcp_server_installed`, `cis_bind_installed`, `cis_dnsmasq_installed`, `cis_samba_installed`, `cis_vsftpd_installed`, `cis_dovecot_installed`, `cis_cyrus_imapd_installed`, `cis_nfs_utils_installed`, `cis_cups_installed`, `cis_rpcbind_installed`, `cis_rsync_daemon_installed`, `cis_net_snmp_installed`, `cis_telnet_server_installed`, `cis_tftp_server_installed`, `cis_squid_installed`, `cis_httpd_installed`, `cis_nginx_installed` | `false` | 2.1.1 to 2.1.18 (2.1.3 is Level 2): whether each service package should be installed, named after the package (`dhcp-server`, `bind`, `nfs-utils`, `cups`, ...). `false`: the role removes it when no other installed package needs it, otherwise stops and masks its units. `true`: the role installs it when missing and leaves its units alone, and the control reports a finding on every run, since the benchmark wants it absent. Set packages that depend on each other together (`cockpit` and `cockpit-ws`). |
+| `cis_x_server_installed`, `cis_xwayland_installed` | `false` | 2.1.21, 2.1.22 (Level 2, skipped by default): whether `xorg-x11-server-common` and `xorg-x11-server-Xwayland` should be installed. `false` removes them with everything that depends on them. `true` installs them when missing. |
+| `cis_gui_installed` | `false` | 2.1.20 (Level 2 Server, skipped by default): whether the graphical interface (the "Server with GUI" group) should be installed. `false` removes the group; `true` installs the group when it is missing and removes nothing, and the control reports a finding. |
+| `cis_default_target` | `multi-user.target` | 2.1.20: the default systemd target the role links `default.target` to whenever it is another one, also when it is not `graphical.target`. `graphical.target` is reported as a finding. |
+| `cis_postfix_inet_interfaces` | `loopback-only` | 2.1.19: the postfix `inet_interfaces` value the role sets (`postconf -e`) whenever the current one differs, also when it is already loopback only in another spelling (`localhost`). postfix restarts only when running. A value that is not loopback only is written and reported as a finding. |
+
+### Client packages (2.2)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `cis_ftp_client_installed`, `cis_ldap_client_installed`, `cis_telnet_client_installed`, `cis_tftp_client_installed` | `false` | 2.2.1, 2.2.2 (Level 2), 2.2.3, 2.2.4: whether `ftp`, `openldap-clients`, `telnet` and `tftp` should be installed. `false` removes the package when nothing else needs it (a needed one stays and is reported); `true` installs it when missing and the control reports a finding. |
 
 ### Time synchronization and job schedulers (2.3, 2.4)
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `cis_time_sources` | `[]` | 2.3.2: full chrony directive lines, for example `["server time.example.com iburst"]`, appended to `/etc/chrony.conf` only when chrony has no `server` or `pool` source at all. Existing lines are never edited or removed. Empty: a host with no source is a finding and nothing changes. |
+| `cis_chrony_installed` | `true` | 2.3.1: whether `chrony` should be installed. `false` removes it when no other installed package needs it; one that is needed stays installed and `chronyd` is stopped and masked instead. `true` only installs it: the role never enables or starts `chronyd`. `false` is reported as a finding when chrony is gone. |
+| `cis_time_sources` | `[]` | 2.3.2: the time sources, as full chrony directive lines, for example `["server time.example.com iburst"]`. Empty: the host's sources are left alone (a host with no source is a finding). Non-empty: the role enforces the list exactly. The `server` and `pool` lines in `/etc/chrony.conf` and in the files it includes (`include`, `confdir`, and the `sourcedir` `*.sources` files, never the DHCP directory) become exactly the list: other such lines are removed, missing ones are appended to `/etc/chrony.conf`, nothing else is touched, and `chronyd` restarts only on a change. |
+| `cis_chronyd_run_as_root` | `false` | 2.3.3: whether `chronyd` runs as root. `false` removes the `-u root` option from `OPTIONS` in `/etc/sysconfig/chronyd` and keeps the others; `true` drops every `-u` option and sets `-u root` (creating the file or the line when missing). `true` is reported as a finding. |
+| `cis_cronie_installed` | `null` | 2.4.1.1: whether `cronie` should be installed. `null` leaves it alone (the benchmark judges cron only when it is installed); `true` installs it when missing (install only; the controls then enable and start `crond` as usual and create an empty `cron.allow`); `false` removes it when no other installed package needs it, otherwise it stays and `crond` is stopped and masked. The cron controls still judge the benchmark (they pass without `cronie`). |
+| `cis_at_installed` | `null` | 2.4.2.1: whether `at` should be installed. `null` leaves it alone (the control applies only when it is installed); `true` installs it, `false` removes it with the same rules as `cronie`. |
+| `cis_crond_enabled`, `cis_crond_active` | `true`, `true` | 2.4.1.1: whether `crond` is enabled and whether it is running. The role unmasks, enables and starts it, or stops and disables it, to match; `false` is reported as a finding. |
+| `cis_cron_owner`, `cis_cron_group` | `root`, `root` | 2.4.1.2 to 2.4.1.8: the owner and group set on `/etc/crontab` and the `/etc/cron.*` directories. |
+| `cis_cron_file_mode`, `cis_cron_dir_mode` | `"0600"`, `"0700"` | 2.4.1.2: the mode of `/etc/crontab`; 2.4.1.3 to 2.4.1.8: the mode of the directories. A stricter mode is replaced. |
+| `cis_cron_allow_owner`, `cis_cron_allow_group`, `cis_cron_allow_mode` | `root`, `crontab`, `"0640"` | 2.4.1.9: the owner, group and mode set on `/etc/cron.allow` and `/etc/cron.deny` (when present) and on a new `cron.allow`. A group that does not exist on the host is replaced by `root`; the benchmark accepts `root` or `crontab`. |
+| `cis_at_allow_owner`, `cis_at_allow_group`, `cis_at_allow_mode` | `root`, `daemon`, `"0640"` | 2.4.2.1: the same for `/etc/at.allow` and `/etc/at.deny`; the benchmark accepts `root` or `daemon`. |
 | `cis_cron_allow_users` | `[]` | 2.4.1.9: users added to `/etc/cron.allow` when missing from it. Users already in the file are never removed. Must be a list of plain login names; anything else stops the run at preflight. |
 | `cis_at_allow_users` | `[]` | 2.4.2.1: users added to `/etc/at.allow`, with the same rules; invalid names stop the run at preflight. |
 
@@ -397,20 +419,22 @@ Values outside these ranges stop the run at preflight.
   stopped and masked instead, and the same happens to a unit that exists with no listed
   package installed. Masked and inactive units are compliant. Dependents are never
   removed. Audit mode only reports. `cis_services_keep` lists the controls to skip for a
-  service the site needs.
+  service the site needs. A package whose `cis_<name>_installed` variable is `true` is
+  installed when missing, never removed, and its units are left alone; the control reports
+  a finding while it is installed.
 - Mail transfer agents (2.1.19): a host with no MTA, or whose MTA listens only on loopback
   for the mail ports (25, 465, 587), passes. The check reads the listening sockets (`ss`)
-  and, for postfix, `inet_interfaces`. A postfix that is not loopback only gets
-  `inet_interfaces = loopback-only` (`postconf -e`) and is restarted only when it is
-  running. Any other MTA that listens beyond loopback is a finding and is never edited.
+  and, for postfix, `inet_interfaces`. A postfix whose `inet_interfaces` is not exactly
+  `cis_postfix_inet_interfaces` (`loopback-only` by default; `localhost` becomes
+  `loopback-only`) gets it (`postconf -e`) and is restarted only when it is running. Any other
+  MTA that listens beyond loopback is a finding and is never edited.
 - Desktop and X server (2.1.20 to 2.1.22, Level 2 Server, skipped by default): 2.1.20 fails
-  while the "Server with GUI" environment group is installed, while `gdm` or `gnome-shell`
-  is installed, or while the default target is `graphical.target`. To fix it the role first
+  while the "Server with GUI" environment group is installed, or while the default target is `graphical.target`. To fix it the role first
   marks the minimal and Server environments as installed (so `openssh-server` and the other
   packages shared with a plain server stay wanted; nothing is installed, so packages other
-  controls removed do not come back), removes the GUI group, removes any leftover
-  `gdm` and `gnome-shell` with their dependents, and points the default target at
-  `multi-user.target`. It records a finding if `openssh-server` is gone afterwards. 2.1.21
+  controls removed do not come back), removes the GUI group, and points the default target at
+  `cis_default_target` (`multi-user.target`) whenever it is another one. With
+  `cis_gui_installed: true` it installs the group instead and removes nothing. It records a finding if `openssh-server` is gone afterwards. 2.1.21
   and 2.1.22 remove `xorg-x11-server-common` and `xorg-x11-server-Xwayland` with dnf
   together with every installed package that depends on them. The role never stops the
   display manager or reboots: while the graphical target is still running on a compliant
@@ -420,7 +444,8 @@ Values outside these ranges stop the run at preflight.
   anything, and records no finding.
 - Client controls (2.2.1 to 2.2.4: ftp, openldap-clients, telnet, tftp): the package is removed
   when no other installed package needs it (an `rpm -e --test` decides); one that is needed
-  stays installed, dependents are never removed, and that is a finding.
+  stays installed, dependents are never removed, and that is a finding. A client whose
+  `cis_<name>_client_installed` is `true` is installed when missing and reported as a finding.
 - Network devices and kernel modules (3.1, 3.2): 3.1.1 (manual) prints whether IPv6 is
   disabled, from the `ipv6` module parameter and the `all` and `default` `disable_ipv6`
   sysctls, and changes nothing. 3.1.2 (Level 1 Server) finds each wireless interface
@@ -499,24 +524,31 @@ Values outside these ranges stop the run at preflight.
   unknown interface), the guard fails. In every failing case the host is left unchanged, a
   message says so, and the control is a finding to fix by hand: allow SSH in the zone, then
   run the role again.
-- Time synchronization (2.3): 2.3.1 installs `chrony`. 2.3.2 looks for a `server` or `pool`
+- Time synchronization (2.3): 2.3.1 installs `chrony` (or removes it when
+  `cis_chrony_installed` is `false` and nothing needs it; if something does, it stops and masks
+  `chronyd` instead) 2.3.2 looks for a `server` or `pool`
   line in `/etc/chrony.conf` and in the files its `include`, `confdir` and `sourcedir`
   directives pull in; `sourcedir /run/chrony-dhcp` is ignored because DHCP sources exist
-  only at run time. With none, it appends `cis_time_sources` (when set) and restarts
-  `chronyd` only if it is running; with chrony not installed, or no sources configured, it
-  is a finding and nothing is installed or guessed. 2.3.3 removes only the `-u root` option
+  only at run time. A non-empty `cis_time_sources` is enforced exactly (see its table row) and
+  `chronyd` restarts only on a change and if it is running; with chrony not installed, or no
+  source at all and an empty list, it is a finding and nothing is installed or guessed. 2.3.3 removes only the `-u root` option
   from the `OPTIONS` value in `/etc/sysconfig/chronyd` (restarting `chronyd` only if it is
-  running); a missing file is compliant.
+  running); a missing file is compliant. With `cis_chronyd_run_as_root: true` it sets `-u root`
+  instead, and that is a finding.
 - Job schedulers (2.4): the controls apply only when `cronie` (2.4.1) or `at` (2.4.2.1) is
   installed; otherwise they pass and nothing is installed. 2.4.1.1 unmasks, enables and
-  starts `crond`. 2.4.1.2 to 2.4.1.8 require `/etc/crontab` and the `/etc/cron.*`
-  directories to be root:root with no group or other permissions (`go-rwx`; owner bits stay).
+  starts `crond` (or stops and disables it, per `cis_crond_enabled` and `cis_crond_active`).
+  2.4.1.2 to 2.4.1.8 require `/etc/crontab` and the `/etc/cron.*` directories to be root:root
+  with no group or other permissions (mode 0600 or stricter for the file, 0700 or stricter for
+  the directories); the role sets exactly `cis_cron_owner`, `cis_cron_group` and
+  `cis_cron_file_mode` or `cis_cron_dir_mode`, also over a stricter mode.
   A missing path is compliant and never created (RHEL 9 has no `/etc/cron.yearly`); a symlink
   or a path of the wrong type is a finding and is never changed. 2.4.1.9 and 2.4.2.1 require
   the allow file (`/etc/cron.allow`, `/etc/at.allow`) to exist, owned by root with group root
   or `crontab` (`daemon` for `at`) and mode 0640 or stricter, and the deny file, if present,
-  the same; the fix creates a missing allow file empty, sets owner, group (the named group
-  when it exists, else root) and mode, and adds the users listed in `cis_cron_allow_users` or
+  the same; the fix creates a missing allow file empty, sets the owner, group (the configured
+  group when it exists, else root) and mode of `cis_cron_allow_*` or `cis_at_allow_*` exactly,
+  also over a stricter mode, and adds the users listed in `cis_cron_allow_users` or
   `cis_at_allow_users`. It never removes a user or deletes a deny file.
 - SSH server (5.1): the role writes its settings to one drop-in,
   `/etc/ssh/sshd_config.d/00-cis-rhel9.conf` (mode 0600), whose name sorts before

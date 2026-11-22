@@ -3,18 +3,24 @@
 # /etc/chrony.conf or in a file it pulls in with include, confdir (*.conf) or sourcedir
 # (*.sources). The check follows those directives itself (up to eight levels deep).
 # sourcedir /run/chrony-dhcp is skipped: DHCP sources are runtime state, not configuration.
+# The check judges the benchmark: at least one source exists.
 #
-# chrony not installed is a finding: 2.3.1 installs it, and nothing is installed here. With
-# no source and a non-empty cis_time_sources, remediate mode appends each item (a full
-# directive line such as "server time.example.com iburst") to /etc/chrony.conf, never
-# editing or removing an existing line, then restarts chronyd only when it is running. An
-# item that is not a server or pool line stops the fix (nothing is written) and the control
-# stays a finding. With an empty list there is no fix and the control is a finding.
-# A control that still fails after the fix is a finding; under --check nothing changes and
-# nothing is recorded in remediate mode.
+# chrony not installed is a finding: 2.3.1 installs it, and nothing is installed here.
+# cis_time_sources empty (default): the host's sources are left alone; with no source at all the
+# control is a finding. cis_time_sources non-empty: the role enforces it exactly. The server and
+# pool lines in /etc/chrony.conf and in every file the check follows (the include and confdir
+# files and the sourcedir *.sources files, never the DHCP directory) become exactly the list:
+# a server or pool line in /etc/chrony.conf that is not in the list is removed, a server or pool
+# line in any of the other files is removed, and a listed line that /etc/chrony.conf lacks is
+# appended (created when the file is missing). Lines are compared with the keyword in lowercase
+# and runs of blanks collapsed; no other directive is touched. An item that is not a server or
+# pool line stops the fix (nothing is written). chronyd is restarted only when something
+# changed and it is running. A control that still fails after the fix is a finding; under
+# --check nothing changes and nothing is recorded in remediate mode.
 #
-# The check prints state=nochrony, state=nosource or state=ok, and active=yes when chronyd
-# is running; its exit status is 1 unless state=ok.
+# The check prints state=nochrony, state=nosource or state=ok (exit status 1 unless ok),
+# active=yes when chronyd is running, and for a non-empty list strip:<file>|<line> (a line to
+# remove) and add:<line> (a listed line to append).
 
 - name: "2.3.2 - Handle chrony time sources"
   tags:
@@ -36,7 +42,12 @@
             conf=$1
             if ! rpm -q chrony >/dev/null 2>&1; then echo "state=nochrony"; exit 1; fi
             found=0
-            # scan <file> <depth>: sets found=1 on a server or pool directive.
+            srcs=""
+            # norm <keyword> <rest>: the keyword in lowercase, blanks collapsed.
+            norm() {
+              printf '%s %s' "$(printf '%s' "$1" | tr 'A-Z' 'a-z')" "$(printf '%s' "$2" | tr -s ' \t' '  ' | sed 's/^ //; s/ *$//')"
+            }
+            # scan <file> <depth>: sets found=1 on a server or pool directive and records it.
             scan() {
               local f=$1 d=$2 kw rest g dir
               [ -f "$f" ] || return 0
@@ -44,7 +55,7 @@
                 case "$kw" in ''|'#'*|'!'*|';'*|'%'*) continue ;; esac
                 kw=$(printf '%s' "$kw" | tr 'A-Z' 'a-z')
                 case "$kw" in
-                  server|pool) found=1 ;;
+                  server|pool) found=1; srcs="$srcs$f|$(norm "$kw" "$rest")"$'\n' ;;
                   include)
                     [ "$d" -lt 8 ] || continue
                     for g in $rest; do
@@ -65,28 +76,63 @@
             }
             scan "$conf" 0
             systemctl is-active --quiet chronyd 2>/dev/null && echo "active=yes"
-            if [ "$found" = 1 ]; then echo "state=ok"; exit 0; fi
+            # $2: the cis_time_sources items, one per line (empty: leave the host's sources alone).
+            items=${2:-}
+            want=""
+            have=no
+            while IFS= read -r a; do
+              a=$(printf '%s' "$a" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+              [ -n "$a" ] || continue
+              have=yes
+              k=${a%%[[:space:]]*}
+              want="$want$(norm "$k" "${a#"$k"}")"$'\n'
+            done <<< "$items"
+            if [ "$have" = yes ]; then
+              printf '%s' "$srcs" | while IFS= read -r s; do
+                [ -n "$s" ] || continue
+                f=${s%%|*}; n=${s#*|}
+                if [ "$f" = "$conf" ] && printf '%s' "$want" | grep -qxF -- "$n"; then continue; fi
+                echo "strip:$f|$n"
+              done
+              printf '%s' "$want" | while IFS= read -r n; do
+                [ -n "$n" ] || continue
+                if ! printf '%s' "$srcs" | grep -qxF -- "$conf|$n"; then echo "add:$n"; fi
+              done
+            fi
+            if [ "$found" = 1 ]; then ok=1; else ok=0; fi
+            if [ "$ok" = 1 ]; then echo "state=ok"; exit 0; fi
             echo "state=nosource"
             exit 1
           - bash
           - /etc/chrony.conf
+          - "{{ cis_time_sources | map('trim') | join('\n') }}"
       register: cis_check_2_3_2
       changed_when: false
       check_mode: false
       failed_when: false
 
+    - name: "2.3.2 - Remove the time sources that are not in cis_time_sources"
+      ansible.builtin.lineinfile:
+        path: "{{ item.split('|', 1)[0] | regex_replace('^strip:', '') }}"
+        regexp: >-
+          ^\s*(?i:{{ item.split('|', 1)[1].split(' ')[0] | regex_escape }})\s+{{ item.split('|', 1)[1].split(' ')[1:] | map('regex_escape') | join('\s+') }}\s*$
+        state: absent
+      loop: "{{ cis_check_2_3_2.stdout_lines | select('match', '^strip:') | list }}"
+      register: cis_strip_2_3_2
+      when:
+        - not (cis_audit_only | bool)
+        - cis_time_sources | length > 0
+        - cis_time_sources | reject('match', '^\\s*(server|pool)\\s+\\S') | list | length == 0
+
     - name: "2.3.2 - Add the configured time sources to chrony.conf"
       ansible.builtin.lineinfile:  # noqa: risky-file-permissions
         path: /etc/chrony.conf
-        line: "{{ item | trim }}"
+        line: "{{ item | regex_replace('^add:', '') }}"
         create: true  # a missing file is created only here, never edited otherwise
-        owner: root
-        group: root
-      loop: "{{ cis_time_sources }}"
+      loop: "{{ cis_check_2_3_2.stdout_lines | select('match', '^add:') | list }}"
       register: cis_add_2_3_2
       when:
         - not (cis_audit_only | bool)
-        - "'state=nosource' in cis_check_2_3_2.stdout_lines"
         - cis_time_sources | length > 0
         - cis_time_sources | reject('match', '^\\s*(server|pool)\\s+\\S') | list | length == 0
 
@@ -97,7 +143,7 @@
         name: chronyd
         state: restarted
       when:
-        - cis_add_2_3_2 is changed
+        - cis_add_2_3_2 is changed or cis_strip_2_3_2 is changed
         - "'active=yes' in cis_check_2_3_2.stdout_lines"
 
     - name: "2.3.2 - Check again after the fix"
@@ -110,7 +156,7 @@
       when:
         - not (cis_audit_only | bool)
         - not ansible_check_mode
-        - cis_check_2_3_2.rc != 0
+        - cis_check_2_3_2.rc != 0 or (cis_check_2_3_2.stdout_lines | select('match', '^(strip|add):') | list | length > 0)
 
     - name: "2.3.2 - Record the finding when the check fails in audit mode"
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
