@@ -1,7 +1,7 @@
 ---
 # 2.2.3 - telnet client not installed. The logic is shared in tasks/lib/client_not_installed.yml:
 # the package is removed when nothing else installed needs it, otherwise it stays and is a
-# finding.
+# finding. cis_telnet_client_installed says whether the package should be installed.
 
 - name: "2.2.3 - Ensure telnet client is not installed"
   ansible.builtin.import_tasks: ../../lib/client_not_installed.yml
@@ -9,6 +9,7 @@
     cis_client_id: "2.2.3"
     cis_client_name: "telnet"
     cis_client_packages: [telnet]
+    cis_client_want: "{{ ['telnet'] if cis_telnet_client_installed | bool else [] }}"
   tags:
     - "2.2.3"
     - section-2

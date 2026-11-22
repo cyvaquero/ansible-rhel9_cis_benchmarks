@@ -1,7 +1,7 @@
 ---
 # 2.2.4 - tftp client not installed. The logic is shared in tasks/lib/client_not_installed.yml:
 # the package is removed when nothing else installed needs it, otherwise it stays and is a
-# finding.
+# finding. cis_tftp_client_installed says whether the package should be installed.
 
 - name: "2.2.4 - Ensure tftp client is not installed"
   ansible.builtin.import_tasks: ../../lib/client_not_installed.yml
@@ -9,6 +9,7 @@
     cis_client_id: "2.2.4"
     cis_client_name: "tftp"
     cis_client_packages: [tftp]
+    cis_client_want: "{{ ['tftp'] if cis_tftp_client_installed | bool else [] }}"
   tags:
     - "2.2.4"
     - section-2

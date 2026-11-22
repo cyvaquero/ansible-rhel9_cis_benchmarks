@@ -1,10 +1,15 @@
 ---
 # 2.4.1.1 - the cron daemon (crond) is enabled and active. Applies only when cronie is
-# installed; without it the control is compliant and nothing is installed. The fix unmasks,
-# enables and starts crond. A control that still fails after the fix is a finding; under
+# installed; without it the control is compliant and nothing is installed. The check judges
+# the benchmark (cis_expect_crond_enabled and _active). The fix makes crond enabled and active
+# exactly as cis_crond_enabled and cis_crond_active say: it unmasks, enables and starts it, or
+# stops and disables it, whenever it differs. A control that is not compliant with the
+# benchmark after the fix is a finding, so a site value of false is found on every run; under
 # --check nothing changes and nothing is recorded in remediate mode.
 #
-# The check prints state=ok or state=bad; its exit status is 1 when state=bad.
+# The check prints state=ok or state=bad (the benchmark verdict) and site=ok or site=bad
+# (whether crond is enabled, not masked when wanted, and active as the site wants); its exit
+# status is 1 when state=bad.
 
 - name: "2.4.1.1 - Handle the cron daemon"
   tags:
@@ -20,27 +25,40 @@
           - /bin/sh
           - -c
           - |
+            # $1, $2: enabled and active as the benchmark wants (yes or no); $3, $4: as the site wants.
             rpm -q cronie >/dev/null 2>&1 || { echo "state=ok"; exit 0; }
-            if [ "$(systemctl is-enabled crond 2>/dev/null)" = enabled ] && systemctl is-active --quiet crond 2>/dev/null; then
+            en=$(systemctl is-enabled crond 2>/dev/null)
+            if [ "$en" = enabled ]; then ens=yes; else ens=no; fi
+            if systemctl is-active --quiet crond 2>/dev/null; then acs=yes; else acs=no; fi
+            site=ok
+            [ "$ens" = "$3" ] && [ "$acs" = "$4" ] || site=bad
+            if [ "$en" = masked ] && { [ "$3" = yes ] || [ "$4" = yes ]; }; then site=bad; fi
+            echo "site=$site"
+            if [ "$ens" = "$1" ] && [ "$acs" = "$2" ]; then
               echo "state=ok"
               exit 0
             fi
             echo "state=bad"
             exit 1
+          - sh
+          - "{{ 'yes' if cis_expect_crond_enabled | bool else 'no' }}"
+          - "{{ 'yes' if cis_expect_crond_active | bool else 'no' }}"
+          - "{{ 'yes' if cis_crond_enabled | bool else 'no' }}"
+          - "{{ 'yes' if cis_crond_active | bool else 'no' }}"
       register: cis_check_2_4_1_1
       changed_when: false
       check_mode: false
       failed_when: false
 
-    - name: "2.4.1.1 - Unmask, enable and start the cron daemon"
+    - name: "2.4.1.1 - Make the cron daemon enabled and active as the site wants"
       ansible.builtin.systemd:
         name: crond
-        masked: false
-        enabled: true
-        state: started
+        masked: "{{ false if (cis_crond_enabled | bool or cis_crond_active | bool) else omit }}"
+        enabled: "{{ cis_crond_enabled | bool }}"
+        state: "{{ 'started' if cis_crond_active | bool else 'stopped' }}"
       when:
         - not (cis_audit_only | bool)
-        - cis_check_2_4_1_1.rc != 0
+        - "'site=bad' in cis_check_2_4_1_1.stdout_lines"
 
     - name: "2.4.1.1 - Check again after the fix"
       ansible.builtin.command:
@@ -52,7 +70,7 @@
       when:
         - not (cis_audit_only | bool)
         - not ansible_check_mode
-        - cis_check_2_4_1_1.rc != 0
+        - "'site=bad' in cis_check_2_4_1_1.stdout_lines"
 
     - name: "2.4.1.1 - Record the finding when the check fails in audit mode"
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
@@ -68,7 +86,7 @@
       vars:
         cis_finding_id: "2.4.1.1"
       when:
-        - cis_recheck_2_4_1_1 is not skipped
+        - not (cis_audit_only | bool)
         - not ansible_check_mode
-        - cis_recheck_2_4_1_1.rc != 0
+        - (cis_recheck_2_4_1_1.rc | default(cis_check_2_4_1_1.rc)) != 0
 ...

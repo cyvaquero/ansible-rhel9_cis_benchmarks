@@ -80,8 +80,8 @@
         path: /etc/chrony.conf
         line: "{{ item | trim }}"
         create: true  # a missing file is created only here, never edited otherwise
-        owner: root
-        group: root
+        owner: "{{ cis_chrony_conf_owner }}"
+        group: "{{ cis_chrony_conf_group }}"
       loop: "{{ cis_time_sources }}"
       register: cis_add_2_3_2
       when:

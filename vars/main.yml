@@ -125,4 +125,42 @@ cis_expect_gdm_automount_open: "false"
 cis_expect_gdm_autorun_never: "true"
 cis_expect_gdm_xdmcp_bad: "true|1"
 cis_expect_gdm_wayland_bad: "false|0"
+# Section 2: the benchmark values the checks judge against (constants, as for section 1).
+# Whether a service or client package is installed is judged in the checks themselves: they
+# always want it absent.
+
+# 2.3.1: chrony is installed. 2.3.3: chronyd does not run as root (compared as yes or no).
+cis_expect_chrony_installed: true
+cis_expect_chronyd_run_as_root: false
+
+# 2.4.1.1: crond is enabled and active.
+cis_expect_crond_enabled: true
+cis_expect_crond_active: true
+
+# 2.4.1.2 to 2.4.1.8: the owner and group ids (root), the mode of /etc/crontab and of the
+# cron directories, and the permission bits each mode forbids (as find -perm /bits reads them).
+cis_expect_cron_uid: "0"
+cis_expect_cron_gid: "0"
+cis_expect_cron_file_mode: "0600"
+cis_expect_cron_file_forbidden_bits: "077"
+cis_expect_cron_dir_mode: "0700"
+cis_expect_cron_dir_forbidden_bits: "077"
+
+# 2.4.1.9, 2.4.2.1: the owner id (root), the groups an allow or deny file may have (root is
+# listed), the most permissive mode and the permission bits it forbids (setuid, setgid, sticky,
+# and the bits above 0640).
+cis_expect_job_allow_uid: "0"
+cis_expect_cron_allow_groups: [root, crontab]
+cis_expect_at_allow_groups: [root, daemon]
+cis_expect_job_allow_mode: "0640"
+cis_expect_job_allow_forbidden_bits: "7137"
+
+# 2.1.19: the mail ports, the inet_interfaces tokens and the listening addresses that count as
+# loopback only (a trailing * matches any suffix).
+cis_expect_mta_ports: ["25", "465", "587"]
+cis_expect_mta_interfaces_ok: ["loopback-only", "localhost", "127.*", "::1", "[::1]"]
+cis_expect_mta_addresses_ok: ["127.*", "::1", "::ffff:127.*"]
+
+# 2.1.20: the default target that is not accepted.
+cis_expect_gui_bad_target: graphical.target
 ...

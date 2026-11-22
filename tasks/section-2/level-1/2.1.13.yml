@@ -1,5 +1,7 @@
 ---
 # 2.1.13 - rsync daemon service not in use. The logic is shared in tasks/lib/service_not_in_use.yml.
+# The package variables (cis_rsync_daemon_installed) say whether each package should be installed;
+# cis_services_keep skips the control.
 
 - name: "2.1.13 - Ensure rsync daemon services are not in use"
   ansible.builtin.import_tasks: ../../lib/service_not_in_use.yml
@@ -7,7 +9,8 @@
     cis_svc_id: "2.1.13"
     cis_svc_name: "rsync daemon"
     cis_svc_packages: [rsync-daemon]
-    cis_svc_units: [rsyncd.socket, rsyncd.service]
+    cis_svc_want: "{{ ['rsync-daemon'] if cis_rsync_daemon_installed | bool else [] }}"
+    cis_svc_units: "{{ [] if cis_rsync_daemon_installed | bool else ['rsyncd.socket', 'rsyncd.service'] }}"
   tags:
     - "2.1.13"
     - section-2

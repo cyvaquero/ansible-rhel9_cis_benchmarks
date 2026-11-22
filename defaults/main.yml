@@ -242,11 +242,75 @@ cis_gdm_xdmcp_enable: false
 # "absent" removes the line (GDM then uses its default), "true" sets it to true.
 cis_gdm_wayland_enable: absent
 
+# Section 2 variables. As for section 1, each one is the value the role enforces exactly (for a
+# package, the state it converges to): whenever the host differs from it, the role changes the
+# host to it, also when the host is stricter than the benchmark. The default is the benchmark
+# value. The checks judge against the benchmark value (vars/main.yml, cis_expect_*), so a value
+# of yours that is weaker than the benchmark's is written and the control reports a finding on
+# every run; exclude the control in cis_exclusions to accept that. Preflight checks only the
+# type and format of each value.
+
 # Services (2.1.1 to 2.1.22, and 3.1.3 for bluetooth): CIS IDs of the service controls whose
 # service the site needs. A listed control is skipped completely: nothing is removed, stopped
-# or masked, and no finding is recorded. Example: ["2.1.1", "2.1.10"] keeps autofs and the
-# NFS server; "3.1.3" keeps bluetooth.
+# or masked, nothing is installed even when its package variable below is true, and no finding
+# is recorded. cis_services_keep wins over the package variables. Example: ["2.1.1", "2.1.10"]
+# keeps autofs and the NFS server; "3.1.3" keeps bluetooth.
 cis_services_keep: []
+
+# Service packages (2.1.1 to 2.1.18, 2.1.21, 2.1.22) and client packages (2.2.1 to 2.2.4):
+# whether each package should be installed. The benchmark wants every one absent. false: the
+# role removes the package when no other installed package needs it; one that another package
+# needs stays installed and its service units are stopped and masked instead (clients: it stays
+# and is reported); dependents are never removed (2.1.21 and 2.1.22 are the exception: they
+# remove the package with everything that depends on it, and are skipped by default). true: the
+# role installs the package when missing and leaves its service units alone; the control then
+# reports a finding on every run. Set the packages that depend on each other together (cockpit
+# and cockpit-ws, the X server and Xwayland).
+cis_autofs_installed: false                 # 2.1.1
+cis_avahi_installed: false                  # 2.1.2
+cis_cockpit_installed: false                # 2.1.3 (Level 2)
+cis_cockpit_ws_installed: false             # 2.1.3 (Level 2)
+cis_dhcp_server_installed: false            # 2.1.4 (package dhcp-server)
+cis_bind_installed: false                   # 2.1.5
+cis_dnsmasq_installed: false                # 2.1.6
+cis_samba_installed: false                  # 2.1.7
+cis_vsftpd_installed: false                 # 2.1.8
+cis_dovecot_installed: false                # 2.1.9
+cis_cyrus_imapd_installed: false            # 2.1.9
+cis_nfs_utils_installed: false              # 2.1.10
+cis_cups_installed: false                   # 2.1.11
+cis_rpcbind_installed: false                # 2.1.12
+cis_rsync_daemon_installed: false           # 2.1.13
+cis_net_snmp_installed: false               # 2.1.14
+cis_telnet_server_installed: false          # 2.1.15
+cis_tftp_server_installed: false            # 2.1.16
+cis_squid_installed: false                  # 2.1.17
+cis_httpd_installed: false                  # 2.1.18
+cis_nginx_installed: false                  # 2.1.18
+cis_x_server_installed: false               # 2.1.21 (Level 2; package xorg-x11-server-common)
+cis_xwayland_installed: false               # 2.1.22 (Level 2; package xorg-x11-server-Xwayland)
+cis_ftp_client_installed: false             # 2.2.1 (package ftp)
+cis_ldap_client_installed: false            # 2.2.2 (Level 2; package openldap-clients)
+cis_telnet_client_installed: false          # 2.2.3 (package telnet)
+cis_tftp_client_installed: false            # 2.2.4 (package tftp)
+
+# 2.1.19: the inet_interfaces value the role holds in the postfix configuration (postconf -e)
+# whenever the current one differs from it, also when the current one is already loopback only
+# in another spelling. A comma separated list of interface names or addresses, or loopback-only.
+# postfix is restarted only when it is running. Another MTA is never edited.
+cis_postfix_inet_interfaces: loopback-only
+
+# 2.1.20 (Level 2 Server, skipped by default): whether the graphical user interface (the
+# "Server with GUI" environment group, with gdm and gnome-shell) should be installed. false
+# removes it; true installs the group when it is missing. And the default systemd target the
+# role holds (the link systemctl set-default makes): multi-user.target or graphical.target.
+cis_gui_installed: false
+cis_default_target: multi-user.target
+
+# 2.3.1: whether chrony should be installed. false removes it when no other installed package
+# needs it; one that another package needs stays installed and chronyd is stopped and masked
+# instead. The benchmark wants it installed, so false is reported as a finding on every run.
+cis_chrony_installed: true
 
 # Time synchronization (2.3.2): chrony directive lines to add to /etc/chrony.conf when chrony
 # has no time source at all (no server or pool line there or in the files it includes).
@@ -255,6 +319,40 @@ cis_services_keep: []
 # restarted only when it is running. An item that is not a server or pool line stops the
 # fix. Empty (default): a host with no time source is only reported.
 cis_time_sources: []
+
+# 2.3.2: the owner and group the role sets on /etc/chrony.conf when it adds a time source from
+# cis_time_sources (and only then). The file's mode is never changed.
+cis_chrony_conf_owner: root
+cis_chrony_conf_group: root
+
+# 2.3.3: whether chronyd runs as root (a "-u root" option in OPTIONS of /etc/sysconfig/chronyd).
+# false removes that option and keeps the other options; true makes "-u root" the only user
+# option. The benchmark wants false, so true is reported as a finding on every run. chronyd is
+# restarted only when it is running.
+cis_chronyd_run_as_root: false
+
+# 2.4.1.1: whether crond is enabled and whether it is active. The role unmasks, enables and
+# starts it, or stops and disables it, to match; a value of false is reported as a finding.
+cis_crond_enabled: true
+cis_crond_active: true
+
+# 2.4.1.2 to 2.4.1.8: the owner and group the role sets on /etc/crontab and the /etc/cron.*
+# directories, the mode of /etc/crontab (a file) and the mode of the directories, whenever they
+# differ (a stricter mode is replaced). Quote modes. A path that is missing is never created.
+cis_cron_owner: root
+cis_cron_group: root
+cis_cron_file_mode: "0600"
+cis_cron_dir_mode: "0700"
+
+# 2.4.1.9, 2.4.2.1: the owner, group and mode the role sets on the allow and deny files of cron
+# and of at, whenever they differ (a stricter mode is replaced). A group that does not exist on
+# the host is replaced by root. The benchmark accepts root or the named group (crontab, daemon).
+cis_cron_allow_owner: root
+cis_cron_allow_group: crontab
+cis_cron_allow_mode: "0640"
+cis_at_allow_owner: root
+cis_at_allow_group: daemon
+cis_at_allow_mode: "0640"
 
 # Job schedulers (2.4.1.9): users to add to /etc/cron.allow when they are not already in it.
 # Users already in the file are never removed. IMPORTANT: with the default empty list, a host

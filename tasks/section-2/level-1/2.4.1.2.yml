@@ -1,7 +1,9 @@
 ---
-# 2.4.1.2 - /etc/crontab is owned by root:root with no permissions for group or other. The logic,
-# including how a missing path, a symlink and the cronie package check are treated, is
-# shared in tasks/lib/cron_access.yml.
+# 2.4.1.2 - /etc/crontab is owned by root:root with no permissions for group or other (the benchmark
+# value the check judges). The role sets the owner, group and mode of cis_cron_owner,
+# cis_cron_group and cis_cron_file_mode exactly, also over a stricter mode. The logic, including how a
+# missing path, a symlink and the cronie package check are treated, is shared in
+# tasks/lib/cron_access.yml.
 
 - name: "2.4.1.2 - Ensure access to /etc/crontab is configured"
   ansible.builtin.import_tasks: ../../lib/cron_access.yml

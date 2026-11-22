@@ -5,6 +5,11 @@
 #   cis_svc_name      a short service label for the task names
 #   cis_svc_packages  the packages that provide the service
 #   cis_svc_units     the systemd units (sockets, services, paths) of the service
+#   cis_svc_want      optional, default []: the listed packages the site wants installed (a
+#                     role variable). They are left out of the removal, installed with dnf when
+#                     missing, and reported as a finding while installed, since the benchmark
+#                     wants them absent. Pass in cis_svc_units only the units of the packages
+#                     that are not wanted
 # and puts the tags, which every task here inherits, on the import.
 #
 # Decision, made on the host at run time with read-only commands:
@@ -16,11 +21,15 @@
 # - When any package is kept, or no listed package is installed but a listed unit still
 #   exists, every existing unit is stopped and masked. A masked, inactive unit is
 #   compliant; a kept package with all its units masked is compliant.
+# - A package in cis_svc_want is installed when missing (after the removal) and
+#   never removed or masked. The check judges the benchmark, so it prints want:<package>
+#   for one that is installed, which fails the check.
 # - A site that needs the service lists the CIS ID in cis_services_keep: the whole
 #   control is skipped with no finding.
 #
 # The check prints one line per action: remove:<package>, keep:<package> (information
-# only) and mask:<unit>; its exit status is 1 when a remove: or mask: line exists.
+# only), want:<package>, install:<package> (information only: a wanted package that is
+# missing) and mask:<unit>; its exit status is 1 when a remove:, want: or mask: line exists.
 # Audit mode only runs the check and records a finding. Remediate mode removes, runs the
 # check again to learn which units remain (units of a removed package are gone), masks
 # them, and checks a last time. A control that still fails is recorded as a finding
@@ -38,12 +47,20 @@
           - /bin/sh
           - -c
           - |
-            # $1: packages, $2: units, both space separated.
+            # $1: packages, $2: units, $3: packages the site wants, all space separated.
             pkgs=$1
             units=$2
+            want=$3
             erase=""
             blocked=""
+            wanted=""
+            install=""
             for p in $pkgs; do
+              case " $want " in
+                *" $p "*)
+                  if rpm -q "$p" >/dev/null 2>&1; then wanted="$wanted $p"; else install="$install $p"; fi
+                  continue ;;
+              esac
               rpm -q "$p" >/dev/null 2>&1 && erase="$erase $p"
             done
             while :; do
@@ -72,6 +89,8 @@
             bad=0
             for p in $erase; do echo "remove:$p"; bad=1; done
             for p in $blocked; do echo "keep:$p"; done
+            for p in $wanted; do echo "want:$p"; bad=1; done
+            for p in $install; do echo "install:$p"; done
             if [ -n "$blocked" ] || [ -z "$erase" ]; then
               for u in $units; do
                 state=$(systemctl show -p LoadState --value "$u" 2>/dev/null)
@@ -91,6 +110,7 @@
           - sh
           - "{{ cis_svc_packages | join(' ') }}"
           - "{{ cis_svc_units | join(' ') }}"
+          - "{{ cis_svc_want | default([]) | join(' ') }}"
       register: cis_svc_check
       changed_when: false
       check_mode: false
@@ -105,6 +125,15 @@
         - not (cis_audit_only | bool)
         - cis_svc_check.rc != 0
         - cis_svc_check.stdout_lines | select('match', '^remove:') | list | length > 0
+
+    - name: "{{ cis_svc_id ~ ' - Install the ' ~ cis_svc_name ~ ' packages the site wants' }}"
+      ansible.builtin.dnf:
+        name: "{{ cis_svc_check.stdout_lines | select('match', '^install:') | map('regex_replace', '^install:', '') | list }}"
+        state: present
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - cis_svc_check.stdout_lines | select('match', '^install:') | list | length > 0
 
     - name: "{{ cis_svc_id ~ ' - Check which ' ~ cis_svc_name ~ ' units remain' }}"
       ansible.builtin.command:
@@ -138,7 +167,7 @@
       when:
         - not (cis_audit_only | bool)
         - not ansible_check_mode
-        - cis_svc_check.rc != 0
+        - cis_svc_check.rc != 0 or (cis_svc_check.stdout_lines | select('match', '^install:') | list | length > 0)
 
     - name: "{{ cis_svc_id ~ ' - Record the finding when the check fails in audit mode' }}"
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"

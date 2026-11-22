@@ -8,6 +8,40 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.33]
+
+### Changed
+
+- Section 2: every value a control writes or expects now comes from an overridable role variable
+  whose default is the benchmark value (`defaults/main.yml`, grouped by control ID), the same way
+  as in section 1. New variables cover whether each service package (2.1.1 to 2.1.18, 2.1.21,
+  2.1.22), client package (2.2.1 to 2.2.4) and `chrony` (2.3.1) is installed
+  (`cis_<package>_installed`: `true` installs it, `false` removes it with the existing safety
+  logic, where a package that another package needs is kept and its units are stopped and masked
+  instead), whether the graphical interface is installed and the default target (2.1.20), the
+  postfix `inet_interfaces` value (2.1.19), the owner and group of `chrony.conf` (2.3.2), whether
+  chronyd runs as root (2.3.3), whether crond is enabled and active (2.4.1.1), and the owner,
+  group and mode of `/etc/crontab`, the cron directories and the cron and at allow and deny
+  files (2.4.1.2 to 2.4.1.9, 2.4.2.1). `cis_services_keep`, `cis_time_sources`,
+  `cis_cron_allow_users` and `cis_at_allow_users` keep their names and meaning;
+  `cis_services_keep` wins over the package variables. Overriding a value changes what the role
+  writes; the checks still judge the benchmark value, kept as `cis_expect_*` constants in
+  `vars/main.yml`, so a weaker value is written and reported as a finding on every run. The fix
+  now enforces the configured value exactly: it changes the host whenever the host differs from
+  the variable, also when the host is stricter than the benchmark. Behavior changes with the
+  default values: a host value that was stricter than the benchmark or spelled differently is
+  set to the default. This covers 2.1.19 (a postfix `inet_interfaces` that was already loopback
+  only, such as `localhost` or `127.0.0.1`, is rewritten to `loopback-only`), 2.1.20 (a default
+  target other than `multi-user.target`, such as `rescue.target`, is linked to
+  `multi-user.target`, not only `graphical.target`), 2.4.1.2 to 2.4.1.8 (a mode stricter than
+  0600 on `/etc/crontab` or than 0700 on a cron directory is set to 0600 or 0700), and 2.4.1.9
+  and 2.4.2.1 (an allow or deny file stricter than 0640 is set to 0640, and when the `crontab` or
+  `daemon` group exists on the host a file with group root gets that group). Preflight validates
+  only the type and format of the new variables. The README has a table per group of controls.
+  The shared `tasks/lib/` helpers take the new inputs as optional parameters, so section 3 and
+  the other users of `service_not_in_use.yml` behave as before. Part of #58 (sections 3 to 5
+  follow).
+
 ## [3.0.0_0.0.32]
 
 ### Changed

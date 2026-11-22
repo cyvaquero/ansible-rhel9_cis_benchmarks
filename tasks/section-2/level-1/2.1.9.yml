@@ -1,5 +1,7 @@
 ---
 # 2.1.9 - message access server service not in use. The logic is shared in tasks/lib/service_not_in_use.yml.
+# The package variables (cis_dovecot_installed, cis_cyrus_imapd_installed) say whether each package should be installed;
+# cis_services_keep skips the control.
 
 - name: "2.1.9 - Ensure message access server services are not in use"
   ansible.builtin.import_tasks: ../../lib/service_not_in_use.yml
@@ -7,7 +9,10 @@
     cis_svc_id: "2.1.9"
     cis_svc_name: "message access server"
     cis_svc_packages: [dovecot, cyrus-imapd]
-    cis_svc_units: [dovecot.socket, dovecot.service, cyrus-imapd.service]
+    cis_svc_want: "{{ (['dovecot'] if cis_dovecot_installed | bool else []) + (['cyrus-imapd'] if cis_cyrus_imapd_installed | bool else []) }}"
+    cis_svc_units: >-
+      {{ ([] if cis_dovecot_installed | bool else ['dovecot.socket', 'dovecot.service'])
+         + ([] if cis_cyrus_imapd_installed | bool else ['cyrus-imapd.service']) }}
   tags:
     - "2.1.9"
     - section-2
