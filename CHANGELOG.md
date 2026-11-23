@@ -46,6 +46,15 @@ implements, then the role's own version.
   section 4. The shared `tasks/lib/` helper `firewalld_ssh_guard.yml` is unchanged apart from
   comments. Part of #58 (section 5 follows).
 
+### Fixed
+
+- 4.1.2 restarts a running `firewalld` right after it rewrites the `FirewallBackend` line,
+  instead of at the end of the run. Before, a later control that reloaded `firewalld` in the
+  same run (4.1.4, 4.1.9, 4.1.10, 4.1.11) applied the new backend through a reload, which
+  firewalld does not support: the reload failed, left the firewall rules half applied and could
+  cut the role's SSH connection. A stopped `firewalld` is still not started by 4.1.2. The
+  `Restart firewalld when running` handler is removed. Fixes #64.
+
 ## [3.0.0_0.0.34]
 
 ### Changed
