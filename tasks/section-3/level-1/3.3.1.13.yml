@@ -1,13 +1,16 @@
 ---
-# 3.3.1.13 - net.ipv4.conf.default.rp_filter is set to 1, both running and in the configuration. The logic is shared in tasks/lib/sysctl.yml.
+# 3.3.1.13 - net.ipv4.conf.default.rp_filter is held at
+# cis_sysctl_net_ipv4_conf_default_rp_filter (default 1), both running and in the configuration;
+# the finding is judged against the benchmark value (cis_expect_sysctl). The logic is shared in tasks/lib/sysctl.yml.
 
 - name: "3.3.1.13 - Ensure net.ipv4.conf.default.rp_filter is configured"
   ansible.builtin.import_tasks: ../../lib/sysctl.yml
   vars:
     cis_sc_id: "3.3.1.13"
     cis_sc_key: "net.ipv4.conf.default.rp_filter"
-    cis_sc_ok: ["1"]
-    cis_sc_set: "1"
+    cis_sc_ok: "{{ cis_expect_sysctl['net.ipv4.conf.default.rp_filter'] }}"
+    cis_sc_enforce: true
+    cis_sc_set: "{{ cis_sysctl_net_ipv4_conf_default_rp_filter }}"
   tags:
     - "3.3.1.13"
     - section-3

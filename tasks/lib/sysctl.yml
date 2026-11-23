@@ -5,8 +5,8 @@
 #   cis_sc_key   the kernel parameter
 #   cis_sc_ok    accepted values, as strings
 #   cis_sc_set   the value to write when the configured value is not accepted
-#   cis_sc_enforce optional, default false (sections 3 and others: write only when the
-#                configured value is not accepted). true (section 1): make the configured and
+#   cis_sc_enforce optional, default false (write only when the configured value is not
+#                accepted). true (sections 1 and 3): make the configured and
 #                the running value exactly cis_sc_set whenever they differ from it, also
 #                when they are already accepted (a stricter host value is replaced); the
 #                finding is still judged against cis_sc_ok

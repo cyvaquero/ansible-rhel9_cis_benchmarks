@@ -1,11 +1,14 @@
 ---
 # 3.2.6 - can kernel module. The logic is shared in tasks/lib/kernel_module.yml.
+# cis_module_can_blocked says whether the role blocks the module; the check judges the
+# benchmark state either way.
 
 - name: "3.2.6 - Ensure the can kernel module is not available"
   ansible.builtin.import_tasks: ../../lib/kernel_module.yml
   vars:
     cis_km_id: "3.2.6"
     cis_km_module: "can"
+    cis_km_fix: "{{ cis_module_can_blocked }}"
   tags:
     - "3.2.6"
     - section-3

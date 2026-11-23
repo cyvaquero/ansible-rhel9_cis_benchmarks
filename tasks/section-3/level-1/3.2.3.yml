@@ -1,11 +1,14 @@
 ---
 # 3.2.3 - rds kernel module. The logic is shared in tasks/lib/kernel_module.yml.
+# cis_module_rds_blocked says whether the role blocks the module; the check judges the
+# benchmark state either way.
 
 - name: "3.2.3 - Ensure the rds kernel module is not available"
   ansible.builtin.import_tasks: ../../lib/kernel_module.yml
   vars:
     cis_km_id: "3.2.3"
     cis_km_module: "rds"
+    cis_km_fix: "{{ cis_module_rds_blocked }}"
   tags:
     - "3.2.3"
     - section-3

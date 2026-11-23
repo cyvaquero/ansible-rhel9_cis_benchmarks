@@ -4,7 +4,7 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.33).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.34).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and these controls are implemented:
 
 - kernel modules, 1.1.1.1 to 1.1.1.11;
@@ -131,7 +131,7 @@ ansible-playbook -i inventory site.yml -e target=webservers
 ### Overriding values
 
 Every value a control writes or expects comes from a role variable whose default is the
-benchmark value; the variables for sections 1 and 2 are listed below, and each has a comment in
+benchmark value; the variables for sections 1 to 3 are listed below, and each has a comment in
 `defaults/main.yml`. Set one at any Ansible precedence level above the role defaults:
 inventory or `group_vars` / `host_vars`, play `vars`, role parameters, `set_fact` and `-e`.
 Do not edit the role's own files.
@@ -157,8 +157,8 @@ roles:
   finding.
 - For a package, the variable is whether it should be installed: the role installs or removes
   the package to match it, and the control reports a finding while the host differs from the
-  benchmark. This holds for every package of section 2 (the service and client packages, chrony),
-  with its own variable (`cis_<name>_installed`); `cis_services_keep` wins over them: a control
+  benchmark. This holds for every package of sections 2 and 3 (the service and client packages,
+  chrony, bluez), with its own variable (`cis_<name>_installed`); `cis_services_keep` wins over them: a control
   listed there is skipped completely, so nothing is installed or removed for it.
 - Preflight checks only the type and format of each value (a yes/no value, a whole number, a
   quoted octal mode such as `"0640"`, a name, a path, a list) and stops the run on anything
@@ -253,6 +253,19 @@ roles:
 once an allow file exists the deny file is ignored. List every account that needs them
 before running the role on such a host. To skip a control, list its ID in `cis_exclusions`;
 `cis_services_keep` applies only to the service controls (2.1.1 to 2.1.22, and 3.1.3).
+
+### Network devices, kernel modules and network parameters (3.1 to 3.3)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `cis_module_wireless_blocked` | `true` | 3.1.2: whether the role blocks (install line to `/bin/false` plus blacklist) and unloads the driver module of each wireless interface. The modules are found at run time, so one variable covers them all. `false` removes the role's own `/etc/modprobe.d/<module>.conf` for wireless drivers (a file it did not write stays), blocks and unloads nothing, and 3.1.2 reports a finding while a wireless interface exists. |
+| `cis_bluez_installed` | `false` | 3.1.3: whether `bluez` should be installed. `false` removes it when no other installed package needs it, otherwise stops and masks `bluetooth.service`. `true` installs it when missing and leaves the unit alone; the control reports a finding on every run. `cis_services_keep` listing 3.1.3 wins. |
+| `cis_module_dccp_blocked`, `cis_module_tipc_blocked`, `cis_module_rds_blocked`, `cis_module_sctp_blocked`, `cis_module_atm_blocked`, `cis_module_can_blocked` | `true` | 3.2.1 to 3.2.6: whether the role blocks and unloads the module, as for 1.1.1.x. `false` removes the role's own drop-in for it (a file it did not write stays) and the control reports the module as not blocked. |
+| `cis_sysctl_net_ipv4_<parameter>` | `0`, except `1` for `icmp_ignore_bogus_error_responses`, `icmp_echo_ignore_broadcasts`, `conf_all_rp_filter`, `conf_default_rp_filter`, `conf_all_log_martians`, `conf_default_log_martians` and `tcp_syncookies` | 3.3.1.1 to 3.3.1.20: the value held for `net.ipv4.<parameter>`, with dots written as underscores (`cis_sysctl_net_ipv4_ip_forward`, `cis_sysctl_net_ipv4_conf_all_send_redirects`, `cis_sysctl_net_ipv4_conf_default_route_localnet`, and so on, one per control). The role writes it to `/etc/sysctl.d/99-zz-cis-benchmarks.conf` and sets it live whenever the configured or the running value is another one, a stricter value included. A whole number. |
+| `cis_sysctl_net_ipv6_<parameter>` | `0` | 3.3.2.1 to 3.3.2.8: the same for `net.ipv6.conf.all.` and `net.ipv6.conf.default.` `forwarding`, `accept_redirects`, `accept_source_route` and `accept_ra` (`cis_sysctl_net_ipv6_conf_all_accept_ra`, ...). These controls are skipped, with no finding, while IPv6 is disabled on the host. |
+
+A site that needs IPv4 or IPv6 forwarding can set the forwarding variables to 1 instead of excluding
+the controls; the control then reports a finding on every run. 3.1.1 (manual) only reports.
 
 ### Firewall (4.1)
 
@@ -360,8 +373,8 @@ Values outside these ranges stop the run at preflight.
   add a drop-in to `rescue.service` or `emergency.service` when their effective
   command is not the configured one. The sysctl controls of section 1 (1.5.1 to 1.5.7) write
   `/etc/sysctl.d/99-zz-cis-benchmarks.conf`, named to sort after the vendor
-  and admin files, whenever the configured or the running value is not the configured one; those
-  of section 3 only when the configured value is not accepted. A value that a later file
+  and admin files, whenever the configured or the running value is not the configured one, as
+  do those of section 3. A value that a later file
   still overrides is a finding. 1.5.8 writes
   `/etc/security/limits.d/99-zz-cis-benchmarks.conf` (`* hard core 0`); entries for other
   users or groups are a finding. 1.5.9 and 1.5.10 write
@@ -453,23 +466,27 @@ Values outside these ranges stop the run at preflight.
   the kernel module controls do (modprobe.d drop-in with an `install ... /bin/false` line
   and a blacklist, then unloaded). A host with no wireless interface passes. A driver that
   cannot be unloaded, or an interface whose driver module cannot be found (built in), is a
-  finding. 3.1.3 (Level 1 Server, Level 2 Workstation) works like the service controls
-  above for `bluez` and `bluetooth.service`: the package is removed when nothing else needs
-  it, otherwise the unit is stopped and masked, and a host without `bluez` passes;
-  `cis_services_keep` skips it. 3.2.1 to 3.2.6 block, blacklist and unload `dccp`, `tipc`,
-  `rds`, `sctp`, `atm` and `can` like 1.1.1.1; a module the kernel does not ship passes.
-- IPv4 kernel parameters (3.3.1): each control sets one parameter through the shared sysctl
-  logic described under the boot loader and kernel controls above, to the one value the
-  benchmark accepts (forwarding, send, accept and secure redirects, source routing and
-  `route_localnet` to 0; bogus ICMP error and broadcast echo ignoring, `rp_filter`,
-  `log_martians` and `tcp_syncookies` to 1). 3.3.1.1 is Level 1 on a workstation and Level 2
-  on a server. 3.3.1.1 to 3.3.1.3 turn IPv4 forwarding off by default. A host that routes,
-  or runs rootful containers or libvirt NAT, needs forwarding: list 3.3.1.1, 3.3.1.2 and
-  3.3.1.3 in `cis_exclusions`. Likewise a host that relies on `route_localnet` or
-  asymmetric routing (`rp_filter`) excludes those IDs.
-- IPv6 kernel parameters (3.3.2): each control sets one parameter (forwarding, accept
+  finding. With `cis_module_wireless_blocked: false` it blocks and unloads nothing and removes
+  the role's own drop-ins for wireless drivers. 3.1.3 (Level 1 Server, Level 2 Workstation)
+  works like the service controls above for `bluez` and `bluetooth.service`
+  (`cis_bluez_installed`): the package is removed when nothing else needs it, otherwise the unit
+  is stopped and masked, and a host without `bluez` passes; `cis_services_keep` skips it.
+  3.2.1 to 3.2.6 block, blacklist and unload `dccp`, `tipc`, `rds`, `sctp`, `atm` and `can`
+  like 1.1.1.1 (`cis_module_<name>_blocked`); a module the kernel does not ship passes.
+- IPv4 kernel parameters (3.3.1): each control holds one parameter at the value of its variable
+  (`cis_sysctl_net_ipv4_*`, default the benchmark value) through the shared sysctl logic
+  described under the boot loader and kernel controls above: forwarding, send, accept and secure
+  redirects, source routing and `route_localnet` default to 0; bogus ICMP error and broadcast
+  echo ignoring, `rp_filter`, `log_martians` and `tcp_syncookies` default to 1. The check accepts
+  only the benchmark value. 3.3.1.1 is Level 1 on a workstation and Level 2 on a server.
+  3.3.1.1 to 3.3.1.3 turn IPv4 forwarding off by default. A host that routes, or runs rootful
+  containers or libvirt NAT, needs forwarding: list 3.3.1.1, 3.3.1.2 and 3.3.1.3 in
+  `cis_exclusions` (or set their variables to 1 and accept the finding). Likewise a host that
+  relies on `route_localnet` or asymmetric routing (`rp_filter`) excludes those IDs.
+- IPv6 kernel parameters (3.3.2): each control holds one parameter (forwarding, accept
   redirects, accept source route, accept router advertisements, each for `all` and
-  `default`) to 0 through the shared sysctl logic described above. The controls are
+  `default`) at the value of its variable (`cis_sysctl_net_ipv6_*`, default 0) through the
+  shared sysctl logic described above. The controls are
   skipped, with no finding, when IPv6 is disabled: when the `ipv6` module parameter
   `disable` is missing or not 0, or when both the `all` and `default` `disable_ipv6`
   sysctls are 1. 3.3.2.1 and 3.3.2.2 turn IPv6 forwarding off, so a host that routes IPv6,

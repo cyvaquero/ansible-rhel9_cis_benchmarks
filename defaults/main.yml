@@ -380,6 +380,70 @@ cis_at_installed: null
 # the run at preflight.
 cis_at_allow_users: []
 
+# Section 3 variables. As for sections 1 and 2, each one is the value the role enforces exactly
+# (for a package or a kernel module, the state it converges to): whenever the host differs from
+# it, the role changes the host to it, also when the host is stricter than the benchmark. The
+# default is the benchmark value. The checks judge against the benchmark value (vars/main.yml,
+# cis_expect_*), so a value of yours that is weaker than the benchmark's is written and the
+# control reports a finding on every run; exclude the control in cis_exclusions to accept that.
+# Preflight checks only the type and format of each value.
+
+# 3.1.2: whether the role blocks (install line to /bin/false plus blacklist) and unloads the
+# driver module of each wireless interface it finds. false: the role removes its own modprobe.d
+# drop-ins for those drivers (a file it did not write is left alone), loads and unloads nothing,
+# and 3.1.2 reports a finding while a wireless interface exists.
+cis_module_wireless_blocked: true
+
+# 3.1.3: whether the bluez package should be installed. false removes it when no other installed
+# package needs it, otherwise stops and masks bluetooth.service. true installs it when missing and
+# leaves the unit alone; the control then reports a finding on every run. cis_services_keep
+# listing 3.1.3 wins: nothing is installed or removed.
+cis_bluez_installed: false
+
+# 3.2.1 to 3.2.6: whether the role blocks (install line to /bin/false plus blacklist) and unloads
+# each network protocol kernel module. false: the role removes its own modprobe.d drop-in for the
+# module (one it did not write is left alone) and the control reports it as not blocked.
+cis_module_dccp_blocked: true               # 3.2.1
+cis_module_tipc_blocked: true               # 3.2.2
+cis_module_rds_blocked: true                # 3.2.3
+cis_module_sctp_blocked: true               # 3.2.4
+cis_module_atm_blocked: true                # 3.2.5
+cis_module_can_blocked: true                # 3.2.6
+
+# 3.3.1.1 to 3.3.1.20 (IPv4) and 3.3.2.1 to 3.3.2.8 (IPv6): the value the role holds for each
+# kernel parameter, in its sysctl file (/etc/sysctl.d/99-zz-cis-benchmarks.conf) and live,
+# whenever the configured or the running value is another one (a stricter value is replaced too).
+# A whole number. The 3.3.2 controls are skipped, with no finding, while IPv6 is disabled on the
+# host.
+cis_sysctl_net_ipv4_ip_forward: 0                           # 3.3.1.1
+cis_sysctl_net_ipv4_conf_all_forwarding: 0                  # 3.3.1.2
+cis_sysctl_net_ipv4_conf_default_forwarding: 0              # 3.3.1.3
+cis_sysctl_net_ipv4_conf_all_send_redirects: 0              # 3.3.1.4
+cis_sysctl_net_ipv4_conf_default_send_redirects: 0          # 3.3.1.5
+cis_sysctl_net_ipv4_icmp_ignore_bogus_error_responses: 1    # 3.3.1.6
+cis_sysctl_net_ipv4_icmp_echo_ignore_broadcasts: 1          # 3.3.1.7
+cis_sysctl_net_ipv4_conf_all_accept_redirects: 0            # 3.3.1.8
+cis_sysctl_net_ipv4_conf_default_accept_redirects: 0        # 3.3.1.9
+cis_sysctl_net_ipv4_conf_all_secure_redirects: 0            # 3.3.1.10
+cis_sysctl_net_ipv4_conf_default_secure_redirects: 0        # 3.3.1.11
+cis_sysctl_net_ipv4_conf_all_rp_filter: 1                   # 3.3.1.12
+cis_sysctl_net_ipv4_conf_default_rp_filter: 1               # 3.3.1.13
+cis_sysctl_net_ipv4_conf_all_accept_source_route: 0         # 3.3.1.14
+cis_sysctl_net_ipv4_conf_default_accept_source_route: 0     # 3.3.1.15
+cis_sysctl_net_ipv4_conf_all_log_martians: 1                # 3.3.1.16
+cis_sysctl_net_ipv4_conf_default_log_martians: 1            # 3.3.1.17
+cis_sysctl_net_ipv4_tcp_syncookies: 1                       # 3.3.1.18
+cis_sysctl_net_ipv4_conf_all_route_localnet: 0              # 3.3.1.19
+cis_sysctl_net_ipv4_conf_default_route_localnet: 0          # 3.3.1.20
+cis_sysctl_net_ipv6_conf_all_forwarding: 0                  # 3.3.2.1
+cis_sysctl_net_ipv6_conf_default_forwarding: 0              # 3.3.2.2
+cis_sysctl_net_ipv6_conf_all_accept_redirects: 0            # 3.3.2.3
+cis_sysctl_net_ipv6_conf_default_accept_redirects: 0        # 3.3.2.4
+cis_sysctl_net_ipv6_conf_all_accept_source_route: 0         # 3.3.2.5
+cis_sysctl_net_ipv6_conf_default_accept_source_route: 0     # 3.3.2.6
+cis_sysctl_net_ipv6_conf_all_accept_ra: 0                   # 3.3.2.7
+cis_sysctl_net_ipv6_conf_default_accept_ra: 0               # 3.3.2.8
+
 # Firewall (4.1.4): the permanent target set on an active firewalld zone whose target is
 # empty or ACCEPT. One of default, REJECT or DROP; preflight stops the run on anything else.
 # The control never lowers a target that is already acceptable.

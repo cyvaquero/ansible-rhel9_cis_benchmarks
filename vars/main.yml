@@ -86,7 +86,7 @@ cis_expect_bootloader_efi_uid: "0"
 cis_expect_bootloader_efi_gid: "0"
 cis_expect_bootloader_efi_umask: "0077"
 
-# 1.5.1 to 1.5.7: the accepted values of each kernel parameter.
+# 1.5.1 to 1.5.7, 3.3.1.1 to 3.3.2.8: the accepted values of each kernel parameter.
 cis_expect_sysctl:
   fs.protected_hardlinks: ["1"]
   fs.protected_symlinks: ["1"]
@@ -95,6 +95,36 @@ cis_expect_sysctl:
   kernel.kptr_restrict: ["1", "2"]
   kernel.randomize_va_space: ["2"]
   kernel.yama.ptrace_scope: ["1", "2", "3"]
+
+  # 3.3.1.1 to 3.3.1.20 and 3.3.2.1 to 3.3.2.8: network kernel parameters (Section 3).
+  net.ipv4.ip_forward: ["0"]
+  net.ipv4.conf.all.forwarding: ["0"]
+  net.ipv4.conf.default.forwarding: ["0"]
+  net.ipv4.conf.all.send_redirects: ["0"]
+  net.ipv4.conf.default.send_redirects: ["0"]
+  net.ipv4.icmp_ignore_bogus_error_responses: ["1"]
+  net.ipv4.icmp_echo_ignore_broadcasts: ["1"]
+  net.ipv4.conf.all.accept_redirects: ["0"]
+  net.ipv4.conf.default.accept_redirects: ["0"]
+  net.ipv4.conf.all.secure_redirects: ["0"]
+  net.ipv4.conf.default.secure_redirects: ["0"]
+  net.ipv4.conf.all.rp_filter: ["1"]
+  net.ipv4.conf.default.rp_filter: ["1"]
+  net.ipv4.conf.all.accept_source_route: ["0"]
+  net.ipv4.conf.default.accept_source_route: ["0"]
+  net.ipv4.conf.all.log_martians: ["1"]
+  net.ipv4.conf.default.log_martians: ["1"]
+  net.ipv4.tcp_syncookies: ["1"]
+  net.ipv4.conf.all.route_localnet: ["0"]
+  net.ipv4.conf.default.route_localnet: ["0"]
+  net.ipv6.conf.all.forwarding: ["0"]
+  net.ipv6.conf.default.forwarding: ["0"]
+  net.ipv6.conf.all.accept_redirects: ["0"]
+  net.ipv6.conf.default.accept_redirects: ["0"]
+  net.ipv6.conf.all.accept_source_route: ["0"]
+  net.ipv6.conf.default.accept_source_route: ["0"]
+  net.ipv6.conf.all.accept_ra: ["0"]
+  net.ipv6.conf.default.accept_ra: ["0"]
 
 # 1.5.8: the core file size hard limit. 1.5.9, 1.5.10: the coredump.conf values (compared
 # without regard to case).

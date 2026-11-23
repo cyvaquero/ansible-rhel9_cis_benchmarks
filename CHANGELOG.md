@@ -8,6 +8,30 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.34]
+
+### Changed
+
+- Section 3: every value a control writes or expects now comes from an overridable role variable
+  whose default is the benchmark value (`defaults/main.yml`, grouped by control ID), the same way
+  as in sections 1 and 2. New variables cover the network protocol kernel modules
+  (`cis_module_<name>_blocked` for `dccp`, `tipc`, `rds`, `sctp`, `atm` and `can`, 3.2.1 to
+  3.2.6), whether the role blocks the wireless driver modules it finds (`cis_module_wireless_blocked`,
+  3.1.2), whether `bluez` is installed (`cis_bluez_installed`, 3.1.3) and the value of each of the
+  28 IPv4 and IPv6 kernel parameters (`cis_sysctl_net_ipv4_*` and `cis_sysctl_net_ipv6_*`, 3.3.1.1
+  to 3.3.2.8). A module variable set to `false` removes the role's own `/etc/modprobe.d` drop-in
+  and unloads nothing, and the control reports the module as not blocked; `cis_bluez_installed`
+  set to `true` only installs the package (the role leaves its unit and configuration alone).
+  Overriding a value changes what the role writes; the checks still judge the benchmark value,
+  kept in `cis_expect_sysctl` in `vars/main.yml`, so a weaker value is written and reported as a
+  finding on every run. The sysctl controls now enforce the configured value exactly: they change
+  the host whenever the configured or the running value differs from the variable, also when the
+  host is stricter than the benchmark. There are no behavior changes with the default values: every
+  section 3 control accepts exactly one benchmark value, which is also the default, so a host
+  value that differs from it was already replaced. Preflight validates only the type and format
+  of the new variables. The README has a table for section 3. The shared
+  `tasks/lib/` helpers are unchanged apart from comments. Part of #58 (sections 4 and 5 follow).
+
 ## [3.0.0_0.0.33]
 
 ### Changed
