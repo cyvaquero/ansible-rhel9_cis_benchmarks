@@ -513,7 +513,7 @@ Values outside these ranges stop the run at preflight.
   (default: installed). 4.1.2 holds `FirewallBackend` in `/etc/firewalld/firewalld.conf` at
   `cis_firewalld_backend` (a missing line already means `nftables`) and, when it changes the
   line, restarts `firewalld` right away if it is running, before any later control reloads it
-  (firewalld cannot change its backend on a reload); the check fails only on an explicit `iptables`. 4.1.3 unmasks,
+  (so no later reload works against a firewalld that has not applied the line); the check fails only on an explicit `iptables`. 4.1.3 unmasks,
   enables and starts `firewalld.service`, or the other states `cis_firewalld_enabled` and
   `cis_firewalld_active` say. 4.1.4 checks every active zone bound to an interface other than `lo`
   or `virbr*`: its target must not be `ACCEPT` or empty, and the runtime and permanent targets

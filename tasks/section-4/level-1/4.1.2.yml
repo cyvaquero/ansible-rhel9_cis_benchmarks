@@ -8,8 +8,9 @@
 # line counts as firewalld's own default (cis_firewalld_backend_unset) and is written only when
 # that differs from the variable; a missing file is left alone. When the line changes, firewalld
 # is restarted right away, and only when it is running (try-restart), so the new backend applies
-# before any later control reloads firewalld: a reload that changes the backend fails in firewalld
-# and leaves its rules half applied, which can cut the role's SSH connection. A control that is not compliant
+# before any later control reloads firewalld: a firewalld that could not apply the old line (a
+# reload with a value it does not know fails and leaves its rules half applied) can hang a later
+# reload and cut the role's SSH connection. A control that is not compliant
 # with the benchmark after the fix (a site value of iptables) is a finding on every run; under
 # --check nothing changes and nothing is recorded in remediate mode.
 #
