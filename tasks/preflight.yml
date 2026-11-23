@@ -236,6 +236,84 @@
     - always
     - preflight
 
+# Section 3 override variables (defaults/main.yml). Only the type and format are checked, never
+# the benchmark bounds (see README, "Overriding values").
+- name: "Preflight - Validate the section 3 yes/no values"
+  ansible.builtin.assert:
+    that:
+      - vars[item] is boolean or (vars[item] | string | lower) in ['true', 'false']
+    fail_msg: "{{ item }} must be true or false (got {{ vars[item] | to_json }})."
+    quiet: true
+  loop:
+    - cis_module_wireless_blocked
+    - cis_bluez_installed
+    - cis_module_dccp_blocked
+    - cis_module_tipc_blocked
+    - cis_module_rds_blocked
+    - cis_module_sctp_blocked
+    - cis_module_atm_blocked
+    - cis_module_can_blocked
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Validate the section 3 whole numbers"
+  ansible.builtin.assert:
+    that:
+      - lookup('ansible.builtin.vars', item) is not boolean
+      - lookup('ansible.builtin.vars', item) | string is match('^[0-9]+$')
+    fail_msg: "{{ item }} must be a whole number of 0 or more (got {{ lookup('ansible.builtin.vars', item) | to_json }})."
+    quiet: true
+  loop:
+    - cis_sysctl_net_ipv4_ip_forward
+    - cis_sysctl_net_ipv4_conf_all_forwarding
+    - cis_sysctl_net_ipv4_conf_default_forwarding
+    - cis_sysctl_net_ipv4_conf_all_send_redirects
+    - cis_sysctl_net_ipv4_conf_default_send_redirects
+    - cis_sysctl_net_ipv4_icmp_ignore_bogus_error_responses
+    - cis_sysctl_net_ipv4_icmp_echo_ignore_broadcasts
+    - cis_sysctl_net_ipv4_conf_all_accept_redirects
+    - cis_sysctl_net_ipv4_conf_default_accept_redirects
+    - cis_sysctl_net_ipv4_conf_all_secure_redirects
+    - cis_sysctl_net_ipv4_conf_default_secure_redirects
+    - cis_sysctl_net_ipv4_conf_all_rp_filter
+    - cis_sysctl_net_ipv4_conf_default_rp_filter
+    - cis_sysctl_net_ipv4_conf_all_accept_source_route
+    - cis_sysctl_net_ipv4_conf_default_accept_source_route
+    - cis_sysctl_net_ipv4_conf_all_log_martians
+    - cis_sysctl_net_ipv4_conf_default_log_martians
+    - cis_sysctl_net_ipv4_tcp_syncookies
+    - cis_sysctl_net_ipv4_conf_all_route_localnet
+    - cis_sysctl_net_ipv4_conf_default_route_localnet
+    - cis_sysctl_net_ipv6_conf_all_forwarding
+    - cis_sysctl_net_ipv6_conf_default_forwarding
+    - cis_sysctl_net_ipv6_conf_all_accept_redirects
+    - cis_sysctl_net_ipv6_conf_default_accept_redirects
+    - cis_sysctl_net_ipv6_conf_all_accept_source_route
+    - cis_sysctl_net_ipv6_conf_default_accept_source_route
+    - cis_sysctl_net_ipv6_conf_all_accept_ra
+    - cis_sysctl_net_ipv6_conf_default_accept_ra
+  tags:
+    - always
+    - preflight
+
+# net.ipv4.ip_forward and net.ipv4.conf.all.forwarding are one kernel setting under two names:
+# setting either sets the other. Different values would make 3.3.1.1 and 3.3.1.2 undo each other
+# on every run.
+- name: "Preflight - Check that the two names of the IPv4 forwarding setting agree"
+  ansible.builtin.assert:
+    that:
+      - (cis_sysctl_net_ipv4_ip_forward | string) == (cis_sysctl_net_ipv4_conf_all_forwarding | string)
+    fail_msg: >-
+      cis_sysctl_net_ipv4_ip_forward ({{ cis_sysctl_net_ipv4_ip_forward }}) and
+      cis_sysctl_net_ipv4_conf_all_forwarding ({{ cis_sysctl_net_ipv4_conf_all_forwarding }}) set
+      the same kernel setting and must be equal. cis_sysctl_net_ipv4_conf_all_forwarding follows
+      cis_sysctl_net_ipv4_ip_forward unless it is set.
+    quiet: true
+  tags:
+    - always
+    - preflight
+
 - name: "Preflight - Validate the firewalld zone target"
   ansible.builtin.assert:
     that:

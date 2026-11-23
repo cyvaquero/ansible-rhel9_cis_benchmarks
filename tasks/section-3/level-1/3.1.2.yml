@@ -8,6 +8,11 @@
 # link) cannot be made unavailable by the role and is a finding. A driver that cannot be
 # unloaded, for example because another module uses it, is a finding from the shared logic.
 # As elsewhere, remediate mode under --check records no finding.
+#
+# cis_module_wireless_blocked says whether the role blocks the drivers. When it is false the
+# role blocks and unloads nothing, removes its own drop-ins for wireless drivers (a file it did
+# not write is never touched), and the check still judges the benchmark state, so a wireless
+# interface that exists is a finding.
 
 - name: "3.1.2 - Find the wireless interface driver modules"
   ansible.builtin.command:
@@ -44,7 +49,33 @@
   vars:
     cis_km_id: "3.1.2"
     cis_km_module: "{{ item | regex_replace('^module:', '') }}"
+    cis_km_fix: "{{ cis_module_wireless_blocked }}"
   loop: "{{ cis_check_3_1_2.stdout_lines | default([]) | select('match', '^module:') | list }}"
+  tags: *cis_tags_3_1_2
+
+# The drop-ins of drivers whose interface is already gone are not reached through the loop above.
+# find matches contains from the start of each line.
+- name: "3.1.2 - Find the role drop-ins of wireless drivers"
+  ansible.builtin.find:
+    paths: /etc/modprobe.d
+    patterns: "*.conf"
+    contains: '# Managed by rhel9_cis_benchmarks \(3\.1\.2\)'
+  register: cis_wireless_own
+  when:
+    - not (cis_audit_only | bool)
+    - not (cis_module_wireless_blocked | bool)
+  tags: *cis_tags_3_1_2
+
+- name: "3.1.2 - Remove the role drop-ins of wireless drivers"
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ cis_wireless_own.files | default([]) }}"
+  loop_control:
+    label: "{{ item.path }}"
+  when:
+    - not (cis_audit_only | bool)
+    - not (cis_module_wireless_blocked | bool)
   tags: *cis_tags_3_1_2
 
 - name: "3.1.2 - Record the finding for a wireless interface with no driver module"

@@ -1,5 +1,7 @@
 ---
-# 3.3.2.6 - net.ipv6.conf.default.accept_source_route is set to 0, both running and in the configuration.
+# 3.3.2.6 - net.ipv6.conf.default.accept_source_route is held at
+# cis_sysctl_net_ipv6_conf_default_accept_source_route (default 0), both running and in the configuration;
+# the finding is judged against the benchmark value (cis_expect_sysctl).
 # Only when IPv6 is enabled (cis_ipv6_disabled from preflight); on a host with IPv6
 # disabled the control is skipped with no finding. The logic is shared in
 # tasks/lib/sysctl.yml.
@@ -9,8 +11,9 @@
   vars:
     cis_sc_id: "3.3.2.6"
     cis_sc_key: "net.ipv6.conf.default.accept_source_route"
-    cis_sc_ok: ["0"]
-    cis_sc_set: "0"
+    cis_sc_ok: "{{ cis_expect_sysctl['net.ipv6.conf.default.accept_source_route'] }}"
+    cis_sc_enforce: true
+    cis_sc_set: "{{ cis_sysctl_net_ipv6_conf_default_accept_source_route }}"
   when: not (cis_ipv6_disabled | bool)
   tags:
     - "3.3.2.6"

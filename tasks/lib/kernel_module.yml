@@ -1,6 +1,6 @@
 ---
-# Shared logic for the kernel module controls (1.1.1.1 to 1.1.1.10). A control file
-# imports this with:
+# Shared logic for the kernel module controls (1.1.1.1 to 1.1.1.10, 3.1.2, 3.2.1 to 3.2.6). A
+# control file imports this with:
 #   cis_km_id      the CIS ID, for the task names and the finding
 #   cis_km_module  the module name as the benchmark writes it, dash or underscore
 #   cis_km_fix     optional, default true: true blocks the module; false removes the role's
