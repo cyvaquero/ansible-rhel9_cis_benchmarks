@@ -29,7 +29,10 @@ implements, then the role's own version.
   host is stricter than the benchmark. There are no behavior changes with the default values: every
   section 3 control accepts exactly one benchmark value, which is also the default, so a host
   value that differs from it was already replaced. Preflight validates only the type and format
-  of the new variables. The README has a table for section 3. The shared
+  of the new variables. `cis_sysctl_net_ipv4_conf_all_forwarding` defaults to
+  `cis_sysctl_net_ipv4_ip_forward`, because the kernel treats `net.ipv4.ip_forward` and
+  `net.ipv4.conf.all.forwarding` as one setting, and preflight refuses the two at different values
+  (otherwise 3.3.1.1 and 3.3.1.2 would undo each other on every run). The README has a table for section 3. The shared
   `tasks/lib/` helpers are unchanged apart from comments. Part of #58 (sections 4 and 5 follow).
 
 ## [3.0.0_0.0.33]

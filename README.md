@@ -265,7 +265,10 @@ before running the role on such a host. To skip a control, list its ID in `cis_e
 | `cis_sysctl_net_ipv6_<parameter>` | `0` | 3.3.2.1 to 3.3.2.8: the same for `net.ipv6.conf.all.` and `net.ipv6.conf.default.` `forwarding`, `accept_redirects`, `accept_source_route` and `accept_ra` (`cis_sysctl_net_ipv6_conf_all_accept_ra`, ...). These controls are skipped, with no finding, while IPv6 is disabled on the host. |
 
 A site that needs IPv4 or IPv6 forwarding can set the forwarding variables to 1 instead of excluding
-the controls; the control then reports a finding on every run. 3.1.1 (manual) only reports.
+the controls; the control then reports a finding on every run. `net.ipv4.ip_forward` and
+`net.ipv4.conf.all.forwarding` are one kernel setting under two names, so
+`cis_sysctl_net_ipv4_conf_all_forwarding` defaults to `cis_sysctl_net_ipv4_ip_forward` and preflight
+refuses the two at different values. 3.1.1 (manual) only reports.
 
 ### Firewall (4.1)
 
