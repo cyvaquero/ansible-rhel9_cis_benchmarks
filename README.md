@@ -4,7 +4,7 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.34).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.35).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and these controls are implemented:
 
 - kernel modules, 1.1.1.1 to 1.1.1.11;
@@ -79,9 +79,8 @@ example `cis_rhel_minor_release | int >= 4`.
 
 It then validates the selection variables below and fails with a clear message on an
 invalid `cis_profile`, a `cis_apply_level_2`, `cis_audit_only` or `cis_fail_on_findings`
-that is not true or false, a `cis_firewalld_zone_target` other than `default`, `REJECT` or
-`DROP`, or a CIS ID in `cis_exclusions` that is not in the benchmark. The section 1 and 2 variables
-below are checked for type and format only (a yes/no value, a whole number, a quoted octal mode,
+that is not true or false, or a CIS ID in `cis_exclusions` that is not in the benchmark. The
+variables of sections 1 to 4 below are checked for type and format only (a yes/no value, a whole number, a quoted octal mode,
 a name, a path, a list), never against the benchmark's bounds; see "Overriding values".
 
 ## Usage (planned)
@@ -131,7 +130,7 @@ ansible-playbook -i inventory site.yml -e target=webservers
 ### Overriding values
 
 Every value a control writes or expects comes from a role variable whose default is the
-benchmark value; the variables for sections 1 to 3 are listed below, and each has a comment in
+benchmark value; the variables for sections 1 to 4 are listed below, and each has a comment in
 `defaults/main.yml`. Set one at any Ansible precedence level above the role defaults:
 inventory or `group_vars` / `host_vars`, play `vars`, role parameters, `set_fact` and `-e`.
 Do not edit the role's own files.
@@ -157,9 +156,13 @@ roles:
   finding.
 - For a package, the variable is whether it should be installed: the role installs or removes
   the package to match it, and the control reports a finding while the host differs from the
-  benchmark. This holds for every package of sections 2 and 3 (the service and client packages,
-  chrony, bluez), with its own variable (`cis_<name>_installed`); `cis_services_keep` wins over them: a control
+  benchmark. This holds for every package of sections 2 to 4 (the service and client packages,
+  chrony, bluez, firewalld, iptables-services, ufw), with its own variable
+  (`cis_<name>_installed`); `cis_services_keep` wins over the service package variables: a control
   listed there is skipped completely, so nothing is installed or removed for it.
+- The SSH guard of the firewalld controls is not a variable and no override bypasses it: the
+  role starts `firewalld` or `nftables.service`, or replaces an `ACCEPT` zone target, only when SSH
+  is already allowed (see "SSH guard" below).
 - Preflight checks only the type and format of each value (a yes/no value, a whole number, a
   quoted octal mode such as `"0640"`, a name, a path, a list) and stops the run on anything
   else. Quote file modes: an unquoted `0600` is a number in YAML. Values passed with `-e` are
@@ -274,8 +277,17 @@ refuses the two at different values. 3.1.1 (manual) only reports.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `cis_firewalld_zone_target` | `default` | 4.1.4: the permanent target set on an active zone whose target is `ACCEPT` or empty. One of `default`, `REJECT` or `DROP`; anything else stops the run at preflight. A target that is already acceptable is never changed. |
-| `cis_firewalld_log_denied` | `unicast` | 4.1.10 (Level 2): the `LogDenied` value set when it is `off`. One of `all`, `unicast`, `broadcast` or `multicast`; anything else stops the run at preflight. A value other than `off` is never changed. |
+| `cis_firewalld_installed` | `true` | 4.1.1: whether `firewalld` should be installed. `true` installs it when missing (install only: 4.1.3 decides whether it runs). `false` removes it when no other installed package needs it; one that is needed stays installed and `firewalld.service` is stopped and masked instead, and 4.1.3 leaves the service alone. `false` is reported as a finding. |
+| `cis_firewalld_backend` | `nftables` | 4.1.2: the `FirewallBackend` value held in `/etc/firewalld/firewalld.conf`: `nftables` or `iptables`. The last `FirewallBackend` line is rewritten whenever it is another value or spelling; a missing line counts as `nftables` (firewalld's own default) and a missing file is left alone. When the line changes, `firewalld` is restarted right away, only when it runs. `iptables` is reported as a finding. |
+| `cis_firewalld_enabled`, `cis_firewalld_active` | `true`, `true` | 4.1.3: whether `firewalld.service` is enabled and whether it is running. The role unmasks (when either is true), enables or disables, and starts or stops it to match. Starting it needs the SSH guard to allow it; stopping and disabling do not. `false` is reported as a finding. Ignored while `cis_firewalld_installed` is `false`. |
+| `cis_firewalld_zone_target` | `default` | 4.1.4: the permanent target of every active zone bound to an interface other than `lo` or `virbr*`: `default`, `ACCEPT`, `REJECT` or `DROP`. The role sets it on any zone whose target is another one, a stricter target included (a `DROP` zone becomes `default`), then reloads `firewalld`. Replacing an `ACCEPT` target needs the SSH guard to allow it. `ACCEPT` is reported as a finding. |
+| `cis_nftables_service_enabled`, `cis_nftables_service_active` | `false`, `false` | 4.1.9: whether `nftables.service` is enabled and whether it is running. With both `false` the role stops, disables and masks it when it is enabled or active (one already masked, disabled and stopped is left as it is); otherwise it unmasks, enables or disables, and starts or stops it to match. Starting it needs the SSH guard to allow it, because the ruleset it loads is the site's own. A unit that does not exist is left alone. `true` is reported as a finding. The `nftables` package is never installed or removed. |
+| `cis_iptables_services_installed`, `cis_ufw_installed` | `false`, `false` | 4.1.9: whether `iptables-services` (any package that provides it, such as `iptables-nft-services`) and `ufw` should be installed. `false` removes the package when nothing else needs it; a needed one stays and is reported. `true` installs it when missing (install only, one package at a time; a package the repositories do not have is left) and is reported as a finding. |
+| `cis_firewalld_log_denied` | `unicast` | 4.1.10 (Level 2): the `LogDenied` value held: `off`, `all`, `unicast`, `broadcast` or `multicast` (quote `"off"`: YAML reads a bare `off` as false). The role sets it whenever the value is another one, one that logs more included (`all` becomes `unicast`). `off` is reported as a finding. |
+| `cis_firewalld_icmp_timestamp_request_blocked`, `cis_firewalld_icmp_timestamp_reply_blocked` | `true`, `true` | 4.1.11 (Level 2): whether the ICMP `timestamp-request` and `timestamp-reply` types are blocked in each active zone whose target is `default`. `false` removes the block (or, with icmp-block-inversion on, allows the type) and is reported as a finding. |
+
+The `cis_firewalld_zone_target` of a site that sets `REJECT`, `DROP` or `ACCEPT` makes 4.1.11
+not applicable: it covers only zones whose target is `default`.
 
 ### SSH server (5.1)
 
@@ -497,49 +509,54 @@ Values outside these ranges stop the run at preflight.
   that relies on the kernel's own router-advertisement handling for its IPv6 address or
   default route (not NetworkManager, which processes router advertisements itself) lists
   3.3.2.7 and 3.3.2.8 in `cis_exclusions`.
-- Firewall (4.1): 4.1.1 installs `firewalld`. 4.1.2 changes `FirewallBackend` in
-  `/etc/firewalld/firewalld.conf` only when it is explicitly `iptables` (a missing line
-  already means `nftables`), and restarts `firewalld` only when it is running. 4.1.3
-  unmasks, enables and starts `firewalld.service`. 4.1.4 checks every active zone bound to
-  an interface other than `lo` or `virbr*`: its target must not be `ACCEPT` or empty, and
-  the runtime and permanent targets must match. A zone with such a target gets
-  `cis_firewalld_zone_target` as its permanent target, then `firewalld` is reloaded; a
-  runtime and permanent mismatch with an acceptable permanent target is fixed by the reload
-  alone (which also drops runtime-only changes). No active zone is a finding with nothing
+- Firewall (4.1): 4.1.1 makes `firewalld` installed or not as `cis_firewalld_installed` says
+  (default: installed). 4.1.2 holds `FirewallBackend` in `/etc/firewalld/firewalld.conf` at
+  `cis_firewalld_backend` (a missing line already means `nftables`) and, when it changes the
+  line, restarts `firewalld` right away if it is running, before any later control reloads it
+  (so no later reload works against a firewalld that has not applied the line); the check fails only on an explicit `iptables`. 4.1.3 unmasks,
+  enables and starts `firewalld.service`, or the other states `cis_firewalld_enabled` and
+  `cis_firewalld_active` say. 4.1.4 checks every active zone bound to an interface other than `lo`
+  or `virbr*`: its target must not be `ACCEPT` or empty, and the runtime and permanent targets
+  must match. Every such zone whose permanent target is not `cis_firewalld_zone_target` gets it
+  as its permanent target (a `REJECT` or `DROP` target too), then `firewalld` is reloaded; a
+  runtime and permanent mismatch with a permanent target that is the variable is fixed by the
+  reload alone (which also drops runtime-only changes). No active zone is a finding with nothing
   to change. 4.1.9 requires `nftables.service` to be neither enabled nor active (disabled,
-  masked or absent all pass) and `iptables-services` and `ufw` (or the packages that provide them, such as
-  `iptables-nft-services`) not to be installed; it
-  stops, disables and masks the service and removes each package that nothing else needs,
-  keeping the `nftables` package itself, then reloads `firewalld` if it is running. A package
-  something else needs is kept and the control is a finding.
+  masked or absent all pass) and `iptables-services` and `ufw` (or the packages that provide
+  them, such as `iptables-nft-services`) not to be installed; it makes the service and the
+  packages as the variables of the table say. By default it stops, disables and masks the
+  service and removes each package that nothing else needs, keeping the `nftables` package
+  itself, then reloads `firewalld` if it is running. A package something else needs is kept and
+  the control is a finding.
 - Firewall, Level 2 (4.1.10, 4.1.11): 4.1.10 fails only when `LogDenied` is `off`, read with
   `firewall-cmd --get-log-denied` when `firewalld` runs and from
   `/etc/firewalld/firewalld.conf` otherwise (a missing line means `off`). It sets
   `cis_firewalld_log_denied` with `firewall-cmd --set-log-denied` when `firewalld` runs, else in
-  `firewalld.conf`; any other value is kept. 4.1.11 applies to each active zone bound to an
+  `firewalld.conf`, whenever the value is another one. 4.1.11 applies to each active zone bound to an
   interface other than `lo` or `virbr*` whose target is `default`; zones with an `ACCEPT`,
   `DROP` or `REJECT` target are not applicable. For such a zone the ICMP types
   `timestamp-request` and `timestamp-reply` must be blocked in the permanent and the runtime
   configuration: listed as ICMP blocks when icmp-block-inversion is off, not listed when it
-  is on. The fix adds (or, with inversion on, removes) the blocks permanently and reloads
-  `firewalld` once; a runtime-only difference is fixed by the reload alone. `firewalld` not
+  is on. The fix makes each type blocked or not as its variable says (by default it adds, or,
+  with inversion on, removes, the blocks permanently) and reloads `firewalld` once; a runtime-only difference is fixed by the reload alone. `firewalld` not
   running is a finding with nothing to change; no applicable zone passes. Neither control
   restricts SSH, so neither uses the SSH guard. 4.1.5 to 4.1.7 and 4.1.8 (Level 2) are manual:
   the role prints the loopback interface rules, the loopback address rules, the zones'
   services and ports, and the default zone, and changes nothing. Review them as described in
   [docs/review-controls.md](docs/review-controls.md); setting the default zone to `drop`
   (4.1.8) can lock you out, so allow SSH in the zone that carries your connection first.
-- SSH guard (4.1.3, 4.1.4): starting `firewalld` and replacing an `ACCEPT` target can begin
-  filtering and cut the role's own SSH connection, so the role makes these two changes only
-  when SSH is already allowed in the zone that applies to that connection. The role reads
+- SSH guard (4.1.3, 4.1.4, 4.1.9): starting `firewalld`, replacing an `ACCEPT` target and
+  starting `nftables.service` can begin filtering and cut the role's own SSH connection, so the
+  role makes these changes only when SSH is already allowed in the zone that applies to that connection. The role reads
   the connection from `SSH_CONNECTION`. The zone is the one whose sources match the
   controller address; else the zone of the interface that carries the server address
   (NetworkManager `connection.zone`, then the firewalld binding); else the default zone.
   SSH is allowed there when its permanent configuration has the `ssh` service and the
   connection is on port 22, or a TCP port or range containing the connection port, which
-  must be one that `sshd -T` reports; rich rules are not read. For 4.1.3 a zone target of
-  `ACCEPT` also counts as allowed, and enabling a `firewalld` that already runs needs no
-  guard. A connection that is not SSH (for example `local`) passes. When anything cannot be
+  must be one that `sshd -T` reports; rich rules are not read. For 4.1.3 and 4.1.9 a zone target of
+  `ACCEPT` also counts as allowed, and enabling a `firewalld` or `nftables.service` that already
+  runs, stopping or disabling either, and setting an `ACCEPT` target, need no guard. No variable
+  bypasses it. A connection that is not SSH (for example `local`) passes. When anything cannot be
   determined (an `ipset:` or `mac:` zone source, two zones matching the controller, an
   unknown interface), the guard fails. In every failing case the host is left unchanged, a
   message says so, and the control is a finding to fix by hand: allow SSH in the zone, then

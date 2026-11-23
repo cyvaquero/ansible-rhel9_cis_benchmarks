@@ -446,15 +446,66 @@ cis_sysctl_net_ipv6_conf_default_accept_source_route: 0     # 3.3.2.6
 cis_sysctl_net_ipv6_conf_all_accept_ra: 0                   # 3.3.2.7
 cis_sysctl_net_ipv6_conf_default_accept_ra: 0               # 3.3.2.8
 
-# Firewall (4.1.4): the permanent target set on an active firewalld zone whose target is
-# empty or ACCEPT. One of default, REJECT or DROP; preflight stops the run on anything else.
-# The control never lowers a target that is already acceptable.
+# Section 4 variables. As for sections 1 to 3, each one is the value the role enforces exactly
+# (for a package or a service, the state it converges to): whenever the host differs from it, the
+# role changes the host to it, also when the host is stricter than the benchmark. The default is
+# the benchmark value. The checks judge against the benchmark value (vars/main.yml,
+# cis_expect_*), so a value of yours that is weaker than the benchmark's is written and the
+# control reports a finding on every run; exclude the control in cis_exclusions to accept that.
+# Preflight checks only the type and format of each value. The SSH guard
+# (tasks/lib/firewalld_ssh_guard.yml) is not a variable: starting firewalld or nftables.service
+# and replacing an ACCEPT zone target happen only when SSH is already allowed, whatever these say.
+
+# 4.1.1: whether firewalld should be installed. true installs it when missing (install only: 4.1.3
+# decides whether it runs). false removes it when no other installed package needs it, otherwise it
+# stays installed and firewalld.service is stopped and masked, and 4.1.3 leaves the service alone.
+# false is reported as a finding.
+cis_firewalld_installed: true
+
+# 4.1.2: the FirewallBackend the role holds in /etc/firewalld/firewalld.conf. One of nftables or
+# iptables. A missing line counts as firewalld's own default (nftables); firewalld is restarted
+# only when it runs. iptables is reported as a finding.
+cis_firewalld_backend: nftables
+
+# 4.1.3: whether firewalld.service is enabled and whether it is running. The role unmasks (when
+# either is true), enables or disables, and starts or stops it to match. Starting it needs the SSH
+# guard to allow it. false is reported as a finding. Ignored while cis_firewalld_installed is false.
+cis_firewalld_enabled: true
+cis_firewalld_active: true
+
+# 4.1.4: the permanent target of every active firewalld zone bound to an interface other than lo or
+# virbr*. One of default, ACCEPT, REJECT or DROP. The role sets it whenever the zone's target is
+# another one, also when that target is stricter (a DROP zone becomes default). Replacing an ACCEPT
+# target needs the SSH guard to allow it. ACCEPT is reported as a finding.
 cis_firewalld_zone_target: default
 
-# Firewall (4.1.10): the LogDenied value set when it is off. One of all, unicast, broadcast
-# or multicast; preflight stops the run on anything else. A value other than off is never
-# changed.
+# 4.1.9: whether nftables.service is enabled and whether it is running. With both false the role
+# stops, disables and masks it when it is enabled or active. Otherwise it unmasks, enables or
+# disables, and starts or stops it to match; starting it needs the SSH guard to allow it, because
+# the ruleset it loads is the site's own. true is reported as a finding. The nftables package is
+# never installed or removed.
+cis_nftables_service_enabled: false
+cis_nftables_service_active: false
+
+# 4.1.9: whether iptables-services (any package providing it, such as iptables-nft-services) and
+# ufw should be installed. false removes the package when no other installed package needs it (one
+# that is needed is kept and reported). true installs it when missing (install only) and is
+# reported as a finding.
+cis_iptables_services_installed: false
+cis_ufw_installed: false
+
+# 4.1.10 (Level 2): the LogDenied value the role holds, set with firewall-cmd --set-log-denied
+# while firewalld runs, else in firewalld.conf. One of off, all, unicast, broadcast or multicast
+# (quote "off": YAML reads a bare off as false).
+# The role sets it whenever the value is another one, also when that one logs more (all becomes
+# unicast). off is reported as a finding.
 cis_firewalld_log_denied: unicast
+
+# 4.1.11 (Level 2): whether the ICMP timestamp-request and timestamp-reply types are blocked in
+# each active zone whose target is default. false removes the block (or, with icmp-block-inversion
+# on, allows the type) and is reported as a finding.
+cis_firewalld_icmp_timestamp_request_blocked: true
+cis_firewalld_icmp_timestamp_reply_blocked: true
 
 # SSH server (5.1.10): the ClientAliveInterval in seconds and the ClientAliveCountMax written
 # when the effective values are not both above zero. A whole number of 1 or more; preflight

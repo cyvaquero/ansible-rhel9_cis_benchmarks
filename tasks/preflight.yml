@@ -314,26 +314,43 @@
     - always
     - preflight
 
-- name: "Preflight - Validate the firewalld zone target"
+# Section 4 override variables (defaults/main.yml). Only the type and format are checked, never
+# the benchmark bounds (see README, "Overriding values").
+- name: "Preflight - Validate the section 4 yes/no values"
   ansible.builtin.assert:
     that:
-      - cis_firewalld_zone_target in ['default', 'REJECT', 'DROP']
-    fail_msg: >-
-      cis_firewalld_zone_target must be one of default, REJECT or DROP (ACCEPT is what 4.1.4
-      replaces). Got {{ cis_firewalld_zone_target | to_json }}.
+      - lookup('ansible.builtin.vars', item) is boolean or (lookup('ansible.builtin.vars', item) | string | lower) in ['true', 'false']
+    fail_msg: "{{ item }} must be true or false (got {{ lookup('ansible.builtin.vars', item) | to_json }})."
     quiet: true
+  loop:
+    - cis_firewalld_installed
+    - cis_firewalld_enabled
+    - cis_firewalld_active
+    - cis_nftables_service_enabled
+    - cis_nftables_service_active
+    - cis_iptables_services_installed
+    - cis_ufw_installed
+    - cis_firewalld_icmp_timestamp_request_blocked
+    - cis_firewalld_icmp_timestamp_reply_blocked
   tags:
     - always
     - preflight
 
-- name: "Preflight - Validate the firewalld denied packet logging value"
+- name: "Preflight - Validate the section 4 firewalld values"
   ansible.builtin.assert:
     that:
-      - cis_firewalld_log_denied in ['all', 'unicast', 'broadcast', 'multicast']
+      - lookup('ansible.builtin.vars', item.key) is string
+      - lookup('ansible.builtin.vars', item.key) in item.allowed
     fail_msg: >-
-      cis_firewalld_log_denied must be one of all, unicast, broadcast or multicast (off is
-      what 4.1.10 replaces). Got {{ cis_firewalld_log_denied | to_json }}.
+      {{ item.key }} must be one of {{ item.allowed | join(', ') }}, as a quoted string
+      (got {{ lookup('ansible.builtin.vars', item.key) | to_json }}).
     quiet: true
+  loop:
+    - {key: cis_firewalld_backend, allowed: [nftables, iptables]}
+    - {key: cis_firewalld_zone_target, allowed: [default, ACCEPT, REJECT, DROP]}
+    - {key: cis_firewalld_log_denied, allowed: ['off', all, unicast, broadcast, multicast]}
+  loop_control:
+    label: "{{ item.key }}"
   tags:
     - always
     - preflight

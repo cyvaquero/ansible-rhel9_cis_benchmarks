@@ -28,14 +28,6 @@
   ansible.builtin.command: /usr/sbin/augenrules --load
   changed_when: true
 
-# try-restart restarts a running unit and leaves a stopped one alone, so a firewalld that
-# is not running is never started here (that is 4.1.3's decision, behind the SSH guard).
-# The systemd module has no try-restart state, so the command-instead-of-module rule is
-# waived for this one task.
-- name: Restart firewalld when running
-  ansible.builtin.command: /usr/bin/systemctl try-restart firewalld.service  # noqa: command-instead-of-module
-  changed_when: true
-
 - name: Reload sysctl
   ansible.builtin.command: /usr/sbin/sysctl --system
   changed_when: true

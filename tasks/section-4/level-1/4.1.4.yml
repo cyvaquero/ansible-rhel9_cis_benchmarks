@@ -1,19 +1,23 @@
 ---
 # 4.1.4 - every active zone bound to an interface other than lo or virbr* has a target that
-# is not ACCEPT or empty, and the same runtime and permanent target. With no such zone (or
-# firewalld not running) the control is a finding with nothing to fix. The fix sets the
-# permanent target to cis_firewalld_zone_target (default: default) on a zone whose target
-# is empty or ACCEPT, then reloads firewalld; a runtime and permanent mismatch with an
-# acceptable permanent target is fixed by the reload alone. Replacing an ACCEPT target can
-# start filtering, so it is made only when the SSH guard
-# (tasks/lib/firewalld_ssh_guard.yml) says the zone that applies to the role's connection
-# allows SSH by service or port; otherwise the zone is left alone, a message says why and
-# the control is a finding. An empty target is set without the guard. A control that still
-# fails after the fix is a finding; under --check nothing changes and nothing is recorded
-# in remediate mode.
+# is not ACCEPT or empty (cis_expect_firewalld_zone_target_forbidden), and the same runtime and
+# permanent target. With no such zone (or firewalld not running) the control is a finding with
+# nothing to fix. The check judges the benchmark. The fix makes the permanent target of each such
+# zone exactly cis_firewalld_zone_target (default: default) whenever it differs, also when the
+# zone's target is already acceptable (a REJECT or DROP target becomes the variable), then
+# reloads firewalld; a runtime and permanent mismatch with a permanent target that is the
+# variable is fixed by the reload alone. Replacing an ACCEPT target can start filtering, so it
+# is made only when the SSH guard (tasks/lib/firewalld_ssh_guard.yml) says the zone that applies
+# to the role's connection allows SSH by service or port; otherwise the zone is left alone, a
+# message says why and the control is a finding. A variable can never bypass the guard. An empty
+# target, and any target changed to ACCEPT, is set without the guard (neither can cut SSH). A
+# control that is not compliant with the benchmark after the fix (a site target of ACCEPT) is a
+# finding on every run; under --check nothing changes and nothing is recorded in remediate mode.
 #
-# The check prints one line per action: accept:<zone>, empty:<zone>, reload, or
-# state=noactive; its exit status is 1 when any line is printed.
+# The check prints one line per action: accept:<zone>, empty:<zone> and reload (the benchmark
+# verdict), set:<zone> (the permanent target differs from the variable), setg:<zone> (the same
+# for a zone whose target is ACCEPT, which the guard must allow) or state=noactive; its exit
+# status is 1 when an accept:, empty:, reload or state=noactive line is printed.
 - name: "4.1.4 - Handle the firewalld zone target"
   tags:
     - "4.1.4"
@@ -29,6 +33,9 @@
           - /bin/sh
           - -c
           - |
+            # $1: the target the site wants, $2: the target the benchmark forbids.
+            want=$1
+            forbid=$2
             if ! systemctl is-active --quiet firewalld.service 2>/dev/null; then
               echo "state=noactive"
               exit 1
@@ -54,9 +61,13 @@
               rt=$(firewall-cmd --zone="$z" --list-all 2>/dev/null | sed -n 's/^[[:space:]]*target:[[:space:]]*//p' | head -n 1 | tr -d '%[:space:]')
               pt=$(firewall-cmd --permanent --zone="$z" --get-target 2>/dev/null | tr -d '%[:space:]')
               case "$pt" in
-                ACCEPT) echo "accept:$z"; bad=1 ;;
-                "") echo "empty:$z"; bad=1 ;;
-                *) if [ -n "$rt" ] && [ "$rt" != "$pt" ]; then reload=1; fi ;;
+                "$forbid")
+                  echo "accept:$z"; bad=1
+                  if [ "$pt" != "$want" ]; then echo "setg:$z"; fi ;;
+                "") echo "empty:$z"; echo "set:$z"; bad=1 ;;
+                *)
+                  if [ -n "$rt" ] && [ "$rt" != "$pt" ]; then reload=1; fi
+                  if [ "$pt" != "$want" ]; then echo "set:$z"; fi ;;
               esac
             done
             if [ "$reload" = 1 ]; then
@@ -64,6 +75,9 @@
               bad=1
             fi
             exit $bad
+          - sh
+          - "{{ cis_firewalld_zone_target }}"
+          - "{{ cis_expect_firewalld_zone_target_forbidden }}"
       register: cis_check_4_1_4
       changed_when: false
       check_mode: false
@@ -77,15 +91,14 @@
           - "--zone={{ item }}"
           - "--set-target={{ cis_firewalld_zone_target }}"
       loop: >-
-        {{ ((cis_check_4_1_4.stdout_lines | select('match', '^empty:') | list)
-            + (cis_check_4_1_4.stdout_lines | select('match', '^accept:') | list
+        {{ ((cis_check_4_1_4.stdout_lines | select('match', '^set:') | list)
+            + (cis_check_4_1_4.stdout_lines | select('match', '^setg:') | list
                if (cis_fw_guard_replace_ok | default(false) | bool) else []))
            | map('regex_replace', '^[a-z]+:', '') | list }}
       register: cis_set_4_1_4
       changed_when: true
       when:
         - not (cis_audit_only | bool)
-        - cis_check_4_1_4.rc != 0
 
     - name: "4.1.4 - Reload firewalld to apply the permanent configuration"
       ansible.builtin.command:
@@ -95,7 +108,6 @@
       changed_when: true
       when:
         - not (cis_audit_only | bool)
-        - cis_check_4_1_4.rc != 0
         - "'state=noactive' not in cis_check_4_1_4.stdout_lines"
         - cis_set_4_1_4 is changed or 'reload' in cis_check_4_1_4.stdout_lines
 
@@ -107,7 +119,7 @@
           Allow SSH there, or set the zone target by hand.
       when:
         - not (cis_audit_only | bool)
-        - cis_check_4_1_4.stdout_lines | select('match', '^accept:') | list | length > 0
+        - cis_check_4_1_4.stdout_lines | select('match', '^setg:') | list | length > 0
         - not (cis_fw_guard_replace_ok | default(false) | bool)
 
     - name: "4.1.4 - Check again after the fix"
@@ -120,7 +132,6 @@
       when:
         - not (cis_audit_only | bool)
         - not ansible_check_mode
-        - cis_check_4_1_4.rc != 0
 
     - name: "4.1.4 - Record the finding when the check fails in audit mode"
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"

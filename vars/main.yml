@@ -193,4 +193,34 @@ cis_expect_mta_addresses_ok: ["127.*", "::1", "::ffff:127.*"]
 
 # 2.1.20: the default target that is not accepted.
 cis_expect_gui_bad_target: graphical.target
+
+# 4.1.1: firewalld is installed.
+cis_expect_firewalld_installed: true
+
+# 4.1.2: the FirewallBackend value the benchmark forbids (compared without regard to case).
+# cis_firewalld_backend_unset is not a benchmark value: it is the backend firewalld uses when
+# firewalld.conf has no FirewallBackend line.
+cis_expect_firewalld_backend_forbidden: iptables
+cis_firewalld_backend_unset: nftables
+
+# 4.1.3: firewalld.service is enabled and active (it must also not be masked).
+cis_expect_firewalld_enabled: true
+cis_expect_firewalld_active: true
+
+# 4.1.4: the target an active zone may not have (an empty target is forbidden too).
+cis_expect_firewalld_zone_target_forbidden: ACCEPT
+
+# 4.1.9: nftables.service is neither enabled nor active; iptables-services and ufw are not
+# installed.
+cis_expect_nftables_enabled: false
+cis_expect_nftables_active: false
+cis_expect_iptables_services_installed: false
+cis_expect_ufw_installed: false
+
+# 4.1.10: the LogDenied value the benchmark forbids.
+cis_expect_firewalld_log_denied_forbidden: "off"
+
+# 4.1.11: the zone target the control applies to, and whether the ICMP types are blocked.
+cis_expect_firewalld_icmp_zone_target: default
+cis_expect_firewalld_icmp_blocked: true
 ...

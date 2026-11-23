@@ -1,9 +1,10 @@
 ---
 # SSH guard for the firewalld controls that could cut the role's own connection: 4.1.3
-# starting firewalld and 4.1.4 replacing an ACCEPT zone target. Imported once per host, by
+# starting firewalld, 4.1.4 replacing an ACCEPT zone target and 4.1.9 starting
+# nftables.service (it uses the starting decision). Imported once per host, by
 # tasks/section-4/level-1.yml, in remediate mode only. It reads the host and changes
 # nothing, and it sets three facts the controls test with | default(false):
-#   cis_fw_guard_start_ok    starting firewalld cannot cut SSH (4.1.3)
+#   cis_fw_guard_start_ok    starting firewalld cannot cut SSH (4.1.3, 4.1.9)
 #   cis_fw_guard_replace_ok  replacing an ACCEPT target cannot cut SSH (4.1.4)
 #   cis_fw_guard_zone        the zone that applies to the connection, for messages
 #

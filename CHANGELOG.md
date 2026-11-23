@@ -8,6 +8,53 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.35]
+
+### Changed
+
+- Section 4: every value a control writes or expects now comes from an overridable role variable
+  whose default is the benchmark value (`defaults/main.yml`, grouped by control ID), the same way
+  as in sections 1 to 3. New variables cover whether `firewalld` is installed
+  (`cis_firewalld_installed`, 4.1.1), the firewalld backend (`cis_firewalld_backend`, 4.1.2),
+  whether `firewalld.service` is enabled and active (`cis_firewalld_enabled` and
+  `cis_firewalld_active`, 4.1.3), whether `nftables.service` is enabled and active
+  (`cis_nftables_service_enabled` and `cis_nftables_service_active`) and whether
+  `iptables-services` and `ufw` are installed (`cis_iptables_services_installed` and
+  `cis_ufw_installed`, 4.1.9), and whether the ICMP `timestamp-request` and `timestamp-reply`
+  types are blocked (`cis_firewalld_icmp_timestamp_request_blocked` and `_reply_blocked`,
+  4.1.11). `cis_firewalld_zone_target` (4.1.4) and `cis_firewalld_log_denied` (4.1.10) keep their
+  names. Overriding a value changes what the role writes; the checks still judge the benchmark
+  value, kept as `cis_expect_*` constants in `vars/main.yml`, so a weaker value is written and
+  reported as a finding on every run. The fix now enforces the configured value exactly: it
+  changes the host whenever the host differs from the variable, also when the host is stricter
+  than the benchmark. A package variable set to `true` only installs the package (a missing
+  package that dnf cannot find is left); `false` removes it with the existing safety logic (a
+  package that another package needs stays, and its unit is stopped and masked for `firewalld`).
+  No variable bypasses the SSH guard: starting `firewalld`, replacing an `ACCEPT` zone target and
+  starting `nftables.service` still happen only when SSH is already allowed. The guard now also
+  decides whether `nftables.service` may be started (4.1.9), because the ruleset that service
+  loads is the site's own and cannot be checked. Behavior changes with the default values:
+  4.1.2 rewrites a `FirewallBackend` line that holds another spelling or value (for example
+  `NFTABLES`) to `nftables`; 4.1.4 sets the target of every active zone (other than `lo` and
+  `virbr*`) to `default`, so a `REJECT` or `DROP` target becomes `default` (an `ACCEPT` target
+  is still replaced only when the guard allows it, and a zone with an empty target is set
+  without it); 4.1.10 sets a `LogDenied` of `all`, `broadcast` or `multicast` to `unicast`. A
+  host that is compliant and has the benchmark value everywhere changes nothing. Preflight now
+  validates only the type and format of the section 4 variables: `cis_firewalld_zone_target`
+  also accepts `ACCEPT` and `cis_firewalld_log_denied` also accepts `"off"` (both weaker than the
+  benchmark, reported as findings; they used to stop the run). The README has a table for
+  section 4. The shared `tasks/lib/` helper `firewalld_ssh_guard.yml` is unchanged apart from
+  comments. Part of #58 (section 5 follows).
+
+### Fixed
+
+- 4.1.2 restarts a running `firewalld` right after it rewrites the `FirewallBackend` line,
+  instead of at the end of the run. Before, a later control that reloaded `firewalld` in the
+  same run (4.1.4, 4.1.9, 4.1.10, 4.1.11) worked against a `firewalld` that had not applied the
+  corrected line: on a host where an earlier reload with a value firewalld does not know had
+  left the rules half applied, that reload hung and the role lost its SSH connection. A stopped `firewalld` is still not started by 4.1.2. The
+  `Restart firewalld when running` handler is removed. Fixes #64.
+
 ## [3.0.0_0.0.34]
 
 ### Changed

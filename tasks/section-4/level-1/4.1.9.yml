@@ -1,19 +1,35 @@
 ---
-# 4.1.9 - nftables.service is neither enabled nor active (disabled, masked, inactive and
-# not installed all pass), and the packages iptables-services and ufw are not installed.
-# Installed means a package providing either name is installed, so the real package
-# (iptables-nft-services on RHEL 9) is found, tested and removed, not the virtual name.
-# The nftables package itself stays: firewalld needs it. The fix stops, disables and masks
-# nftables.service, and removes iptables-services and ufw with dnf unless another installed
-# package needs them (the rpm erase test of tasks/lib/service_not_in_use.yml; a package
-# something needs is kept and the control stays a finding). firewalld is reloaded
-# afterwards when it was running, because stopping nftables.service flushes the rules.
-# A control that still fails after the fix is a finding; under --check nothing changes and
-# nothing is recorded in remediate mode.
+# 4.1.9 - nftables.service is not enabled and not active (disabled, masked, inactive and not
+# installed all pass), and the packages iptables-services and ufw are not installed. The check
+# judges the benchmark (cis_expect_nftables_enabled and _active,
+# cis_expect_iptables_services_installed, cis_expect_ufw_installed). Installed means a package providing either name is installed, so the
+# real package (iptables-nft-services on RHEL 9) is found, tested and removed, not the virtual
+# name. The nftables package itself stays: firewalld needs it.
 #
-# The check prints one line per action: nft:nftables.service, remove:<package>,
-# keep:<package>, and fwrunning=yes when firewalld is active; its exit status is 1 when a
-# nft:, remove: or keep: line is printed.
+# The fix makes the state exactly the site's. nftables.service: cis_nftables_service_enabled and
+# cis_nftables_service_active (default false, false): with both false it stops, disables and masks
+# the service when it is enabled or active (one already masked, disabled and stopped is left as
+# it is); otherwise it unmasks, enables or disables, and starts or stops it, whenever it differs.
+# Starting nftables.service loads the site's own ruleset, which the role cannot judge, so it is
+# started only when the SSH guard (tasks/lib/firewalld_ssh_guard.yml) says SSH is allowed in
+# the zone that applies to the role's own connection (the same test as for starting firewalld in
+# 4.1.3), or the nftables.service is already active, or the connection is not SSH. A variable can
+# never bypass the guard; otherwise the host is left alone and a message says why. Stopping and
+# disabling need no guard.
+# Packages: cis_iptables_services_installed and cis_ufw_installed (default false): false removes
+# the package with dnf unless another installed package needs it (the rpm erase test of
+# tasks/lib/service_not_in_use.yml; a package something needs is kept and the control stays a
+# finding), true installs it when missing (install only, one package at a time; a package dnf
+# cannot find is left). firewalld is reloaded afterwards when it was running and something
+# changed, because stopping nftables.service flushes the rules. A control that is not compliant
+# with the benchmark after the fix (a site value of true) is a finding on every run; under
+# --check nothing changes and nothing is recorded in remediate mode.
+#
+# The check prints state=ok or state=bad (the benchmark verdict), nftsite=ok, bad or missing
+# (whether nftables.service is as the site wants; missing: the unit does not exist and the site
+# wants it enabled or active, which the role cannot create), nftactive=yes or no, one line per
+# action remove:<package>, keep:<package> and install:<package>, and fwrunning=yes when firewalld
+# is active; its exit status is 1 when state=bad.
 - name: "4.1.9 - Handle conflicting firewall utilities"
   tags:
     - "4.1.9"
@@ -29,15 +45,35 @@
           - /bin/sh
           - -c
           - |
+            # $1: the packages the site wants installed, $2: the packages the benchmark expects
+            # installed, $3, $4: nftables.service enabled and active as the site wants (yes or no),
+            # $5, $6: as the benchmark wants.
+            want=$1
+            expect=$2
+            sw_en=$3
+            sw_act=$4
+            bm_en=$5
+            bm_act=$6
             erase=""
             blocked=""
+            install=""
+            bad=0
             # On RHEL 9 iptables-services is provided by iptables-nft-services, so ask
             # which installed packages provide each name and test those.
             for v in iptables-services ufw; do
-              names=$(rpm -q --qf '%{NAME}\n' --whatprovides "$v" 2>/dev/null) || continue
-              for p in $names; do
-                case " $erase " in *" $p "*) ;; *) erase="$erase $p" ;; esac
-              done
+              names=$(rpm -q --qf '%{NAME}\n' --whatprovides "$v" 2>/dev/null) || names=""
+              inst=no
+              [ -z "$names" ] || inst=yes
+              exp=no
+              case " $expect " in *" $v "*) exp=yes ;; esac
+              [ "$inst" = "$exp" ] || bad=1
+              case " $want " in
+                *" $v "*) [ "$inst" = yes ] || install="$install $v" ;;
+                *)
+                  for p in $names; do
+                    case " $erase " in *" $p "*) ;; *) erase="$erase $p" ;; esac
+                  done ;;
+              esac
             done
             while :; do
               set -- $erase
@@ -62,35 +98,87 @@
               done
               erase=$new
             done
-            bad=0
-            for p in $erase; do echo "remove:$p"; bad=1; done
-            for p in $blocked; do echo "keep:$p"; bad=1; done
+            for p in $erase; do echo "remove:$p"; done
+            for p in $blocked; do echo "keep:$p"; done
+            for p in $install; do echo "install:$p"; done
             enabled=$(systemctl is-enabled nftables.service 2>/dev/null)
             active=$(systemctl show -p ActiveState --value nftables.service 2>/dev/null)
-            nft=0
-            case "$enabled" in enabled|enabled-runtime) nft=1 ;; esac
-            case "$active" in active|activating|reloading) nft=1 ;; esac
-            if [ "$nft" = 1 ]; then
-              echo "nft:nftables.service"
-              bad=1
+            load=$(systemctl show -p LoadState --value nftables.service 2>/dev/null)
+            ens=no
+            case "$enabled" in enabled|enabled-runtime) ens=yes ;; esac
+            acs=no
+            case "$active" in active|activating|reloading) acs=yes ;; esac
+            echo "nftactive=$acs"
+            [ "$ens" = "$bm_en" ] && [ "$acs" = "$bm_act" ] || bad=1
+            site=ok
+            [ "$ens" = "$sw_en" ] && [ "$acs" = "$sw_act" ] || site=bad
+            if [ "$load" = masked ] && { [ "$sw_en" = yes ] || [ "$sw_act" = yes ]; }; then site=bad; fi
+            if [ "$site" = bad ] && [ "$load" != loaded ] && [ "$load" != masked ]; then
+              if [ "$sw_en" = yes ] || [ "$sw_act" = yes ]; then site=missing; else site=ok; fi
             fi
+            echo "nftsite=$site"
             systemctl is-active --quiet firewalld.service 2>/dev/null && echo "fwrunning=yes"
+            if [ "$bad" = 1 ]; then echo "state=bad"; else echo "state=ok"; fi
             exit $bad
+          - sh
+          - >-
+            {{ [('iptables-services' if cis_iptables_services_installed | bool else ''),
+                ('ufw' if cis_ufw_installed | bool else '')] | select | join(' ') }}
+          - >-
+            {{ [('iptables-services' if cis_expect_iptables_services_installed | bool else ''),
+                ('ufw' if cis_expect_ufw_installed | bool else '')] | select | join(' ') }}
+          - "{{ 'yes' if cis_nftables_service_enabled | bool else 'no' }}"
+          - "{{ 'yes' if cis_nftables_service_active | bool else 'no' }}"
+          - "{{ 'yes' if cis_expect_nftables_enabled | bool else 'no' }}"
+          - "{{ 'yes' if cis_expect_nftables_active | bool else 'no' }}"
       register: cis_check_4_1_9
       changed_when: false
       check_mode: false
       failed_when: false
 
-    - name: "4.1.9 - Stop, disable and mask nftables.service"
+    - name: "4.1.9 - Make nftables.service as the site wants"
       ansible.builtin.systemd:
         name: nftables.service
-        state: stopped
-        enabled: false
-        masked: true
+        masked: "{{ false if (cis_nftables_service_enabled | bool or cis_nftables_service_active | bool) else true }}"
+        enabled: "{{ cis_nftables_service_enabled | bool }}"
+        state: "{{ 'started' if cis_nftables_service_active | bool else 'stopped' }}"
       register: cis_nft_4_1_9
       when:
         - not (cis_audit_only | bool)
-        - "'nft:nftables.service' in cis_check_4_1_9.stdout_lines"
+        - "'nftsite=bad' in cis_check_4_1_9.stdout_lines"
+        - not (cis_nftables_service_active | bool) or 'nftactive=yes' in cis_check_4_1_9.stdout_lines or (cis_fw_guard_start_ok | default(false) | bool)
+
+    - name: "4.1.9 - Report that nftables.service was not started because SSH may not be allowed"
+      ansible.builtin.debug:
+        msg: >-
+          nftables.service is not started: SSH is not known to be allowed in the zone that applies
+          to this connection ({{ cis_fw_guard_zone | default('unknown') }}), and the ruleset the
+          service loads cannot be checked. Allow SSH there, or start the service by hand.
+      when:
+        - not (cis_audit_only | bool)
+        - cis_nftables_service_active | bool
+        - "'nftsite=bad' in cis_check_4_1_9.stdout_lines"
+        - "'nftactive=no' in cis_check_4_1_9.stdout_lines"
+        - not (cis_fw_guard_start_ok | default(false) | bool)
+
+    - name: "4.1.9 - Report that nftables.service does not exist"
+      ansible.builtin.debug:
+        msg: >-
+          nftables.service cannot be enabled or started because the unit does not exist (the
+          nftables package is not installed); the role leaves it alone.
+      when:
+        - not (cis_audit_only | bool)
+        - "'nftsite=missing' in cis_check_4_1_9.stdout_lines"
+
+    - name: "4.1.9 - Install the packages the site wants"
+      ansible.builtin.dnf:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ cis_check_4_1_9.stdout_lines | select('match', '^install:') | map('regex_replace', '^install:', '') | list }}"
+      failed_when: false
+      when:
+        - not (cis_audit_only | bool)
+        - cis_check_4_1_9.stdout_lines | select('match', '^install:') | list | length > 0
 
     - name: "4.1.9 - Remove the conflicting packages nothing else needs"
       ansible.builtin.dnf:
@@ -123,7 +211,6 @@
       when:
         - not (cis_audit_only | bool)
         - not ansible_check_mode
-        - cis_check_4_1_9.rc != 0
 
     - name: "4.1.9 - Record the finding when the check fails in audit mode"
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
