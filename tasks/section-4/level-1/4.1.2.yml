@@ -1,12 +1,19 @@
 ---
-# 4.1.2 - the firewalld backend is nftables. Only an explicit FirewallBackend=iptables in
-# /etc/firewalld/firewalld.conf is non-compliant (the last such line wins, as in firewalld);
-# a missing file, a missing line or any other value is left alone. The fix sets the last
-# FirewallBackend line to nftables and restarts firewalld only when it is running, through
-# the handler, so the new backend applies. A control that still fails after the fix is a
-# finding; under --check nothing changes and nothing is recorded in remediate mode.
+# 4.1.2 - the firewalld backend. The check judges the benchmark: only an explicit
+# FirewallBackend=<cis_expect_firewalld_backend_forbidden> (iptables) in
+# /etc/firewalld/firewalld.conf is non-compliant (the last such line wins, as in firewalld, and
+# the case is ignored); a missing file, a missing line or any other value passes. The fix makes
+# the last FirewallBackend line exactly cis_firewalld_backend (default nftables) whenever it
+# differs, also when the line holds another spelling or value the benchmark accepts. A missing
+# line counts as firewalld's own default (cis_firewalld_backend_unset) and is written only when
+# that differs from the variable; a missing file is left alone. firewalld is restarted only when
+# it is running, through the handler, so the new backend applies. A control that is not compliant
+# with the benchmark after the fix (a site value of iptables) is a finding on every run; under
+# --check nothing changes and nothing is recorded in remediate mode.
 #
-# The check prints state=ok or state=bad; its exit status is 1 when state=bad.
+# The check prints state=ok or state=bad (the benchmark verdict) and site=ok or site=bad
+# (whether the effective backend is exactly the variable); its exit status is 1 when
+# state=bad.
 - name: "4.1.2 - Handle the firewalld backend"
   tags:
     - "4.1.2"
@@ -22,27 +29,43 @@
           - /bin/sh
           - -c
           - |
+            # $1: the backend the site wants, $2: the one the benchmark forbids, $3: the backend
+            # firewalld uses when the line is missing.
             f=/etc/firewalld/firewalld.conf
-            v=$(sed -n 's/^[[:space:]]*FirewallBackend[[:space:]]*=[[:space:]]*//p' "$f" 2>/dev/null | tail -n 1 | tr -d '[:space:]' | tr 'A-Z' 'a-z')
-            if [ "$v" = iptables ]; then
+            raw=$(sed -n 's/^[[:space:]]*FirewallBackend[[:space:]]*=[[:space:]]*//p' "$f" 2>/dev/null | tail -n 1 | tr -d '[:space:]')
+            v=$(printf '%s' "$raw" | tr 'A-Z' 'a-z')
+            site=ok
+            if [ -f "$f" ]; then
+              if [ -n "$raw" ]; then
+                [ "$raw" = "$1" ] || site=bad
+              else
+                [ "$3" = "$1" ] || site=bad
+              fi
+            fi
+            echo "site=$site"
+            if [ "$v" = "$2" ]; then
               echo "state=bad"
               exit 1
             fi
             echo "state=ok"
+          - sh
+          - "{{ cis_firewalld_backend }}"
+          - "{{ cis_expect_firewalld_backend_forbidden }}"
+          - "{{ cis_firewalld_backend_unset }}"
       register: cis_check_4_1_2
       changed_when: false
       check_mode: false
       failed_when: false
 
-    - name: "4.1.2 - Set the firewalld backend to nftables"
+    - name: "4.1.2 - Set the firewalld backend"
       ansible.builtin.lineinfile:
         path: /etc/firewalld/firewalld.conf
         regexp: '^\s*FirewallBackend\s*='
-        line: FirewallBackend=nftables
+        line: "FirewallBackend={{ cis_firewalld_backend }}"
       notify: Restart firewalld when running
       when:
         - not (cis_audit_only | bool)
-        - cis_check_4_1_2.rc != 0
+        - "'site=bad' in cis_check_4_1_2.stdout_lines"
 
     - name: "4.1.2 - Check again after the fix"
       ansible.builtin.command:
@@ -54,7 +77,6 @@
       when:
         - not (cis_audit_only | bool)
         - not ansible_check_mode
-        - cis_check_4_1_2.rc != 0
 
     - name: "4.1.2 - Record the finding when the check fails in audit mode"
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"

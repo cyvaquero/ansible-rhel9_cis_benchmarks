@@ -1,22 +1,26 @@
 ---
-# 4.1.11 - firewalld blocks ICMP timestamp requests and replies. It applies to each active
-# zone bound to an interface other than lo or virbr* whose permanent target is default; a
-# zone with an ACCEPT, DROP or REJECT target is not applicable. For an applicable zone both
-# timestamp-request and timestamp-reply must be blocked, in the permanent and the runtime
-# configuration. A type is blocked when it is listed as an ICMP block with icmp-block-inversion
-# off, and when it is not listed with inversion on (inversion turns the list into an allow
-# list). firewalld not running is a finding with nothing to fix. firewalld running with no
-# applicable zone passes: there is nothing to check.
+# 4.1.11 - firewalld blocks ICMP timestamp requests and replies. It applies to each active zone
+# bound to an interface other than lo or virbr* whose permanent target is
+# cis_expect_firewalld_icmp_zone_target (default); a zone with an ACCEPT, DROP or REJECT target
+# is not applicable. The check judges the benchmark: for an applicable zone both timestamp-request
+# and timestamp-reply must be blocked (cis_expect_firewalld_icmp_blocked), in the permanent and
+# the runtime configuration. A type is blocked when it is listed as an ICMP block with
+# icmp-block-inversion off, and when it is not listed with inversion on (inversion turns the list
+# into an allow list). firewalld not running is a finding with nothing to fix. firewalld running
+# with no applicable zone passes: there is nothing to check.
 #
-# The fix, per zone and type that is not blocked permanently, is
-# firewall-cmd --permanent --zone=Z --add-icmp-block=<type>, or --remove-icmp-block when
-# inversion is on; then firewalld is reloaded once. A difference that exists only at runtime
-# is fixed by the reload alone (which also drops runtime-only changes). This does not
-# restrict SSH, so there is no SSH guard. A control that still fails after the fix is a
-# finding; under --check nothing changes and nothing is recorded in remediate mode.
+# The fix makes each type exactly as cis_firewalld_icmp_timestamp_request_blocked and
+# cis_firewalld_icmp_timestamp_reply_blocked say (default true: blocked), per zone and type whose
+# permanent state differs: firewall-cmd --permanent --zone=Z --add-icmp-block=<type> or
+# --remove-icmp-block (the opposite when inversion is on); then firewalld is reloaded once. A
+# difference that exists only at runtime is fixed by the reload alone (which also drops
+# runtime-only changes). This does not restrict SSH, so there is no SSH guard. A control that is
+# not compliant with the benchmark after the fix (a site value of false) is a finding on every
+# run; under --check nothing changes and nothing is recorded in remediate mode.
 #
 # The check prints one line per action: perm:<zone>:<type>:add|remove, reload, or
-# state=noactive; its exit status is 1 when any line is printed.
+# state=noactive, and fix=yes when there is any action; its exit status is 1 when the benchmark
+# fails (a type is not blocked in an applicable zone) or state=noactive is printed.
 - name: "4.1.11 - Handle firewalld blocking of ICMP timestamp requests and replies"
   tags:
     - "4.1.11"
@@ -31,6 +35,9 @@
           - /bin/sh
           - -c
           - |
+            # $1: the zone target the benchmark applies to, $2: yes when the benchmark wants the
+            # types blocked, $3: the types and whether the site wants each blocked, as
+            # <type>:yes|no, space separated.
             if ! systemctl is-active --quiet firewalld.service 2>/dev/null; then
               echo "state=noactive"
               exit 1
@@ -46,34 +53,52 @@
               }')
             bad=0
             reload=0
+            fix=0
             for z in $zones; do
               pt=$(firewall-cmd --permanent --zone="$z" --get-target 2>/dev/null | tr -d '%[:space:]')
-              [ "$pt" = default ] || continue
+              [ "$pt" = "$1" ] || continue
               pinv=0
               firewall-cmd --permanent --zone="$z" --query-icmp-block-inversion >/dev/null 2>&1 && pinv=1
               rinv=0
               firewall-cmd --zone="$z" --query-icmp-block-inversion >/dev/null 2>&1 && rinv=1
-              for t in timestamp-request timestamp-reply; do
+              for ts in $3; do
+                t=${ts%%:*}
+                w=${ts##*:}
                 plisted=0
                 firewall-cmd --permanent --zone="$z" --query-icmp-block="$t" >/dev/null 2>&1 && plisted=1
                 rlisted=0
                 firewall-cmd --zone="$z" --query-icmp-block="$t" >/dev/null 2>&1 && rlisted=1
-                if [ "$plisted" = "$pinv" ]; then
-                  # Not blocked permanently: list it, or take it off the allow list.
-                  if [ "$pinv" = 1 ]; then op=remove; else op=add; fi
+                # Blocked is listed with inversion off, or not listed with inversion on.
+                pblocked=no
+                [ "$plisted" != "$pinv" ] && pblocked=yes
+                rblocked=no
+                [ "$rlisted" != "$rinv" ] && rblocked=yes
+                if [ "$pblocked" != "$2" ] || [ "$rblocked" != "$2" ]; then bad=1; fi
+                if [ "$pblocked" != "$w" ]; then
+                  # Add or remove the block, whichever makes the permanent state the site's.
+                  if [ "$pinv" = 1 ]; then
+                    if [ "$w" = yes ]; then op=remove; else op=add; fi
+                  else
+                    if [ "$w" = yes ]; then op=add; else op=remove; fi
+                  fi
                   echo "perm:$z:$t:$op"
-                  bad=1
-                elif [ "$rlisted" = "$rinv" ]; then
-                  # Blocked permanently, not at runtime: the reload fixes it.
+                  fix=1
+                elif [ "$rblocked" != "$w" ]; then
+                  # In the permanent state as the site wants, not at runtime: the reload fixes it.
                   reload=1
+                  fix=1
                 fi
               done
             done
-            if [ "$reload" = 1 ]; then
-              echo "reload"
-              bad=1
-            fi
+            [ "$reload" = 1 ] && echo "reload"
+            [ "$fix" = 1 ] && echo "fix=yes"
             exit $bad
+          - sh
+          - "{{ cis_expect_firewalld_icmp_zone_target }}"
+          - "{{ 'yes' if cis_expect_firewalld_icmp_blocked | bool else 'no' }}"
+          - >-
+            {{ ['timestamp-request:' ~ ('yes' if cis_firewalld_icmp_timestamp_request_blocked | bool else 'no'),
+                'timestamp-reply:' ~ ('yes' if cis_firewalld_icmp_timestamp_reply_blocked | bool else 'no')] | join(' ') }}
       register: cis_check_4_1_11
       changed_when: false
       check_mode: false
@@ -91,7 +116,6 @@
       changed_when: true
       when:
         - not (cis_audit_only | bool)
-        - cis_check_4_1_11.rc != 0
 
     - name: "4.1.11 - Reload firewalld to apply the permanent configuration"
       ansible.builtin.command:
@@ -101,8 +125,7 @@
       changed_when: true
       when:
         - not (cis_audit_only | bool)
-        - cis_check_4_1_11.rc != 0
-        - "'state=noactive' not in cis_check_4_1_11.stdout_lines"
+        - "'fix=yes' in cis_check_4_1_11.stdout_lines"
 
     - name: "4.1.11 - Check again after the fix"
       ansible.builtin.command:
@@ -114,7 +137,6 @@
       when:
         - not (cis_audit_only | bool)
         - not ansible_check_mode
-        - cis_check_4_1_11.rc != 0
 
     - name: "4.1.11 - Record the finding when the check fails in audit mode"
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
