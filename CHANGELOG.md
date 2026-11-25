@@ -57,7 +57,7 @@ implements, then the role's own version.
   - 5.2.2 and 5.2.3 set sudoers files to 0440 and `/etc/sudoers.d` to 0750 (0400 and 0700 are
     replaced); the role's own sudoers file takes the same mode.
   - 5.2.5 replaces a sudo log file path the site set with `/var/log/sudo.log`; 5.2.10 writes
-    `timestamp_timeout=15` over no line (sudo's default of 5) and over a value from 0 to 14, and
+    `timestamp_timeout=5` over another value (a host with no line is left alone), and
     5.2.11 replaces `ppid` and `kernel` with `tty`.
   - 5.2.12 rewrites a `pam_wheel` line that names another group to `sugroup` and creates it.
   - 5.3.3.1.1 and 5.3.3.1.2 write `deny = 5` and `unlock_time = 900` over other compliant values
@@ -65,9 +65,10 @@ implements, then the role's own version.
     is set to 60; 5.3.3.2.x write `difok = 2`, `minlen = 14`, `maxrepeat = 3` and `maxsequence = 3`;
     5.3.3.3.1 writes `remember = 24`; a PAM argument that differs from these is removed from the
     templates of the role's own authselect profile.
-  - 5.3.3.4.3 makes `sha512` the only hashing algorithm on the `pam_unix` password line of the
-    role's own authselect profile (`yescrypt` becomes `sha512`) and 5.4.1.4 sets `ENCRYPT_METHOD`
-    to `SHA512`, no longer following a `yescrypt` line.
+  - 5.3.3.4.3 makes `yescrypt` (the RHEL 9 default) the only hashing algorithm on the `pam_unix`
+    password line of the role's own authselect profile (a `sha512` line becomes `yescrypt`) and
+    5.4.1.4 sets `ENCRYPT_METHOD` to `YESCRYPT`; FIPS sites set `cis_password_hash: sha512`. A stock
+    RHEL 9 host is unchanged.
   - 5.4.1.1, 5.4.1.3 and 5.4.1.5 set `PASS_MAX_DAYS` 365, `PASS_WARN_AGE` 7 and the inactive
     period 45 in `login.defs`, in the useradd default and on every account with a password hash
     whose value differs, a stricter value included (a maximum of 90 becomes 365, an inactive period

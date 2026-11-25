@@ -624,7 +624,7 @@ cis_sudo_logfile: /var/log/sudo.log
 
 # 5.2.10: the timestamp_timeout in minutes, written whenever the effective value differs (no
 # line counts as sudo's default of 5). A whole number; a negative one means the timeout never expires.
-cis_sudo_timestamp_timeout: 15
+cis_sudo_timestamp_timeout: 5
 
 # 5.2.11: the timestamp_type: tty, ppid, global or kernel. No line counts as sudo's default (tty).
 cis_sudo_timestamp_type: tty
@@ -681,10 +681,11 @@ cis_pwhistory_enforce_for_root: true
 # named on the pam_unix password line of system-auth and password-auth (5.3.3.4.3), and
 # ENCRYPT_METHOD in /etc/login.defs (5.4.1.4), which is this value in upper case. One of sha512,
 # yescrypt, sha256, md5 or blowfish. The pam_unix line is changed only on the templates of the
-# role's own authselect profile; on any other profile a line that differs is reported. sha512 is
-# the only one FIPS mode allows. cis_encrypt_method must agree with it (preflight stops the run
+# role's own authselect profile; on any other profile a line that differs is reported. The
+# default is yescrypt, the RHEL 9 default; the benchmark accepts yescrypt and sha512. sha512 is the
+# only one FIPS mode allows, so FIPS sites set cis_password_hash: sha512. cis_encrypt_method must agree with it (preflight stops the run
 # otherwise), or the role would undo its own change on every run.
-cis_password_hash: sha512
+cis_password_hash: yescrypt
 cis_encrypt_method: "{{ cis_password_hash | upper }}"
 
 # 5.4.1.1, 5.4.1.3, 5.4.1.5: password aging. Set in /etc/login.defs (PASS_MAX_DAYS,

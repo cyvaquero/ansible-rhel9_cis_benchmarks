@@ -337,7 +337,7 @@ parses the files.
 | `cis_sudoers_owner`, `cis_sudoers_group`, `cis_sudoers_file_mode`, `cis_sudoers_dir_mode` | `root`, `root`, `"0440"`, `"0750"` | 5.2.2, 5.2.3: the owner and group of `/etc/sudoers`, its folder and every file in it, the mode of the files and the mode of `/etc/sudoers.d`; also the owner, group and mode of the role's own sudoers file. A stricter mode (0400, 0700) is replaced. |
 | `cis_sudo_use_pty`, `cis_sudo_pwfeedback`, `cis_sudo_visiblepw` | `true`, `false`, `false` | 5.2.4, 5.2.8, 5.2.9: whether sudo uses a pty, echoes asterisks (`pwfeedback`) and prompts where the password shows (`visiblepw`). The role writes `Defaults use_pty`, `Defaults pwfeedback` or `Defaults !pwfeedback` (and the same for `visiblepw`) to its own sudoers file whenever the effective value differs; no line counts as sudo's default (all three off). `true` for the last two is reported as a finding. |
 | `cis_sudo_logfile` | `/var/log/sudo.log` | 5.2.5: the path written as `Defaults logfile=` whenever the effective path differs, a path the site already set included. An absolute path of letters, digits, underscore, dot, hyphen and slash; anything else stops the run at preflight. Rotate the file (logrotate) to keep it from filling the disk. |
-| `cis_sudo_timestamp_timeout` | `15` | 5.2.10: minutes, written whenever the effective timeout differs; no line counts as sudo's default of 5, so with the default a host with no line gets `timestamp_timeout=15`. A whole number (a negative one means never). A value above 15 or a negative one is reported as a finding. |
+| `cis_sudo_timestamp_timeout` | `5` | 5.2.10: minutes, written whenever the effective timeout differs; no line counts as sudo's default of 5, so with the default a host with no line is left alone. A whole number (a negative one means never). A value above 15 or a negative one is reported as a finding. |
 | `cis_sudo_timestamp_type` | `tty` | 5.2.11: `tty`, `ppid`, `global` or `kernel`; no line counts as `tty`. `global` is reported as a finding. |
 | `cis_su_group` | `sugroup` | 5.2.12: the group `pam_wheel` allows to use `su`. A plain group name (lowercase letters, digits, underscore, hyphen); anything else stops the run at preflight. The role creates it empty when missing, rewrites a `pam_wheel` line that names another group, and never adds or removes members. A group that has members is a finding. |
 
@@ -352,7 +352,7 @@ parses the files.
 | `cis_pwquality_difok`, `cis_pwquality_minlen`, `cis_pwquality_maxrepeat`, `cis_pwquality_maxsequence`, `cis_pwquality_dictcheck` | `2`, `14`, `3`, `3`, `1` | 5.3.3.2.1, 5.3.3.2.2, 5.3.3.2.4, 5.3.3.2.5, 5.3.3.2.6: the values written to the role's own pwquality drop-in whenever the value in effect differs (no `dictcheck` counts as libpwquality's default, 1). Whole numbers of 0 or more; `dictcheck` is 0 or 1. |
 | `cis_pwquality_enforce_for_root`, `cis_pwhistory_enforce_for_root` | `true`, `true` | 5.3.3.2.7, 5.3.3.3.2: whether `enforce_for_root` is set in the pwquality configuration and in `pwhistory.conf`. `false` removes it from the role's own file (a flag in another file stays) and is reported as a finding. |
 | `cis_pwhistory_remember` | `24` | 5.3.3.3.1: `remember` in `/etc/security/pwhistory.conf`, written whenever the value there differs. A whole number of 0 or more. |
-| `cis_password_hash`, `cis_encrypt_method` | `sha512`, the upper case of `cis_password_hash` | 5.3.3.4.3, 5.4.1.4: the password hashing algorithm, one setting in two places: the algorithm named on the `pam_unix` password line (fixed in the templates of the role's own authselect profile, where every other algorithm is removed; on another profile a line that differs is reported) and `ENCRYPT_METHOD` in `login.defs`. One of `sha512`, `yescrypt`, `sha256`, `md5`, `blowfish`. Preflight stops the run when `cis_encrypt_method` does not agree with `cis_password_hash`. `sha512` is the only one FIPS mode allows. |
+| `cis_password_hash`, `cis_encrypt_method` | `yescrypt`, the upper case of `cis_password_hash` | 5.3.3.4.3, 5.4.1.4: the password hashing algorithm, one setting in two places: the algorithm named on the `pam_unix` password line (fixed in the templates of the role's own authselect profile, where every other algorithm is removed; on another profile a line that differs is reported) and `ENCRYPT_METHOD` in `login.defs`. One of `sha512`, `yescrypt`, `sha256`, `md5`, `blowfish`. Preflight stops the run when `cis_encrypt_method` does not agree with `cis_password_hash`. The benchmark accepts `yescrypt` (the RHEL 9 default) and `sha512`; `sha512` is the only one FIPS mode allows, so FIPS sites set `cis_password_hash: sha512`. |
 
 A `deny`, `unlock_time`, `root_unlock_time`, `difok`, `minlen`, `maxrepeat`, `maxsequence`,
 `dictcheck` or `remember` argument on a PAM module line that differs from its variable overrides the
@@ -738,8 +738,8 @@ never judges a value against the benchmark's bounds.
   judged from the active `system-auth` and `password-auth`. On the role's own profile it is
   removed or added in the templates in `/etc/authselect/custom/<name>/` and applied with
   `authselect apply-changes`; on any other profile only the features can fix it and the rest is
-  a finding. The password hash is `cis_password_hash` (`sha512` by default; the check accepts
-  `sha512` and `yescrypt`). 5.3.3.2.3 only
+  a finding. The password hash is `cis_password_hash` (`yescrypt` by default, the RHEL 9 default; the check accepts
+  `sha512` and `yescrypt`, and FIPS sites set `sha512`). 5.3.3.2.3 only
   reports the complexity settings in effect. The scanner is `files/pam_scan.py`, run with the
   managed node's Python. See [docs/review-controls.md](docs/review-controls.md).
 - User accounts and environment (5.4): the scan is `files/accounts_scan.py`, run with the managed
@@ -753,7 +753,7 @@ never judges a value against the benchmark's bounds.
   expires it at once), or a password older than the new maximum. Such an account is skipped, named
   in a message, and the control is a finding when its value fails the benchmark; the role never
   changes it. A value that differs from the variable is written, a stricter one included.
-  5.4.1.4 sets `ENCRYPT_METHOD` in `login.defs` to `cis_encrypt_method` (`SHA512` by default,
+  5.4.1.4 sets `ENCRYPT_METHOD` in `login.defs` to `cis_encrypt_method` (`YESCRYPT` by default,
   the upper case of `cis_password_hash`); the PAM side is 5.3.3.4.3 and is not repeated.
   5.4.1.2 (manual, Level 2), 5.4.1.6 and 5.4.2.1 to 5.4.2.5 (audit-only) only report; the
   [review page](docs/review-controls.md) lists what. **Lockout guard:** 5.4.2.7 (nologin shell)

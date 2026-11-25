@@ -3,7 +3,7 @@
 # (the benchmark, cis_expect_pam_hash_algorithms). The fix makes it name exactly cis_password_hash:
 # in the templates of the role's own authselect profile every other hashing algorithm is removed
 # from the line and the configured one is added when it is missing (a line with yescrypt, or with a
-# weaker one, becomes sha512 with the default); on any other profile a line that differs is not
+# weaker one, becomes yescrypt with the default); on any other profile a line that differs is not
 # changed and, when it fails the benchmark, is a finding. 5.4.1.4 writes the same algorithm to
 # login.defs.
 # The logic is in tasks/lib/pam_setting.yml.
