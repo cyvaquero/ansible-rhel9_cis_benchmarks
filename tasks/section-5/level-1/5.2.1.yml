@@ -1,61 +1,27 @@
 ---
-# 5.2.1 - sudo is installed. Remediate mode installs it with dnf; audit mode records a
-# finding. The other 5.2 controls pass on a host without sudo. Under --check nothing
-# changes and nothing is recorded in remediate mode.
-- name: "5.2.1 - Handle the sudo package"
+# 5.2.1 - sudo is installed (the benchmark). The fix follows
+# cis_sudo_installed: true installs sudo when missing, false removes it when no other installed
+# package needs it (one that is needed stays and is reported). sudo is never removed while the role
+# becomes root with sudo and is not connected as root, whatever the variable says. A site that sets
+# false gets a finding on every run. The logic is in tasks/lib/package_min_version.yml.
+
+- name: "5.2.1 - Ensure sudo is installed"
+  ansible.builtin.import_tasks: ../../lib/package_min_version.yml
+  vars:
+    cis_pm_id: "5.2.1"
+    cis_pm_package: sudo
+    cis_pm_min: ""
+    cis_pm_want: "{{ cis_sudo_installed | bool }}"
+    # Removing sudo would cut the role off when it becomes root with sudo (the default become
+    # method) and is not connected as root.
+    cis_pm_remove_ok: >-
+      {{ (cis_sudo_conn_user | default('')) == 'root'
+         or (ansible_become_method | default('sudo')) != 'sudo'
+         or not (ansible_become | default(true) | bool) }}
   tags:
     - "5.2.1"
     - section-5
     - level-1
     - server
     - workstation
-  block:
-    - name: "5.2.1 - Check sudo is installed"
-      ansible.builtin.command:
-        argv: &cis_sudo_5_2_1_argv
-          - rpm
-          - -q
-          - sudo
-      register: cis_check_5_2_1
-      changed_when: false
-      check_mode: false
-      failed_when: false
-
-    - name: "5.2.1 - Install sudo"
-      ansible.builtin.dnf:
-        name: sudo
-        state: present
-      when:
-        - not (cis_audit_only | bool)
-        - cis_check_5_2_1.rc != 0
-
-    - name: "5.2.1 - Check again after the fix"
-      ansible.builtin.command:
-        argv: *cis_sudo_5_2_1_argv
-      register: cis_recheck_5_2_1
-      changed_when: false
-      check_mode: false
-      failed_when: false
-      when:
-        - not (cis_audit_only | bool)
-        - not ansible_check_mode
-        - cis_check_5_2_1.rc != 0
-
-    - name: "5.2.1 - Record the finding when the check fails in audit mode"
-      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
-      vars:
-        cis_finding_id: "5.2.1"
-      when:
-        - cis_audit_only | bool
-        - cis_check_5_2_1.rc != 0
-
-    # Under --check the fix does not happen, so the second check says nothing new.
-    - name: "5.2.1 - Record the finding when the fix did not take effect"
-      ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
-      vars:
-        cis_finding_id: "5.2.1"
-      when:
-        - cis_recheck_5_2_1 is not skipped
-        - not ansible_check_mode
-        - cis_recheck_5_2_1.rc != 0
 ...

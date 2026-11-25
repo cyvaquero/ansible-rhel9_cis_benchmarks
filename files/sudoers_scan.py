@@ -4,12 +4,20 @@
 # the managed node's Python with `python -c`, so keep it standard library only and
 # compatible with Python 3.9.
 #
-#   sudoers_scan.py defaults OPTION MAX_TIMEOUT
+#   sudoers_scan.py defaults OPTION MAX_TIMEOUT [CONFIG_JSON]
 #       Judges one Defaults option (use_pty, logfile, pwfeedback, visiblepw,
 #       timestamp_timeout, timestamp_type) from the Defaults lines that apply to everyone.
 #       sudo applies the last one it reads. Lines scoped to a user, host, command or runas
 #       list (Defaults:user, Defaults@host, Defaults!cmnd, Defaults>runas) beat the global
-#       ones and are judged on their own.
+#       ones and are judged on their own. CONFIG_JSON is optional: "expect" is the flag the
+#       benchmark wants for use_pty, pwfeedback and visiblepw, "forbidden" the timestamp_type
+#       it forbids (without it the built-in benchmark values below apply, which only the tests
+#       rely on; the role always passes its constants) and "want" what the site configured
+#       (a boolean for the flags, a string for logfile, timestamp_timeout and timestamp_type).
+#       With a "want", "global_differs" says the effective global value is not it ("fix": the
+#       global line has to be written, because it fails the benchmark or differs from want). A
+#       missing line counts as sudo's own default: the flags off, a timestamp_timeout of 5, a
+#       timestamp_type of tty.
 #   sudoers_scan.py rules TAG ACCOUNT GUARD
 #       Lists the lines that carry NOPASSWD (TAG NOPASSWD) or !authenticate (TAG
 #       !authenticate), the edit that removes it, and which lines reach ACCOUNT, the
@@ -153,14 +161,32 @@ def number(text):
         return None
 
 
-def judge(option, effect, max_timeout):
+# The benchmark values, used when the caller passes none (the role always does).
+DEFAULT_EXPECT = {"use_pty": True, "pwfeedback": False, "visiblepw": False}
+DEFAULT_FORBIDDEN_TYPE = "global"
+# What sudo does with no line.
+SUDO_DEFAULTS = {"use_pty": False, "pwfeedback": False, "visiblepw": False, "timestamp_timeout": "5",
+                 "timestamp_type": "tty"}
+
+
+def as_bool(value):
+    """A boolean from a JSON boolean or the text of one (Ansible may hand either)."""
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "yes", "1")
+    return bool(value)
+
+
+def judge(option, effect, max_timeout, cfg=None):
     """True when the effective global effect (None: no line) meets the control."""
-    if option == "use_pty":
-        return effect == ("flag", True)
+    cfg = cfg or {}
+    expect = dict(DEFAULT_EXPECT)
+    expect.update(cfg.get("expect") or {})
+    forbidden = cfg.get("forbidden", DEFAULT_FORBIDDEN_TYPE)
+    if option in ("use_pty", "pwfeedback", "visiblepw"):
+        flag = SUDO_DEFAULTS[option] if effect is None else (effect[0] == "flag" and effect[1])
+        return bool(flag) == as_bool(expect[option])
     if option == "logfile":
         return effect is not None and effect[0] == "value" and effect[1] != ""
-    if option in ("pwfeedback", "visiblepw"):
-        return effect is None or effect == ("flag", False)
     if option == "timestamp_timeout":
         if effect is None:
             return True
@@ -171,31 +197,49 @@ def judge(option, effect, max_timeout):
     if option == "timestamp_type":
         if effect is None:
             return True
-        return effect[0] == "value" and effect[1] != "global"
+        return effect[0] == "value" and effect[1] != forbidden
     return False
 
 
-def scoped_ok(option, effect, max_timeout):
+def differs(option, effect, want):
+    """True when the effective global effect is not what the site wants (want None: not asked)."""
+    if want is None:
+        return False
+    if option in ("use_pty", "pwfeedback", "visiblepw"):
+        flag = SUDO_DEFAULTS[option] if effect is None else (effect[0] == "flag" and effect[1])
+        return bool(flag) != as_bool(want)
+    value = SUDO_DEFAULTS.get(option) if effect is None else (effect[1] if effect[0] == "value" else None)
+    if option == "timestamp_timeout":
+        return number(value) != number(want) if value is not None else True
+    return value != str(want)
+
+
+def scoped_ok(option, effect, max_timeout, cfg=None):
     if option in ("use_pty", "logfile"):
         return effect != ("flag", False)
-    return judge(option, effect, max_timeout)
+    return judge(option, effect, max_timeout, cfg)
 
 
 def where(ln):
     return "%s:%d" % (ln["file"], ln["line"])
 
 
-def scan_defaults(option, max_timeout):
+def scan_defaults(option, max_timeout, cfg=None):
+    cfg = cfg or {}
     out, errors = [], []
     walk(SUDOERS, 0, frozenset(), out, errors)
     glob, scoped = defaults_effects(out, option)
     eff = glob[-1][0] if glob else None
+    global_bad = not judge(option, eff, max_timeout, cfg)
+    global_differs = differs(option, eff, cfg.get("want"))
     result = {
         "state": "ok",
         "option": option,
-        "global_bad": not judge(option, eff, max_timeout),
+        "global_bad": global_bad,
+        "global_differs": global_differs,
+        "fix": global_bad or global_differs,
         "winner": where(glob[-1][1]) if glob else "",
-        "scoped_bad": [where(ln) for effect, ln in scoped if not scoped_ok(option, effect, max_timeout)],
+        "scoped_bad": [where(ln) for effect, ln in scoped if not scoped_ok(option, effect, max_timeout, cfg)],
         "errors": errors,
     }
     if result["global_bad"] or result["scoped_bad"]:
@@ -335,7 +379,7 @@ def main(argv):
         print(json.dumps({"state": "nosudo"}))
         return 0
     if argv[1] == "defaults":
-        result = scan_defaults(argv[2], float(argv[3]))
+        result = scan_defaults(argv[2], float(argv[3]), json.loads(argv[4]) if len(argv) > 4 and argv[4] else None)
     else:
         result = scan_rules(argv[2], argv[3], argv[4] == "1")
     # The main file itself must be readable; an include that is not is only reported.

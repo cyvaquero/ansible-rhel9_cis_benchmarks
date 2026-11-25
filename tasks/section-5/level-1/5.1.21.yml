@@ -1,17 +1,21 @@
 ---
-# 5.1.21 - PermitRootLogin is no. The change is made only when the role is not itself
-# connected as root over SSH. The logic is shared in tasks/lib/sshd_option.yml.
+# 5.1.21 - PermitRootLogin is no (the benchmark; the check judges cis_expect_sshd_permit_root_login).
+# The fix makes the effective value exactly cis_sshd_permit_root_login. A value that closes root
+# login (no, forced-commands-only) is written only when the role is not itself connected as root
+# over SSH, whatever the variable says. The logic is shared in tasks/lib/sshd_option.yml.
 
 - name: "5.1.21 - Ensure sshd PermitRootLogin is disabled"
   ansible.builtin.import_tasks: ../../lib/sshd_option.yml
   vars:
     cis_sd_id: "5.1.21"
     cis_sd_options:
-      - spec: "permitrootlogin|eq|no"
+      - spec: "permitrootlogin|eq|{{ cis_expect_sshd_permit_root_login }}|{{ cis_sshd_permit_root_login }}"
         directive: "PermitRootLogin"
-        value: "no"
+        value: "{{ cis_sshd_permit_root_login }}"
     # Closing root login would lock the role out when it is connected as root over SSH.
-    cis_sd_fix_ok: "{{ not (cis_sshd_over_ssh | default(true) | bool and cis_sshd_conn_user | default('') in ['root', '']) }}"
+    cis_sd_fix_ok: >-
+      {{ cis_sshd_permit_root_login in ['yes', 'prohibit-password']
+         or not (cis_sshd_over_ssh | default(true) | bool and cis_sshd_conn_user | default('') in ['root', '']) }}
     cis_sd_fix_msg: >-
       PermitRootLogin is not changed: the role is connected over SSH as root (or the
       account could not be read), and closing root login would lock it out. Connect as

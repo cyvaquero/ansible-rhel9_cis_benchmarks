@@ -8,7 +8,7 @@
   vars:
     cis_sd_id: "5.1.18"
     cis_sd_options:
-      - spec: "maxstartups|startups|10:30:60"
+      - spec: "maxstartups|startups|{{ cis_expect_sshd_max_startups }}|{{ cis_sshd_max_startups }}"
         directive: "MaxStartups"
         value: "{{ cis_sshd_max_startups }}"
   tags:

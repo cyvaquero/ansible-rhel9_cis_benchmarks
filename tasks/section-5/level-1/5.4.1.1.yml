@@ -1,13 +1,14 @@
 ---
-# 5.4.1.1 - The maximum password age. PASS_MAX_DAYS in /etc/login.defs is from 1 to 365 (the value
-# the role writes is cis_pass_max_days; a lower value already set is kept) and so is the maximum
-# of every account that has a password hash (field 2 of /etc/shadow starts with `$`), set with
-# `chage --maxdays`. Accounts without a hash (locked, no password) are left alone. The scan
+# 5.4.1.1 - The maximum password age. PASS_MAX_DAYS in /etc/login.defs is from 1 to 365 (the
+# benchmark) and so is the maximum of every account that has a password hash (field 2 of
+# /etc/shadow starts with `$`). The fix makes both exactly cis_pass_max_days (one variable drives
+# login.defs and `chage --maxdays`, so they cannot disagree), a stricter value included. Accounts
+# without a hash (locked, no password) are left alone. The scan
 # (files/accounts_scan.py, tasks/lib/accounts_state.yml) works out first whether the new maximum
 # would make an account's password expired or inactive today (a last change date of 0, no last
-# change date, a password older than the maximum): such an account is skipped, named in a
-# message, and the control is a finding. An account the role is connected as is covered by the
-# same rule.
+# change date, a password older than the maximum): such an account is skipped and named in a
+# message; the control is a finding when it fails the benchmark. An account the role is connected
+# as is covered by the same rule.
 
 - name: "5.4.1.1 - Handle password expiration"
   tags:
@@ -24,7 +25,7 @@
         line: "PASS_MAX_DAYS {{ cis_pass_max_days }}"
       when:
         - not (cis_audit_only | bool)
-        - not cis_acct.defaults.max.ok
+        - cis_acct.defaults.max.fix | bool
 
     - name: "5.4.1.1 - Set the maximum password age of accounts with a password"
       ansible.builtin.command:
@@ -54,6 +55,8 @@
         cis_finding_id: "5.4.1.1"
       when:
         - >-
-          cis_acct.aging.max.skip | length > 0
-          or (cis_audit_only | bool and (not cis_acct.defaults.max.ok or cis_acct.aging.max.fix | length > 0))
+          cis_acct.aging.max.skip | selectattr('bad') | list | length > 0
+          or not cis_acct.target_ok.max
+          or (cis_audit_only | bool and (not cis_acct.defaults.max.ok
+                                         or cis_acct.aging.max.fix | selectattr('bad') | list | length > 0))
 ...

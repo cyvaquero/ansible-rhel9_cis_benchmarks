@@ -4,8 +4,9 @@
 # file imports this with:
 #   cis_ps_id       the CIS ID
 #   cis_ps_conf     the lines the fix writes: a list of {path, regexp, line} (an item may add
-#                   `skip: true` to be left out), written when the configuration file part of
-#                   the verdict is bad
+#                   `skip: true` to be left out, or `state: absent` to remove the lines the
+#                   regexp matches), written when the configuration file part of the verdict
+#                   has to change (conf_fix)
 #   cis_ps_header   the file, when it is one the role owns (the pwquality drop-in), so its
 #                   folder and a header line are created first; empty otherwise
 #   cis_ps_tmpl     for a PAM argument that makes the control fail: a list of {re, to}
@@ -17,10 +18,12 @@
 # The verdict comes from files/pam_scan.py, which judges the files PAM reads at run time: the
 # configuration file value in effect (for pwquality the last of pwquality.conf and then
 # pwquality.conf.d/*.conf in name order, as libpwquality applies them) and every argument on the
-# module lines of system-auth and password-auth, which override the files. A setting that is
-# already compliant, wherever it comes from, is never touched, so a stricter value is never
-# loosened. The fix writes the configuration file value (the role's own pwquality drop-in, or the
-# one file of faillock and pwhistory). A bad PAM argument is fixed only through authselect, never
+# module lines of system-auth and password-auth, which override the files. state, conf_bad and
+# pam_bad judge the benchmark and decide the finding; conf_fix and pam_fix decide the fix: they
+# are also set when a value is compliant but differs from what the site configured (the role
+# variable), so the role holds exactly that value, a stricter one replaced. A setting that is
+# compliant and is the configured value, wherever it comes from, is never touched. The fix writes the configuration file value (the role's own pwquality
+# drop-in, or the one file of faillock and pwhistory). A bad PAM argument is fixed only through authselect, never
 # in /etc/pam.d: by the feature on any profile, or by editing the templates of the role's own
 # profile and applying them (authselect apply-changes, and authselect select --force when the
 # profile will not apply). On a profile the role does not own, what the features cannot fix is a
@@ -40,6 +43,8 @@
 
 - name: "{{ cis_ps_id ~ ' - Work out how a PAM argument can be fixed' }}"
   ansible.builtin.set_fact:
+    cis_ps_conf_fix: "{{ cis_ps_v0.conf_fix | default(cis_ps_v0.conf_bad) | bool }}"
+    cis_ps_arg_fix: "{{ cis_ps_v0.pam_fix | default(cis_ps_v0.pam_bad) | bool }}"
     cis_ps_feature_todo: >-
       {{ cis_ps_feature | length > 0 and cis_ps_managed | bool and cis_ps_feature not in cis_pam.authselect.features }}
     cis_ps_pam_fixable: >-
@@ -57,7 +62,7 @@
   when:
     - not (cis_audit_only | bool)
     - cis_ps_header | length > 0
-    - cis_ps_v0.conf_bad | bool
+    - cis_ps_conf_fix | bool
 
 - name: "{{ cis_ps_id ~ ' - Write the header of the role file' }}"
   ansible.builtin.lineinfile:
@@ -72,14 +77,15 @@
   when:
     - not (cis_audit_only | bool)
     - cis_ps_header | length > 0
-    - cis_ps_v0.conf_bad | bool
+    - cis_ps_conf_fix | bool
 
 - name: "{{ cis_ps_id ~ ' - Set the value in the configuration file' }}"
   ansible.builtin.lineinfile:
     path: "{{ item.path }}"
     regexp: "{{ item.regexp }}"
-    line: "{{ item.line }}"
-    create: true
+    line: "{{ item.line | default(omit) }}"
+    state: "{{ item.state | default('present') }}"
+    create: "{{ (item.state | default('present')) == 'present' }}"
     owner: root
     group: root
     mode: "0644"
@@ -89,7 +95,7 @@
   register: cis_ps_conf_res
   when:
     - not (cis_audit_only | bool)
-    - cis_ps_v0.conf_bad | bool
+    - cis_ps_conf_fix | bool
     - not (item.skip | default(false) | bool)
 
 - name: "{{ cis_ps_id ~ ' - Enable the authselect feature' }}"
@@ -118,7 +124,7 @@
   register: cis_ps_tmpl_res
   when:
     - not (cis_audit_only | bool)
-    - cis_ps_v0.pam_bad | bool
+    - cis_ps_arg_fix | bool
     - cis_ps_template_ok | bool
 
 - name: "{{ cis_ps_id ~ ' - Apply the changed templates' }}"
@@ -167,7 +173,7 @@
   when:
     - not (cis_audit_only | bool)
     - not ansible_check_mode
-    - cis_ps_v0.state | default('bad') != 'ok'
+    - cis_ps_conf_fix | bool or cis_ps_arg_fix | bool
 
 - name: "{{ cis_ps_id ~ ' - Report what still fails' }}"
   ansible.builtin.debug:
@@ -184,6 +190,19 @@
       (cis_audit_only | bool and cis_ps_v0.state | default('bad') != 'ok')
       or (not (cis_audit_only | bool) and not ansible_check_mode
           and cis_pam.verdict[cis_ps_id].state | default('bad') != 'ok')
+
+- name: "{{ cis_ps_id ~ ' - Report a PAM argument that differs from the configured value and is left' }}"
+  ansible.builtin.debug:
+    msg: >-
+      A PAM line argument differs from the configured value but meets the benchmark:
+      {{ cis_ps_v0.detail | join('; ') if cis_ps_v0.detail | length > 0 else 'see the pam_* lines of system-auth and password-auth' }}.
+      The role changes PAM lines only in the templates of its own authselect profile, and the active
+      profile ({{ cis_pam.authselect.profile | default('none', true) }}) is not one it can edit here, so it is left as it is.
+  when:
+    - not (cis_audit_only | bool)
+    - cis_ps_arg_fix | bool
+    - not cis_ps_pam_fixable | bool
+    - cis_ps_v0.state | default('bad') == 'ok'
 
 # Audit mode and an unreadable configuration are findings; so is a setting that is still not
 # compliant after the fix. Under --check the fix does not happen, so only what could not be

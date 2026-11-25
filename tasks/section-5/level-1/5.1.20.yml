@@ -7,9 +7,9 @@
   vars:
     cis_sd_id: "5.1.20"
     cis_sd_options:
-      - spec: "permitemptypasswords|eq|no"
+      - spec: "permitemptypasswords|eq|{{ cis_expect_sshd_permit_empty_passwords }}|{{ 'yes' if cis_sshd_permit_empty_passwords | bool else 'no' }}"
         directive: "PermitEmptyPasswords"
-        value: "no"
+        value: "{{ 'yes' if cis_sshd_permit_empty_passwords | bool else 'no' }}"
   tags:
     - "5.1.20"
     - section-5

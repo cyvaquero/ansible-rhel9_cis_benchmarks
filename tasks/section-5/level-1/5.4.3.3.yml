@@ -1,8 +1,8 @@
 ---
-# 5.4.3.3 - UMASK in /etc/login.defs is 027 or more restrictive. pam_umask reads it for every PAM
-# session (SSH, console, su -) before any shell file runs, and useradd uses it for new home
-# directories. A value that is not compliant is replaced with cis_umask; a stricter value
-# already set (077) is kept.
+# 5.4.3.3 - UMASK in /etc/login.defs is 027 or more restrictive (the benchmark). pam_umask reads it for
+# every PAM session (SSH, console, su -) before any shell file runs, and useradd uses it for new
+# home directories. The fix makes it exactly cis_umask (a different spelling of the same mask, 0027
+# for 027, is left alone), a stricter value included.
 
 - name: "5.4.3.3 - Set UMASK in login.defs"
   ansible.builtin.lineinfile:
@@ -11,7 +11,7 @@
     line: "UMASK {{ cis_umask }}"
   when:
     - not (cis_audit_only | bool)
-    - not cis_acct.defaults.umask.ok
+    - cis_acct.defaults.umask.fix | bool
   tags:
     - "5.4.3.3"
     - section-5
@@ -24,8 +24,9 @@
   vars:
     cis_finding_id: "5.4.3.3"
   when:
-    - cis_audit_only | bool
-    - not cis_acct.defaults.umask.ok
+    - >-
+      (cis_audit_only | bool and not cis_acct.defaults.umask.ok)
+      or not cis_acct.target_ok.umask
   tags:
     - "5.4.3.3"
     - section-5

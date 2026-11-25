@@ -6,16 +6,37 @@
 #                private (host private keys) or public (host public keys)
 # and puts the tags, which every task here inherits, on the import.
 #
-# The check prints one `bad=<path>|<owner>|<group>|<mode>` line per offender: the owner,
-# group and mode (a symbolic or octal string) the fix gives it. Compliant files are never
-# touched. Host keys are the files `sshd -T` lists as hostkey plus a glob of
-# /etc/ssh/ssh_host_*_key; a file that ssh-keygen cannot read as a key is ignored. A
-# private key may be root:root with no group or other access, or owned by the ssh_keys
-# group (when the host has it) with group read at most; a public key may also be in
-# ssh_keys and must not be writable by group or other. The fix keeps ssh_keys on a private
-# key that already has it. Only the default drop-in folder is read; folders named by an
-# Include line elsewhere are not. Remediate mode records a finding when something is still
-# wrong after the fix; under --check nothing is fixed, so nothing is recorded then.
+# Two things are judged for each file. The benchmark: the owner and group are
+# cis_expect_sshd_file_owner and _group, none of the forbidden permission bits
+# (cis_expect_sshd_*_forbidden_bits) is set, and a host key may instead be in the group
+# cis_expect_sshd_key_alt_group with its own, wider set of allowed bits. The site's setting:
+# the owner, group and mode of the variables of the kind (cis_sshd_config_*, cis_sshd_private_key_*,
+# cis_sshd_public_key_*). The fix gives every file that fails either the owner, group and mode of
+# the variables exactly, a stricter mode and a group the benchmark also allows included (a host
+# key that is root:ssh_keys 0640 becomes root:root 0600 with the defaults). A file that passes
+# both is left alone. A control is a finding only when the benchmark still fails after the fix
+# (a site that sets a weaker mode). A wanted owner or group that does not exist stops the fix
+# (nothing is written, the control is a finding).
+#
+# The check prints one `fix=<path>|<owner>|<group>|<mode>` line per file to change and
+# `bad=<path>` for each that fails the benchmark. Host keys are the files `sshd -T` lists as
+# hostkey plus a glob of /etc/ssh/ssh_host_*_key; a file that ssh-keygen cannot read as a key
+# is ignored. Only the default drop-in folder is read; folders named by an Include line
+# elsewhere are not. Remediate mode records a finding when something is still wrong after the
+# fix; under --check nothing is fixed, so nothing is recorded then.
+
+- name: "{{ cis_sf_id ~ ' - Work out the owner, group and mode the variables give' }}"
+  ansible.builtin.set_fact:
+    cis_sf_want: >-
+      {{ {'config': {'owner': cis_sshd_config_owner, 'group': cis_sshd_config_group, 'mode': cis_sshd_config_mode,
+                     'forbidden': cis_expect_sshd_config_forbidden_bits},
+          'dir': {'owner': cis_sshd_config_owner, 'group': cis_sshd_config_group, 'mode': cis_sshd_config_dir_mode,
+                  'forbidden': cis_expect_sshd_dir_forbidden_bits},
+          'private': {'owner': cis_sshd_private_key_owner, 'group': cis_sshd_private_key_group,
+                      'mode': cis_sshd_private_key_mode, 'forbidden': cis_expect_sshd_private_key_forbidden_bits},
+          'public': {'owner': cis_sshd_public_key_owner, 'group': cis_sshd_public_key_group,
+                     'mode': cis_sshd_public_key_mode, 'forbidden': cis_expect_sshd_public_key_forbidden_bits}
+         }[cis_sf_kind] }}
 
 - name: "{{ cis_sf_id ~ ' - Check ownership and mode' }}"
   ansible.builtin.command:
@@ -25,22 +46,49 @@
       - |
         set -u
         export LC_ALL=C
-        kind=$1
+        kind=$1 wo=$2 wg=$3 wm=$4 bo=$5 bg=$6 fb=$7 altg=$8 altfb=$9
+        if ! getent passwd "$wo" >/dev/null 2>&1 || ! getent group "$wg" >/dev/null 2>&1; then
+          echo "state=unfixable"
+          exit 1
+        fi
         sshgrp=""
-        getent group ssh_keys >/dev/null 2>&1 && sshgrp=ssh_keys
+        [ -n "$altg" ] && getent group "$altg" >/dev/null 2>&1 && sshgrp=$altg
         out=""
-        add() { out="$out
-        bad=$1|$2|$3|$4"; }
+        bench=0
+        # $1 path: judge one file or folder, adding a fix= line when it has to change.
+        judge() {
+          set -- "$1" $(stat -Lc '%a %U %G' "$1")
+          mode=$2
+          owner=$3
+          grp=$4
+          mask=$fb
+          bad=0
+          case $kind in
+            private|public)
+              if [ -n "$sshgrp" ] && [ "$grp" = "$sshgrp" ] && [ "$kind" = private ]; then mask=$altfb; fi ;;
+          esac
+          [ $(( 0$mode & mask )) -gt 0 ] && bad=1
+          [ "$owner" != "$bo" ] && bad=1
+          if [ "$grp" != "$bg" ]; then
+            if [ -z "$sshgrp" ] || [ "$grp" != "$sshgrp" ] || [ "$kind" = config ] || [ "$kind" = dir ]; then bad=1; fi
+          fi
+          differs=0
+          [ $(( 0$mode )) -ne $(( 0$wm )) ] && differs=1
+          [ "$owner" != "$wo" ] && differs=1
+          [ "$grp" != "$wg" ] && differs=1
+          if [ "$bad" -eq 1 ] || [ "$differs" -eq 1 ]; then
+            out="$out
+        fix=$1|$wo|$wg|$wm"
+            [ "$bad" -eq 1 ] && out="$out
+        bad=$1"
+          fi
+        }
         case $kind in
           config)
-            for f in $(find /etc/ssh/sshd_config -maxdepth 0 -type f \( -perm /177 -o ! -user root -o ! -group root \) 2>/dev/null) \
-                     $(find /etc/ssh/sshd_config.d -maxdepth 1 -type f -name '*.conf' \( -perm /177 -o ! -user root -o ! -group root \) 2>/dev/null); do
-              add "$f" root root "u-x,og-rwx"
-            done ;;
+            [ -f /etc/ssh/sshd_config ] && [ ! -L /etc/ssh/sshd_config ] && judge /etc/ssh/sshd_config
+            for f in $(find /etc/ssh/sshd_config.d -maxdepth 1 -type f -name '*.conf' 2>/dev/null); do judge "$f"; done ;;
           dir)
-            for f in $(find /etc/ssh/sshd_config.d -maxdepth 0 -type d \( ! -user root -o ! -group root -o -perm /077 \) 2>/dev/null); do
-              add "$f" root root 0700
-            done ;;
+            [ -d /etc/ssh/sshd_config.d ] && judge /etc/ssh/sshd_config.d ;;
           private|public)
             keys=$( { [ -x /usr/sbin/sshd ] && /usr/sbin/sshd -T 2>/dev/null | awk '$1 == "hostkey" { print $2 }'
                       for k in /etc/ssh/ssh_host_*_key; do [ -e "$k" ] && echo "$k"; done; } | sort -u)
@@ -49,36 +97,30 @@
               [ "$kind" = public ] && f="$k.pub"
               [ -e "$f" ] || continue
               ssh-keygen -lf "$f" >/dev/null 2>&1 || continue
-              set -- $(stat -Lc '%a %U %G' "$f")
-              mode=$1
-              owner=$2
-              grp=$3
-              if [ "$kind" = private ]; then
-                mask=0177
-                [ -n "$sshgrp" ] && [ "$grp" = "$sshgrp" ] && mask=0137
-                if [ $(( 0$mode & mask )) -gt 0 ] || [ "$owner" != root ] || { [ "$grp" != root ] && [ "$grp" != "$sshgrp" ]; }; then
-                  if [ -n "$sshgrp" ] && [ "$grp" = "$sshgrp" ]; then
-                    add "$f" root "$sshgrp" "u-x,g-wx,o-rwx"
-                  else
-                    add "$f" root root "u-x,go-rwx"
-                  fi
-                fi
-              else
-                if [ $(( 0$mode & 0133 )) -gt 0 ] || [ "$owner" != root ] || { [ "$grp" != root ] && [ "$grp" != "$sshgrp" ]; }; then
-                  add "$f" root root "u-x,go-wx"
-                fi
-              fi
+              judge "$f"
             done ;;
         esac
         out=$(printf '%s\n' "$out" | sed '/^$/d')
         if [ -n "$out" ]; then
           printf '%s\n' "$out"
-          echo "state=bad"
-          exit 1
+          if printf '%s\n' "$out" | grep -q '^bad='; then
+            echo "state=bad"
+            exit 1
+          fi
+          echo "state=diff"
+          exit 0
         fi
         echo "state=ok"
       - sh
       - "{{ cis_sf_kind }}"
+      - "{{ cis_sf_want.owner }}"
+      - "{{ cis_sf_want.group }}"
+      - "{{ cis_sf_want.mode }}"
+      - "{{ cis_expect_sshd_file_owner }}"
+      - "{{ cis_expect_sshd_file_group }}"
+      - "{{ cis_sf_want.forbidden }}"
+      - "{{ cis_expect_sshd_key_alt_group }}"
+      - "{{ cis_expect_sshd_private_key_alt_forbidden_bits }}"
   register: cis_sf_check
   changed_when: false
   check_mode: false
@@ -90,10 +132,9 @@
     owner: "{{ item.split('|')[1] }}"
     group: "{{ item.split('|')[2] }}"
     mode: "{{ item.split('|')[3] }}"
-  loop: "{{ cis_sf_check.stdout_lines | select('match', '^bad=') | map('regex_replace', '^bad=', '') | list }}"
+  loop: "{{ cis_sf_check.stdout_lines | select('match', '^fix=') | map('regex_replace', '^fix=', '') | list }}"
   when:
     - not (cis_audit_only | bool)
-    - cis_sf_check.rc != 0
 
 - name: "{{ cis_sf_id ~ ' - Check ownership and mode again after the fix' }}"
   ansible.builtin.command:
@@ -105,7 +146,14 @@
   when:
     - not (cis_audit_only | bool)
     - not ansible_check_mode
-    - cis_sf_check.rc != 0
+    - "'state=ok' not in cis_sf_check.stdout_lines"
+
+- name: "{{ cis_sf_id ~ ' - Report an owner or group that does not exist' }}"
+  ansible.builtin.debug:
+    msg: >-
+      The owner or group the variables name for this kind of file does not exist on the host,
+      so nothing is changed.
+  when: "'state=unfixable' in cis_sf_check.stdout_lines"
 
 - name: "{{ cis_sf_id ~ ' - Record the finding' }}"
   ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
@@ -113,6 +161,7 @@
     cis_finding_id: "{{ cis_sf_id }}"
   when:
     - >-
-      (cis_audit_only | bool and cis_sf_check.rc != 0)
-      or (cis_sf_recheck is not skipped and cis_sf_recheck.rc != 0)
+      ('state=unfixable' in cis_sf_check.stdout_lines)
+      or (cis_audit_only | bool and 'state=bad' in cis_sf_check.stdout_lines)
+      or (cis_sf_recheck is not skipped and 'state=bad' in cis_sf_recheck.stdout_lines)
 ...

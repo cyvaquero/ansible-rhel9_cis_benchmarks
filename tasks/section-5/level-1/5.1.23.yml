@@ -8,9 +8,9 @@
   vars:
     cis_sd_id: "5.1.23"
     cis_sd_options:
-      - spec: "usepam|eq|yes"
+      - spec: "usepam|eq|{{ cis_expect_sshd_use_pam }}|{{ 'yes' if cis_sshd_use_pam | bool else 'no' }}"
         directive: "UsePAM"
-        value: "yes"
+        value: "{{ 'yes' if cis_sshd_use_pam | bool else 'no' }}"
   tags:
     - "5.1.23"
     - section-5

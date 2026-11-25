@@ -1,14 +1,18 @@
 ---
-# 5.2.11 - the sudo credential cache is not shared by all of a user's sessions:
-# timestamp_type is not global (no line is the default, tty, and passes). Otherwise
-# `Defaults timestamp_type=tty` is written. The logic is shared in tasks/lib/sudo_default.yml.
+# 5.2.11 - the sudo credential cache is not shared by all of a user's sessions: timestamp_type is
+# not global (cis_expect_sudo_timestamp_type_forbidden; no line is the default, tty, and passes). The
+# fix makes the effective value exactly cis_sudo_timestamp_type. The logic is shared in
+# tasks/lib/sudo_default.yml.
 
 - name: "5.2.11 - Ensure sudo timestamp_type is configured"
   ansible.builtin.import_tasks: ../../lib/sudo_default.yml
   vars:
     cis_sdo_id: "5.2.11"
     cis_sdo_option: "timestamp_type"
-    cis_sdo_line: 'timestamp_type=tty'
+    cis_sdo_line: 'timestamp_type={{ cis_sudo_timestamp_type }}'
+    cis_sdo_cfg:
+      want: "{{ cis_sudo_timestamp_type }}"
+      forbidden: "{{ cis_expect_sudo_timestamp_type_forbidden }}"
   tags:
     - "5.2.11"
     - section-5

@@ -7,9 +7,9 @@
   vars:
     cis_sd_id: "5.1.13"
     cis_sd_options:
-      - spec: "hostbasedauthentication|eq|no"
+      - spec: "hostbasedauthentication|eq|{{ cis_expect_sshd_hostbased_authentication }}|{{ 'yes' if cis_sshd_hostbased_authentication | bool else 'no' }}"
         directive: "HostbasedAuthentication"
-        value: "no"
+        value: "{{ 'yes' if cis_sshd_hostbased_authentication | bool else 'no' }}"
   tags:
     - "5.1.13"
     - section-5

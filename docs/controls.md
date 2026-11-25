@@ -230,84 +230,84 @@ yet. `implemented`: the control has its task file at
 
 | CIS ID | Title | Profile | Type | Disposition | Status | Notes |
 |---|---|---|---|---|---|---|
-| 5.1.1 | Ensure access to /etc/ssh/sshd_config is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
-| 5.1.2 | Ensure access to /etc/ssh/sshd_config.d/ directory is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
-| 5.1.3 | Ensure access to SSH private host key files is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
-| 5.1.4 | Ensure access to SSH public host key files is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
-| 5.1.5 | Ensure sshd Ciphers are configured | L1 Server, L1 Workstation | Automated | implement | implemented | Fixed through the crypto policy (CIS-NO-SSHCBC), not a Ciphers line |
-| 5.1.6 | Ensure sshd KexAlgorithms is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Fixed through the crypto policy (NO-SHA1), not a KexAlgorithms line |
-| 5.1.7 | Ensure sshd MACs are configured | L1 Server, L1 Workstation | Automated | implement | implemented | Fixed through the crypto policy (CIS-NO-WEAKMAC), not a MACs line |
+| 5.1.1 | Ensure access to /etc/ssh/sshd_config is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Sets cis_sshd_config_owner, cis_sshd_config_group and cis_sshd_config_mode exactly |
+| 5.1.2 | Ensure access to /etc/ssh/sshd_config.d/ directory is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Sets cis_sshd_config_dir_mode and the owner and group exactly |
+| 5.1.3 | Ensure access to SSH private host key files is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Sets cis_sshd_private_key_owner, cis_sshd_private_key_group and cis_sshd_private_key_mode exactly; root:ssh_keys 0640 becomes root:root 0600 by default |
+| 5.1.4 | Ensure access to SSH public host key files is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Sets cis_sshd_public_key_owner, cis_sshd_public_key_group and cis_sshd_public_key_mode exactly |
+| 5.1.5 | Ensure sshd Ciphers are configured | L1 Server, L1 Workstation | Automated | implement | implemented | Fixed through the crypto policy with the module of 1.6.4 (cis_crypto_policy_module_sshcbc), not a Ciphers line |
+| 5.1.6 | Ensure sshd KexAlgorithms is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Fixed through the crypto policy with the module of 1.6.2 (cis_crypto_policy_module_sha1), not a KexAlgorithms line |
+| 5.1.7 | Ensure sshd MACs are configured | L1 Server, L1 Workstation | Automated | implement | implemented | Fixed through the crypto policy with the module of 1.6.3 (cis_crypto_policy_module_mac), not a MACs line |
 | 5.1.8 | Ensure sshd access is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Needs site-supplied allow or deny lists (`cis_sshd_*`); report only when unset; lockout guard on the role's own account |
-| 5.1.9 | Ensure sshd Banner is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Banner is /etc/issue.net, whose text 1.7.3 manages |
-| 5.1.10 | Ensure sshd ClientAliveInterval and ClientAliveCountMax are configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
-| 5.1.11 | Ensure sshd DisableForwarding is enabled | L1 Workstation, L2 Server | Automated | implement | implemented | Profile differs: L1 Workstation, L2 Server |
-| 5.1.12 | Ensure sshd GSSAPIAuthentication is disabled | L1 Workstation, L2 Server | Automated | implement | implemented | Profile differs: L1 Workstation, L2 Server |
-| 5.1.13 | Ensure sshd HostbasedAuthentication is disabled | L1 Server, L1 Workstation | Automated | implement | implemented |  |
-| 5.1.14 | Ensure sshd IgnoreRhosts is enabled | L1 Server, L1 Workstation | Automated | implement | implemented |  |
-| 5.1.15 | Ensure sshd LoginGraceTime is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
-| 5.1.16 | Ensure sshd LogLevel is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
-| 5.1.17 | Ensure sshd MaxAuthTries is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
-| 5.1.18 | Ensure sshd MaxStartups is configured | L1 Server, L1 Workstation | Automated | implement | implemented | sshd takes the last MaxStartups value, so a later file can override it (a finding) |
-| 5.1.19 | Ensure sshd MaxSessions is configured | L1 Server, L1 Workstation | Automated | implement | implemented |  |
-| 5.1.20 | Ensure sshd PermitEmptyPasswords is disabled | L1 Server, L1 Workstation | Automated | implement | implemented |  |
-| 5.1.21 | Ensure sshd PermitRootLogin is disabled | L1 Server, L1 Workstation | Automated | implement | implemented | Lockout risk: confirm another admin login first; not changed while the role is connected as root |
-| 5.1.22 | Ensure sshd PermitUserEnvironment is disabled | L1 Server, L1 Workstation | Automated | implement | implemented |  |
-| 5.1.23 | Ensure sshd UsePAM is enabled | L1 Server, L1 Workstation | Automated | implement | implemented |  |
-| 5.2.1 | Ensure sudo is installed | L1 Server, L1 Workstation | Automated | implement | implemented | |
-| 5.2.2 | Ensure access on sudoers configuration files is configured | L1 Server | Automated | implement | implemented | |
-| 5.2.3 | Ensure access on the /etc/sudoers.d directory is configured | L1 Server | Automated | implement | implemented | |
-| 5.2.4 | Ensure sudo commands use pty | L1 Server, L1 Workstation | Automated | implement | implemented | Writes `Defaults use_pty` to the role's sudoers file; last Defaults line wins |
-| 5.2.5 | Ensure sudo log file exists | L1 Server, L1 Workstation | Automated | implement | implemented | Path from `cis_sudo_logfile`; a log file the site set is kept |
+| 5.1.9 | Ensure sshd Banner is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Banner is cis_sshd_banner (defaults to cis_issue_net_path, whose text 1.7.3 manages) |
+| 5.1.10 | Ensure sshd ClientAliveInterval and ClientAliveCountMax are configured | L1 Server, L1 Workstation | Automated | implement | implemented | Holds cis_sshd_client_alive_interval and cis_sshd_client_alive_count_max |
+| 5.1.11 | Ensure sshd DisableForwarding is enabled | L1 Workstation, L2 Server | Automated | implement | implemented | Profile differs: L1 Workstation, L2 Server; holds cis_sshd_disable_forwarding |
+| 5.1.12 | Ensure sshd GSSAPIAuthentication is disabled | L1 Workstation, L2 Server | Automated | implement | implemented | Profile differs: L1 Workstation, L2 Server; holds cis_sshd_gssapi_authentication |
+| 5.1.13 | Ensure sshd HostbasedAuthentication is disabled | L1 Server, L1 Workstation | Automated | implement | implemented | Holds cis_sshd_hostbased_authentication |
+| 5.1.14 | Ensure sshd IgnoreRhosts is enabled | L1 Server, L1 Workstation | Automated | implement | implemented | Holds cis_sshd_ignore_rhosts |
+| 5.1.15 | Ensure sshd LoginGraceTime is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Holds cis_sshd_login_grace_time |
+| 5.1.16 | Ensure sshd LogLevel is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Holds cis_sshd_log_level |
+| 5.1.17 | Ensure sshd MaxAuthTries is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Holds cis_sshd_max_auth_tries |
+| 5.1.18 | Ensure sshd MaxStartups is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Holds cis_sshd_max_startups; sshd takes the last MaxStartups value, so a later file can override it (a finding) |
+| 5.1.19 | Ensure sshd MaxSessions is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Holds cis_sshd_max_sessions |
+| 5.1.20 | Ensure sshd PermitEmptyPasswords is disabled | L1 Server, L1 Workstation | Automated | implement | implemented | Holds cis_sshd_permit_empty_passwords |
+| 5.1.21 | Ensure sshd PermitRootLogin is disabled | L1 Server, L1 Workstation | Automated | implement | implemented | Holds cis_sshd_permit_root_login; lockout risk: confirm another admin login first; a value that closes root login is not written while the role is connected as root |
+| 5.1.22 | Ensure sshd PermitUserEnvironment is disabled | L1 Server, L1 Workstation | Automated | implement | implemented | Holds cis_sshd_permit_user_environment |
+| 5.1.23 | Ensure sshd UsePAM is enabled | L1 Server, L1 Workstation | Automated | implement | implemented | Holds cis_sshd_use_pam |
+| 5.2.1 | Ensure sudo is installed | L1 Server, L1 Workstation | Automated | implement | implemented | Adds cis_sudo_installed; sudo is never removed while the role becomes root with sudo |
+| 5.2.2 | Ensure access on sudoers configuration files is configured | L1 Server | Automated | implement | implemented | Sets cis_sudoers_owner, cis_sudoers_group and cis_sudoers_file_mode exactly |
+| 5.2.3 | Ensure access on the /etc/sudoers.d directory is configured | L1 Server | Automated | implement | implemented | Sets cis_sudoers_dir_mode and the owner and group exactly |
+| 5.2.4 | Ensure sudo commands use pty | L1 Server, L1 Workstation | Automated | implement | implemented | Holds cis_sudo_use_pty in the role's sudoers file; last Defaults line wins |
+| 5.2.5 | Ensure sudo log file exists | L1 Server, L1 Workstation | Automated | implement | implemented | Path from `cis_sudo_logfile`; a log file the site set is replaced when it differs |
 | 5.2.6 | Ensure users must provide password for escalation | L2 Server, L2 Workstation | Automated | implement | implemented | Excluded by default: breaks passwordless become for Ansible; lockout guard on the role's own account |
 | 5.2.7 | Ensure re-authentication for privilege escalation is not disabled globally | L1 Server, L1 Workstation | Automated | implement | implemented | Lockout guard on the role's own account |
-| 5.2.8 | Ensure sudo pwfeedback is configured | L1 Server | Automated | implement | implemented | |
-| 5.2.9 | Ensure sudo visiblepw is configured | L1 Server | Automated | implement | implemented | |
-| 5.2.10 | Ensure sudo timestamp_timeout is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Value from `cis_sudo_timestamp_timeout`; a stricter value is kept |
-| 5.2.11 | Ensure sudo timestamp_type is configured | L1 Server | Automated | implement | implemented | |
-| 5.2.12 | Ensure access to the su command is restricted | L1 Server, L1 Workstation | Automated | implement | implemented | Group from `cis_su_group`; reports members, never removes them |
-| 5.3.1.1 | Ensure latest version of pam is installed | L1 Server, L1 Workstation | Automated | implement | implemented | Upgraded with dnf only when below the benchmark's minimum version |
-| 5.3.1.2 | Ensure latest version of authselect is installed | L1 Server, L1 Workstation | Automated | implement | implemented | Upgraded with dnf only when below the benchmark's minimum version |
-| 5.3.1.3 | Ensure latest version of libpwquality is installed | L1 Server, L1 Workstation | Automated | implement | implemented | Upgraded with dnf only when below the benchmark's minimum version |
+| 5.2.8 | Ensure sudo pwfeedback is configured | L1 Server | Automated | implement | implemented | Holds cis_sudo_pwfeedback in the role's sudoers file |
+| 5.2.9 | Ensure sudo visiblepw is configured | L1 Server | Automated | implement | implemented | Holds cis_sudo_visiblepw in the role's sudoers file |
+| 5.2.10 | Ensure sudo timestamp_timeout is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Value from `cis_sudo_timestamp_timeout`; no line counts as sudo's default of 5 |
+| 5.2.11 | Ensure sudo timestamp_type is configured | L1 Server | Automated | implement | implemented | Holds cis_sudo_timestamp_type; no line counts as tty |
+| 5.2.12 | Ensure access to the su command is restricted | L1 Server, L1 Workstation | Automated | implement | implemented | Group from `cis_su_group` (a pam_wheel line with another group is rewritten); reports members, never removes them |
+| 5.3.1.1 | Ensure latest version of pam is installed | L1 Server, L1 Workstation | Automated | implement | implemented | Adds cis_pam_installed; upgraded with dnf only when below the benchmark's minimum version |
+| 5.3.1.2 | Ensure latest version of authselect is installed | L1 Server, L1 Workstation | Automated | implement | implemented | Adds cis_authselect_installed; upgraded with dnf only when below the benchmark's minimum version |
+| 5.3.1.3 | Ensure latest version of libpwquality is installed | L1 Server, L1 Workstation | Automated | implement | implemented | Adds cis_libpwquality_installed; upgraded with dnf only when below the benchmark's minimum version |
 | 5.3.2.1 | Ensure PAM is managed by an active authselect profile | L1 Server, L1 Workstation | Automated | implement | implemented | Converts a host without authselect to a role-owned custom profile based on sssd (`cis_authselect_profile`), with a backup; lockout guard |
 | 5.3.2.2 | Ensure pam_faillock module is enabled | L1 Server, L1 Workstation | Automated | implement | implemented | Enables the `with-faillock` feature on an authselect-managed host |
 | 5.3.2.3 | Ensure pam_pwquality module is enabled | L1 Server, L1 Workstation | Automated | implement | implemented | Reports a stack without it; no feature to enable |
 | 5.3.2.4 | Ensure pam_pwhistory module is enabled | L1 Server, L1 Workstation | Automated | implement | implemented | Enables the `with-pwhistory` feature on an authselect-managed host |
 | 5.3.2.5 | Ensure pam_unix module is enabled | L1 Server, L1 Workstation | Automated | implement | implemented | Reports a stack without it; no feature to enable |
-| 5.3.3.1.1 | Ensure password failed attempts lockout is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Value from `cis_faillock_deny` in `faillock.conf` |
-| 5.3.3.1.2 | Ensure password unlock time is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Value from `cis_faillock_unlock_time` in `faillock.conf` |
-| 5.3.3.1.3 | Ensure password failed attempts lockout includes root account | L2 Server, L2 Workstation | Automated | implement | implemented | Adds `even_deny_root` to `faillock.conf`; root can be locked out of password logins |
-| 5.3.3.2.1 | Ensure password number of changed characters is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Value from `cis_pwquality_difok` in the role's pwquality drop-in |
-| 5.3.3.2.2 | Ensure password length is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Value from `cis_pwquality_minlen` in the role's pwquality drop-in |
+| 5.3.3.1.1 | Ensure password failed attempts lockout is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Holds `cis_faillock_deny` in `faillock.conf` |
+| 5.3.3.1.2 | Ensure password unlock time is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Holds `cis_faillock_unlock_time` in `faillock.conf` |
+| 5.3.3.1.3 | Ensure password failed attempts lockout includes root account | L2 Server, L2 Workstation | Automated | implement | implemented | Holds `cis_faillock_even_deny_root` and rewrites a root_unlock_time that is set to `cis_faillock_root_unlock_time`; root can be locked out of password logins |
+| 5.3.3.2.1 | Ensure password number of changed characters is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Holds `cis_pwquality_difok` in the role's pwquality drop-in |
+| 5.3.3.2.2 | Ensure password length is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Holds `cis_pwquality_minlen` in the role's pwquality drop-in |
 | 5.3.3.2.3 | Ensure password complexity is configured | L1 Server, L1 Workstation | Manual | manual | implemented | Reports `minclass` and the credit settings in effect; the role never sets them |
-| 5.3.3.2.4 | Ensure password same consecutive characters is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Value from `cis_pwquality_maxrepeat` in the role's pwquality drop-in |
-| 5.3.3.2.5 | Ensure password maximum sequential characters is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Value from `cis_pwquality_maxsequence` in the role's pwquality drop-in |
-| 5.3.3.2.6 | Ensure password dictionary check is enabled | L1 Server, L1 Workstation | Automated | implement | implemented | Overrides a `dictcheck = 0` in the role's pwquality drop-in |
-| 5.3.3.2.7 | Ensure password quality is enforced for the root user | L1 Server, L1 Workstation | Automated | implement | implemented | Adds `enforce_for_root` to the role's pwquality drop-in |
-| 5.3.3.3.1 | Ensure password history remember is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Value from `cis_pwhistory_remember` in `pwhistory.conf` |
-| 5.3.3.3.2 | Ensure password history is enforced for the root user | L1 Server, L1 Workstation | Automated | implement | implemented | Adds `enforce_for_root` to `pwhistory.conf` |
+| 5.3.3.2.4 | Ensure password same consecutive characters is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Holds `cis_pwquality_maxrepeat` in the role's pwquality drop-in |
+| 5.3.3.2.5 | Ensure password maximum sequential characters is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Holds `cis_pwquality_maxsequence` in the role's pwquality drop-in |
+| 5.3.3.2.6 | Ensure password dictionary check is enabled | L1 Server, L1 Workstation | Automated | implement | implemented | Holds `cis_pwquality_dictcheck` in the role's pwquality drop-in |
+| 5.3.3.2.7 | Ensure password quality is enforced for the root user | L1 Server, L1 Workstation | Automated | implement | implemented | Holds `cis_pwquality_enforce_for_root` in the role's pwquality drop-in |
+| 5.3.3.3.1 | Ensure password history remember is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Holds `cis_pwhistory_remember` in `pwhistory.conf` |
+| 5.3.3.3.2 | Ensure password history is enforced for the root user | L1 Server, L1 Workstation | Automated | implement | implemented | Holds `cis_pwhistory_enforce_for_root` in `pwhistory.conf` |
 | 5.3.3.3.3 | Ensure pam_pwhistory includes use_authtok | L1 Server, L1 Workstation | Automated | implement | implemented | Fixed in the templates of the role's own authselect profile; a finding on another profile |
 | 5.3.3.4.1 | Ensure pam_unix does not include nullok | L1 Server, L1 Workstation | Automated | implement | implemented | Enables the `without-nullok` feature; a finding where a profile the role does not own hard-codes it |
 | 5.3.3.4.2 | Ensure pam_unix does not include remember | L1 Server, L1 Workstation | Automated | implement | implemented | Fixed in the templates of the role's own authselect profile; a finding on another profile |
-| 5.3.3.4.3 | Ensure pam_unix includes a strong password hashing algorithm | L1 Server, L1 Workstation | Automated | implement | implemented | Adds `sha512` in the templates of the role's own authselect profile; a finding on another profile |
+| 5.3.3.4.3 | Ensure pam_unix includes a strong password hashing algorithm | L1 Server, L1 Workstation | Automated | implement | implemented | Holds cis_password_hash in the templates of the role's own authselect profile (removes every other algorithm); a finding on another profile |
 | 5.3.3.4.4 | Ensure pam_unix includes use_authtok | L1 Server, L1 Workstation | Automated | implement | implemented | Fixed in the templates of the role's own authselect profile; a finding on another profile |
-| 5.4.1.1 | Ensure password expiration is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Sets login.defs and `chage --maxdays` on accounts with a password hash, skipping and reporting any whose password would expire |
+| 5.4.1.1 | Ensure password expiration is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Holds cis_pass_max_days in login.defs and `chage --maxdays` on accounts with a password hash, skipping and reporting any whose password would expire |
 | 5.4.1.2 | Ensure minimum password days is configured | L2 Server, L2 Workstation | Manual | manual | implemented | Reports PASS_MIN_DAYS and the accounts with a password and a minimum below 1; the role never sets it |
-| 5.4.1.3 | Ensure password expiration warning days is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Sets login.defs and `chage --warndays` on accounts with a password hash |
-| 5.4.1.4 | Ensure strong password hashing algorithm is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Sets ENCRYPT_METHOD in login.defs (SHA512, or YESCRYPT when PAM already uses it); the PAM hash is 5.3.3.4.3 |
-| 5.4.1.5 | Ensure inactive password lock is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Sets the useradd default and `chage --inactive` on accounts with a password hash, skipping and reporting any that would become inactive |
+| 5.4.1.3 | Ensure password expiration warning days is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Holds cis_pass_warn_age in login.defs and `chage --warndays` on accounts with a password hash |
+| 5.4.1.4 | Ensure strong password hashing algorithm is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Holds ENCRYPT_METHOD at cis_encrypt_method (the upper case of cis_password_hash, which the pam_unix line of 5.3.3.4.3 follows) |
+| 5.4.1.5 | Ensure inactive password lock is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Holds cis_inactive_days in the useradd default and `chage --inactive` on accounts with a password hash, skipping and reporting any that would become inactive |
 | 5.4.1.6 | Ensure all users last password change date is in the past | L1 Server, L1 Workstation | Automated | audit-only | implemented | Future change dates need a person to decide the fix |
 | 5.4.2.1 | Ensure root is the only UID 0 account | L1 Server, L1 Workstation | Automated | audit-only | implemented | Never modify accounts automatically; report only |
 | 5.4.2.2 | Ensure root is the only GID 0 account | L1 Server, L1 Workstation | Automated | audit-only | implemented | Never modify accounts automatically; report only |
 | 5.4.2.3 | Ensure group root is the only GID 0 group | L1 Server, L1 Workstation | Automated | audit-only | implemented | Never modify groups automatically; report only |
 | 5.4.2.4 | Ensure root account access is controlled | L1 Server, L1 Workstation | Automated | audit-only | implemented | Root password versus locked root is a site decision; report only |
 | 5.4.2.5 | Ensure root path integrity | L1 Server, L1 Workstation | Automated | audit-only | implemented | PATH fixes depend on the site; report only |
-| 5.4.2.6 | Ensure root user umask is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Edits root's `.bash_profile` and `.bashrc` only; lockout guard for the connecting account |
+| 5.4.2.6 | Ensure root user umask is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Edits root's `.bash_profile` and `.bashrc` only, to cis_umask; lockout guard for the connecting account |
 | 5.4.2.7 | Ensure system accounts do not have a valid login shell | L1 Server, L1 Workstation | Automated | implement | implemented | System accounts only; lockout guard (connecting account, running processes, `cis_account_exceptions`) |
 | 5.4.2.8 | Ensure accounts without a valid login shell are locked | L1 Server, L1 Workstation | Automated | implement | implemented | System accounts only; same lockout guard as 5.4.2.7 |
 | 5.4.3.1 | Ensure nologin is not listed in /etc/shells | L2 Server, L2 Workstation | Automated | implement | implemented | Removes the lines from `/etc/shells` |
-| 5.4.3.2 | Ensure default user shell timeout is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Role-owned `/etc/profile.d/zz-cis-rhel9.sh`, interactive shells only; a TMOUT elsewhere is judged, never edited |
-| 5.4.3.3 | Ensure default user umask is configured in /etc/login.defs | L1 Server, L1 Workstation | Automated | implement | implemented | Sets UMASK in login.defs |
-| 5.4.3.4 | Ensure default user umask is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Role-owned `/etc/profile.d/zz-cis-rhel9.sh`; a looser umask elsewhere is a finding |
+| 5.4.3.2 | Ensure default user shell timeout is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Holds cis_tmout in the role-owned `/etc/profile.d/zz-cis-rhel9.sh`, interactive shells only; a TMOUT elsewhere is judged, never edited |
+| 5.4.3.3 | Ensure default user umask is configured in /etc/login.defs | L1 Server, L1 Workstation | Automated | implement | implemented | Holds cis_umask as UMASK in login.defs |
+| 5.4.3.4 | Ensure default user umask is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Holds cis_umask in the role-owned `/etc/profile.d/zz-cis-rhel9.sh`; a looser umask elsewhere is a finding |
 
 ## 6 Logging and Auditing
 

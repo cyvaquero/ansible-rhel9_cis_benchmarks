@@ -1,10 +1,19 @@
 ---
-# Shared logic for the package controls that want a minimum version (5.3.1.1 to 5.3.1.3). A
-# control file imports this with:
+# Shared logic for the package controls that want a package installed, optionally at a minimum
+# version (5.2.1, 5.3.1.1 to 5.3.1.3). A control file imports this with:
 #   cis_pm_id       the CIS ID
 #   cis_pm_package  the package
-#   cis_pm_min      the least version-release that is compliant (for example 1.5.1-14)
-# and puts the tags, which every task here inherits, on the import.
+#   cis_pm_min      the least version-release that is compliant (for example 1.5.1-14, the
+#                   constant cis_expect_*_min_version); empty for any version
+#   cis_pm_want     optional, default true: whether the site wants the package installed (the
+#                   role variable, cis_*_installed). true installs or upgrades it as below;
+#                   false removes it when no other installed package needs it (rpm -e --test
+#                   decides; one that is needed stays installed and is reported)
+#   cis_pm_remove_ok optional, default true: false keeps the package whatever cis_pm_want says,
+#                   with a message (a guard against a removal that would cut the role off)
+# and puts the tags, which every task here inherits, on the import. The check always judges
+# the benchmark (the package installed, at the minimum), so a site that wants the package gone
+# gets a finding on every run.
 #
 # The benchmark asks for the package at that version or later, not for the newest one, so the
 # check compares the installed version-release with the minimum (rpm's own comparison, the
@@ -27,6 +36,7 @@
         state=ok
         for v in $inst; do
           echo "installed=$v"
+          [ -n "$2" ] || continue
           r=$(rpm --eval "%{lua: print(rpm.vercmp(\"$v\", \"$2\"))}" 2>/dev/null)
           case $r in
             -1) [ "$state" = unreadable ] || state=old ;;
@@ -50,7 +60,48 @@
     state: latest  # noqa: package-latest
   when:
     - not (cis_audit_only | bool)
+    - cis_pm_want | default(true) | bool
     - "'state=old' in cis_pm_check.stdout_lines or 'state=missing' in cis_pm_check.stdout_lines"
+
+- name: "{{ cis_pm_id ~ ' - Check whether another package needs ' ~ cis_pm_package }}"
+  ansible.builtin.command:
+    argv:
+      - rpm
+      - -e
+      - --test
+      - "{{ cis_pm_package }}"
+  register: cis_pm_erase
+  changed_when: false
+  check_mode: false
+  failed_when: false
+  when:
+    - not (cis_audit_only | bool)
+    - not (cis_pm_want | default(true) | bool)
+    - cis_pm_remove_ok | default(true) | bool
+    - "'state=missing' not in cis_pm_check.stdout_lines"
+
+- name: "{{ cis_pm_id ~ ' - Remove ' ~ cis_pm_package }}"
+  ansible.builtin.dnf:
+    name: "{{ cis_pm_package }}"
+    state: absent
+  when:
+    - cis_pm_erase is not skipped
+    - cis_pm_erase.rc == 0
+
+- name: "{{ cis_pm_id ~ ' - Report that ' ~ cis_pm_package ~ ' is kept' }}"
+  ansible.builtin.debug:
+    msg: >-
+      {{ cis_pm_package }} stays installed although the site does not want it:
+      {{ 'removing it would cut the role off from the host (it becomes root with it)'
+         if not (cis_pm_remove_ok | default(true) | bool)
+         else 'another installed package needs it' }}.
+  when:
+    - not (cis_audit_only | bool)
+    - not (cis_pm_want | default(true) | bool)
+    - "'state=missing' not in cis_pm_check.stdout_lines"
+    - >-
+      not (cis_pm_remove_ok | default(true) | bool)
+      or (cis_pm_erase is not skipped and cis_pm_erase.rc != 0)
 
 - name: "{{ cis_pm_id ~ ' - Check the version of ' ~ cis_pm_package ~ ' again after the fix' }}"
   ansible.builtin.command:
@@ -62,7 +113,9 @@
   when:
     - not (cis_audit_only | bool)
     - not ansible_check_mode
-    - "'state=ok' not in cis_pm_check.stdout_lines"
+    - >-
+      'state=ok' not in cis_pm_check.stdout_lines
+      or not (cis_pm_want | default(true) | bool)
 
 - name: "{{ cis_pm_id ~ ' - Report a package below the minimum version' }}"
   ansible.builtin.debug:
@@ -72,6 +125,7 @@
          | select('match', '^(installed|state)=') | join(', ') }}).
       {{ 'The enabled repositories have no newer build.' if cis_pm_recheck is not skipped else '' }}
   when:
+    - cis_pm_want | default(true) | bool
     - >-
       (cis_audit_only | bool and 'state=ok' not in cis_pm_check.stdout_lines)
       or (cis_pm_recheck is not skipped and 'state=ok' not in cis_pm_recheck.stdout_lines)

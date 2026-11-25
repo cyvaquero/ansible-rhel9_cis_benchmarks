@@ -1,6 +1,8 @@
 ---
 # Reads the accounts and the shell environment of the host (files/accounts_scan.py state,
-# read-only) into the fact cis_acct: the defaults of login.defs and useradd, the aging plan
+# read-only) into the fact cis_acct. It passes the scanner what the site configured (the cis_*
+# variables, which the "fix" flags and the aging plan follow) and the benchmark limits (the
+# cis_expect_* constants, which "ok", "state" and the findings follow). The fact holds: the defaults of login.defs and useradd, the aging plan
 # for accounts with a password hash, the system accounts to give a nologin shell or lock,
 # the lines of /etc/shells, TMOUT, the umask of the shell files and of root's login, and
 # root's PATH. Include it again after a change to see the result. It carries the always tag,
@@ -43,6 +45,16 @@
       warn_age: "{{ cis_pass_warn_age | int }}"
       inactive_days: "{{ cis_inactive_days | int }}"
       tmout: "{{ cis_tmout | int }}"
+      umask: "{{ cis_umask }}"
+      encrypt_method: "{{ cis_encrypt_method | upper }}"
+      expect:
+        max_days_max: "{{ cis_expect_pass_max_days_max | int }}"
+        warn_age_min: "{{ cis_expect_pass_warn_age_min | int }}"
+        min_days_min: "{{ cis_expect_pass_min_days_min | int }}"
+        inactive_max: "{{ cis_expect_inactive_days_max | int }}"
+        umask: "{{ cis_expect_umask }}"
+        tmout_max: "{{ cis_expect_tmout_max | int }}"
+        encrypt_methods: "{{ cis_expect_encrypt_methods }}"
       guard: "{{ cis_acct_guard | default([]) }}"
       exceptions: "{{ cis_account_exceptions }}"
       lock: "{{ '5.4.2.8' in cis_selected_controls }}"

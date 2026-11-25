@@ -1,7 +1,8 @@
 ---
-# 5.3.3.3.1 - remember is at least 24 in /etc/security/pwhistory.conf (the role writes cis_pwhistory_remember, 24 by
-# default, when it is not); a remember= argument on a pam_pwhistory line below 24 overrides the
-# file and is removed from the templates of the role's own authselect profile.
+# 5.3.3.3.1 - remember is set in /etc/security/pwhistory.conf (the benchmark: at least 24). The fix makes
+# it exactly cis_pwhistory_remember, also when the file holds another compliant value; a remember=
+# argument on a pam_pwhistory line that differs from it overrides the file and is removed from the
+# templates of the role's own authselect profile.
 # The logic is in tasks/lib/pam_setting.yml.
 
 - name: "5.3.3.3.1 - Ensure password history remember is configured"

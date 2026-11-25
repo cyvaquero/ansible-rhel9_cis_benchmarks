@@ -1,8 +1,8 @@
 ---
-# 5.3.3.2.5 - maxsequence is from 1 to 3 in the pwquality configuration (the role's drop-in gets
-# cis_pwquality_maxsequence, 3 by default, when it is not); a maxsequence= argument on a
-# pam_pwquality line outside that range overrides the files and is removed from the templates of
-# the role's own profile.
+# 5.3.3.2.5 - maxsequence is set in the pwquality configuration (the benchmark: from 1 to 3). The fix
+# makes it exactly cis_pwquality_maxsequence in the role's drop-in, also when the value in effect is
+# another compliant one; a maxsequence= argument on a pam_pwquality line that differs from it
+# overrides the files and is removed from the templates of the role's own profile.
 # The logic is in tasks/lib/pam_setting.yml.
 
 - name: "5.3.3.2.5 - Ensure password maximum sequential characters is configured"

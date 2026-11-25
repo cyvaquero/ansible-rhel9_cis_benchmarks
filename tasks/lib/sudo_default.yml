@@ -5,15 +5,19 @@
 #   cis_sdo_option  the Defaults option (use_pty, logfile, pwfeedback, visiblepw,
 #                   timestamp_timeout, timestamp_type)
 #   cis_sdo_line    the line the fix writes, after "Defaults "
-#   cis_sdo_max     optional: for timestamp_timeout, the most minutes that pass (15)
+#   cis_sdo_max     optional: for timestamp_timeout, the most minutes that pass (15, the
+#                   constant cis_expect_sudo_timestamp_timeout_max)
+#   cis_sdo_cfg     optional: what files/sudoers_scan.py is told (see there): the benchmark
+#                   flag (expect), the forbidden timestamp_type and what the site wants (want)
 # and puts the tags, which every task here inherits, on the import.
 #
 # Compliance is judged on all the sudoers files sudo reads (files/sudoers_scan.py follows
 # /etc/sudoers and its include lines in sudo's order), never on one file. sudo applies the
 # last Defaults line it reads, so the effective value is the last global one; a line scoped
 # to a user, host, command or runas list (Defaults:user and so on) beats the global ones and
-# is judged on its own. A setting that is already compliant, wherever it comes from, is never
-# touched, so a stricter value is never loosened. The fix writes one line to the role's own
+# is judged on its own. A setting that is already compliant and is what the site wants (cis_sdo_cfg
+# want; a missing line counts as sudo's default), wherever it comes from, is never touched; one that
+# differs from the want is written, a stricter value included. The fix writes one line to the role's own
 # file (cis_sudoers_dropin, named to sort last), validated with visudo -cf before it lands,
 # and the whole configuration is checked with visudo -c afterwards. The role edits no sudoers
 # file it does not own for these controls: a non-compliant line that still wins (a file that
@@ -30,6 +34,7 @@
       - defaults
       - "{{ cis_sdo_option }}"
       - "{{ cis_sdo_max | default(15) }}"
+      - "{{ cis_sdo_cfg | default({}) | to_json }}"
   register: cis_sdo_check
   changed_when: false
   check_mode: false
@@ -51,14 +56,13 @@
       reads this folder in name order, so this file is named to be read last.
     insertbefore: BOF
     create: true
-    owner: root
-    group: root
-    mode: "0440"
+    owner: "{{ cis_sudoers_owner }}"
+    group: "{{ cis_sudoers_group }}"
+    mode: "{{ cis_sudoers_file_mode }}"
     validate: /usr/sbin/visudo -cf %s
   when:
     - not (cis_audit_only | bool)
-    - cis_sdo_res.state == 'bad'
-    - cis_sdo_res.global_bad | bool
+    - cis_sdo_res.fix | default(false) | bool
 
 - name: "{{ cis_sdo_id ~ ' - Set the sudo Defaults line in the role file' }}"
   ansible.builtin.lineinfile:
@@ -66,15 +70,14 @@
     regexp: '^\s*Defaults\s+!?{{ cis_sdo_option }}\b'
     line: "Defaults {{ cis_sdo_line }}"
     create: true
-    owner: root
-    group: root
-    mode: "0440"
+    owner: "{{ cis_sudoers_owner }}"
+    group: "{{ cis_sudoers_group }}"
+    mode: "{{ cis_sudoers_file_mode }}"
     validate: /usr/sbin/visudo -cf %s
   register: cis_sdo_write
   when:
     - not (cis_audit_only | bool)
-    - cis_sdo_res.state == 'bad'
-    - cis_sdo_res.global_bad | bool
+    - cis_sdo_res.fix | default(false) | bool
 
 - name: "{{ cis_sdo_id ~ ' - Check the whole sudo configuration after the change' }}"
   ansible.builtin.command:
@@ -99,8 +102,7 @@
   when:
     - not (cis_audit_only | bool)
     - not ansible_check_mode
-    - cis_sdo_res.state == 'bad'
-    - cis_sdo_res.global_bad | bool
+    - cis_sdo_res.fix | default(false) | bool
 
 - name: "{{ cis_sdo_id ~ ' - Work out what the sudo files set after the fix' }}"
   ansible.builtin.set_fact:
@@ -134,8 +136,7 @@
       read before {{ cis_sudoers_dropin }}.
   when:
     - cis_sdo_after | length > 0
-    - cis_sdo_after.state | default('') != 'ok'
-    - cis_sdo_after.global_bad | default(false) | bool
+    - cis_sdo_after.global_differs | default(false) | bool
 
 - name: "{{ cis_sdo_id ~ ' - Report a scoped sudo line that overrides the setting' }}"
   ansible.builtin.debug:
@@ -156,9 +157,9 @@
   vars:
     cis_finding_id: "{{ cis_sdo_id }}"
   when:
-    - cis_sdo_res.state | default('') in ['bad', 'unreadable']
     - >-
-      (cis_audit_only | bool) or cis_sdo_res.state == 'unreadable'
+      cis_sdo_res.state | default('') == 'unreadable'
+      or (cis_audit_only | bool and cis_sdo_res.state | default('') == 'bad')
       or (cis_sdo_res.scoped_bad | default([]) | length > 0)
       or (cis_sdo_after | length > 0 and cis_sdo_after.state | default('') != 'ok')
       or (cis_sdo_visudo is not skipped and cis_sdo_visudo.rc | default(1) != 0)

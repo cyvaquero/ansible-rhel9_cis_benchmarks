@@ -4,12 +4,21 @@
 # It never writes anything. The role passes it to the managed node's Python with
 # `python -c`, so keep it standard library only and compatible with Python 3.9.
 #
-#   pam_scan.py state PROFILE
+#   pam_scan.py state PROFILE [CONFIG_JSON]
 #       Judges every 5.3.2 and 5.3.3 control from the files PAM reads at run time. PROFILE
 #       is the name of the role's own authselect profile (without "custom/"). Each verdict
 #       has state ok|bad, conf_bad (a setting that belongs in a configuration file is
 #       missing or not compliant there), pam_bad (a PAM line carries an argument, or lacks
-#       one, that makes the control fail) and detail (messages naming file and line).
+#       one, that makes the control fail) and detail (messages naming file and line). state,
+#       conf_bad and pam_bad judge the benchmark. conf_fix and pam_fix say what the fix has to
+#       write: the same, or also a value that differs from what the site configured.
+#       CONFIG_JSON is optional: "expect" holds the benchmark limits (deny_min, deny_max,
+#       unlock_min, root_unlock_min, difok_min, minlen_min, maxrepeat_max, maxsequence_max,
+#       remember_min, hashes), "want" what the site configured (deny, unlock_time,
+#       root_unlock_time, even_deny_root, difok, minlen, maxrepeat, maxsequence, dictcheck,
+#       pwquality_enforce_for_root, remember, pwhistory_enforce_for_root, hash) and "owned_pwquality"
+#       the role's own pwquality file. Without it the built-in benchmark limits below apply, which
+#       only the tests rely on (the role always passes its constants), and there is no "want".
 #   pam_scan.py guard PROFILE_ID [FEATURE ...]
 #       The lockout guard: renders what authselect would write for that profile and
 #       features (authselect test, nothing is written) and reports a problem when a stack
@@ -38,6 +47,12 @@ TYPES = ("auth", "account", "password", "session")
 # Name services nsswitch.conf handles without a separate library.
 BUILTIN_NSS = ("files", "compat", "dns", "db", "nis", "nisplus")
 NSS_DATABASES = ("passwd", "group", "shadow", "gshadow", "netgroup")
+# The benchmark limits, used when the caller passes none.
+DEFAULT_EXPECT = {"deny_min": 1, "deny_max": 5, "unlock_min": 900, "root_unlock_min": 60, "difok_min": 2,
+                  "minlen_min": 14, "maxrepeat_max": 3, "maxsequence_max": 3, "remember_min": 24,
+                  "hashes": ["sha512", "yescrypt"]}
+# Every hashing algorithm pam_unix knows by name.
+HASH_NAMES = ("md5", "bigcrypt", "sha256", "sha512", "blowfish", "yescrypt", "gost_yescrypt")
 # Files authselect renders and the option of `authselect test` that prints each.
 RENDER_OPTION = {"system-auth": "-s", "password-auth": "-p"}
 
@@ -96,6 +111,15 @@ def read_text(path):
 def read_pam(path):
     text = read_text(path)
     return None if text is None else parse_pam_text(text)
+
+
+def wbool(value):
+    """A site flag from a JSON boolean or the text of one (None stays None)."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "yes", "1")
+    return bool(value)
 
 
 def split_arg(arg):
@@ -179,15 +203,20 @@ def pam_flag(stacks, module, ltypes, key):
     return found
 
 
-def verdict(conf_bad=False, pam_bad=False, detail=None):
+def verdict(conf_bad=False, pam_bad=False, detail=None, conf_fix=None, pam_fix=None):
     return {"state": "bad" if (conf_bad or pam_bad) else "ok", "conf_bad": conf_bad, "pam_bad": pam_bad,
+            "conf_fix": conf_bad if conf_fix is None else (conf_bad or conf_fix),
+            "pam_fix": pam_bad if pam_fix is None else (pam_bad or pam_fix),
             "detail": detail or []}
 
 
-def numeric(entries, stacks, key, ok, module, ltypes, need_value):
+def numeric(entries, stacks, key, ok, module, ltypes, need_value, want=None, unset_default=None):
     """A numeric setting in a configuration file and as an argument of the PAM module.
     need_value: the file must set it (the benchmark's audit looks for the line); otherwise only
-    a value that is set and not compliant fails."""
+    a value that is set and not compliant fails. want: what the site configured (None: not
+    asked); a value in the file or an argument that differs from it has to be fixed even when it
+    is compliant. unset_default: what the module uses with no setting, so no setting differs from
+    want when that is another value (None: no setting never differs)."""
     detail = []
     conf_bad = False
     pam_bad = False
@@ -201,12 +230,34 @@ def numeric(entries, stacks, key, ok, module, ltypes, need_value):
         if number is None or not ok(number):
             conf_bad = True
             detail.append("%s = %s at %s is not compliant" % (key, entry[3], where(entry)))
+    conf_fix = False
+    pam_fix = False
+    if want is not None:
+        if entry is None:
+            conf_fix = unset_default is not None and unset_default != want
+        else:
+            conf_fix = to_int(entry[3]) != want
     for stack, value in pam_args(stacks, module, ltypes, key):
         number = to_int(value)
         if number is None or not ok(number):
             pam_bad = True
             detail.append("%s=%s on the %s line of %s is not compliant" % (key, value, module, stack))
-    return verdict(conf_bad, pam_bad, detail)
+        if want is not None and number != want:
+            pam_fix = True
+    return verdict(conf_bad, pam_bad, detail, conf_fix, pam_fix)
+
+
+def flag_verdict(entries, key, want, owned=None):
+    """A flag (a key with no value) in a configuration file. The benchmark wants it set. want
+    True: the fix sets it when missing; False: the fix removes it from the file the role owns
+    (owned; every file when None); None: not asked."""
+    present = has_flag(entries, key)
+    fix = False
+    if want is True:
+        fix = not present
+    elif want is False:
+        fix = any(e[2] == key and (owned is None or e[0] == owned) for e in entries)
+    return verdict(not present, False, [] if present else ["%s is not set" % key], fix, False)
 
 
 def module_verdict(missing):
@@ -264,7 +315,16 @@ def authselect_info():
     return info
 
 
-def state(profile_name):
+def state(profile_name, cfg=None):
+    cfg = cfg or {}
+    expect = dict(DEFAULT_EXPECT)
+    expect.update(cfg.get("expect") or {})
+    # Ansible may hand the numbers over as text.
+    expect = {k: (v if k == "hashes" else to_int(v)) for k, v in expect.items()}
+    want = cfg.get("want") or {}
+    wint = {k: to_int(v) for k, v in want.items() if k in (
+        "deny", "unlock_time", "root_unlock_time", "difok", "minlen", "maxrepeat", "maxsequence",
+        "dictcheck", "remember")}
     info = authselect_info()
     stacks = {name: read_pam(os.path.join(PAM_DIR, name)) for name in STACKS}
     faillock = read_conf(FAILLOCK_CONF)
@@ -288,26 +348,44 @@ def state(profile_name):
         ("auth line", "auth", "pam_unix", None, None), ("account line", "account", "pam_unix", None, None),
         ("password line", "password", "pam_unix", None, None), ("session line", "session", "pam_unix", None, None)]))
 
-    v["5.3.3.1.1"] = numeric(faillock, stacks, "deny", lambda n: 1 <= n <= 5, "pam_faillock", ("auth",), True)
-    v["5.3.3.1.2"] = numeric(faillock, stacks, "unlock_time", lambda n: n == 0 or n >= 900, "pam_faillock", ("auth",), True)
+    v["5.3.3.1.1"] = numeric(faillock, stacks, "deny", lambda n: expect["deny_min"] <= n <= expect["deny_max"],
+                             "pam_faillock", ("auth",), True, wint.get("deny"))
+    v["5.3.3.1.2"] = numeric(faillock, stacks, "unlock_time", lambda n: n == 0 or n >= expect["unlock_min"],
+                             "pam_faillock", ("auth",), True, wint.get("unlock_time"))
 
     # 5.3.3.1.3: root is subject to the lockout (even_deny_root, or a root_unlock_time that implies
     # it), and a root_unlock_time that is set is 0 or at least 60.
-    root_ok = lambda n: n == 0 or n >= 60
-    rut = numeric(faillock, stacks, "root_unlock_time", root_ok, "pam_faillock", ("auth",), False)
+    root_ok = lambda n: n == 0 or n >= expect["root_unlock_min"]
+    rut = numeric(faillock, stacks, "root_unlock_time", root_ok, "pam_faillock", ("auth",), False,
+                  wint.get("root_unlock_time"))
     if not (has_flag(faillock, "even_deny_root") or last(faillock, "root_unlock_time") is not None):
         rut["conf_bad"] = True
+        rut["conf_fix"] = True
         rut["state"] = "bad"
         rut["detail"].append("even_deny_root is not set")
+    # The site's even_deny_root: set it when missing (True), remove the line (False).
+    even = wbool(want.get("even_deny_root"))
+    if even is not None:
+        present = has_flag(faillock, "even_deny_root")
+        if (even and not present) or (not even and present):
+            rut["conf_fix"] = True
+    # Whether a root_unlock_time line exists: the role rewrites one, never adds one.
+    rut["root_unlock_set"] = last(faillock, "root_unlock_time") is not None
     v["5.3.3.1.3"] = rut
 
-    v["5.3.3.2.1"] = numeric(pwq, stacks, "difok", lambda n: n >= 2, "pam_pwquality", ("password",), True)
-    v["5.3.3.2.2"] = numeric(pwq, stacks, "minlen", lambda n: n >= 14, "pam_pwquality", ("password",), True)
-    v["5.3.3.2.4"] = numeric(pwq, stacks, "maxrepeat", lambda n: 1 <= n <= 3, "pam_pwquality", ("password",), True)
-    v["5.3.3.2.5"] = numeric(pwq, stacks, "maxsequence", lambda n: 1 <= n <= 3, "pam_pwquality", ("password",), True)
-    v["5.3.3.2.6"] = numeric(pwq, stacks, "dictcheck", lambda n: n != 0, "pam_pwquality", ("password",), False)
-    v["5.3.3.2.7"] = verdict(not has_flag(pwq, "enforce_for_root"), False,
-                             [] if has_flag(pwq, "enforce_for_root") else ["enforce_for_root is not set"])
+    v["5.3.3.2.1"] = numeric(pwq, stacks, "difok", lambda n: n >= expect["difok_min"], "pam_pwquality",
+                             ("password",), True, wint.get("difok"))
+    v["5.3.3.2.2"] = numeric(pwq, stacks, "minlen", lambda n: n >= expect["minlen_min"], "pam_pwquality",
+                             ("password",), True, wint.get("minlen"))
+    v["5.3.3.2.4"] = numeric(pwq, stacks, "maxrepeat", lambda n: 1 <= n <= expect["maxrepeat_max"],
+                             "pam_pwquality", ("password",), True, wint.get("maxrepeat"))
+    v["5.3.3.2.5"] = numeric(pwq, stacks, "maxsequence", lambda n: 1 <= n <= expect["maxsequence_max"],
+                             "pam_pwquality", ("password",), True, wint.get("maxsequence"))
+    # libpwquality checks the dictionary unless dictcheck is 0, so no setting is a dictcheck of 1.
+    v["5.3.3.2.6"] = numeric(pwq, stacks, "dictcheck", lambda n: n != 0, "pam_pwquality", ("password",), False,
+                             wint.get("dictcheck"), 1)
+    v["5.3.3.2.7"] = flag_verdict(pwq, "enforce_for_root", wbool(want.get("pwquality_enforce_for_root")),
+                                  cfg.get("owned_pwquality"))
 
     # 5.3.3.2.3 is manual: the values in effect, for review.
     manual = {}
@@ -318,9 +396,9 @@ def state(profile_name):
     v["5.3.3.2.3"] = verdict()
     v["5.3.3.2.3"]["values"] = manual
 
-    v["5.3.3.3.1"] = numeric(pwhist, stacks, "remember", lambda n: n >= 24, "pam_pwhistory", ("password",), True)
-    v["5.3.3.3.2"] = verdict(not has_flag(pwhist, "enforce_for_root"), False,
-                             [] if has_flag(pwhist, "enforce_for_root") else ["enforce_for_root is not set"])
+    v["5.3.3.3.1"] = numeric(pwhist, stacks, "remember", lambda n: n >= expect["remember_min"], "pam_pwhistory",
+                             ("password",), True, wint.get("remember"))
+    v["5.3.3.3.2"] = flag_verdict(pwhist, "enforce_for_root", wbool(want.get("pwhistory_enforce_for_root")))
     hist = [(s, l) for s, l in password_lines(stacks, "pam_pwhistory")]
     bad = [s for s, l in hist if l is None or not any(split_arg(a)[0] == "use_authtok" for a in l["args"])]
     v["5.3.3.3.3"] = verdict(False, bool(bad), ["no use_authtok on the pam_pwhistory password line of " + ", ".join(bad)] if bad else [])
@@ -332,11 +410,21 @@ def state(profile_name):
                           and any(split_arg(a)[0] == "remember" for a in l["args"])))
     v["5.3.3.4.2"] = verdict(False, bool(remember), ["remember on a pam_unix password line of " + ", ".join(remember)] if remember else [])
     weak = []
+    off = []
+    want_hash = want.get("hash")
     for name, line in password_lines(stacks, "pam_unix"):
         if line is None or line["control"] not in ("requisite", "required", "sufficient") \
-                or not any(split_arg(a)[0] in ("sha512", "yescrypt") for a in line["args"]):
+                or not any(split_arg(a)[0] in expect["hashes"] for a in line["args"]):
             weak.append(name)
-    v["5.3.3.4.3"] = verdict(False, bool(weak), ["no sha512 or yescrypt on the pam_unix password line of " + ", ".join(sorted(set(weak)))] if weak else [])
+        if want_hash and line is not None:
+            named = [split_arg(a)[0] for a in line["args"] if split_arg(a)[0] in HASH_NAMES]
+            if named != [want_hash]:
+                off.append(name)
+        elif want_hash:
+            off.append(name)
+    v["5.3.3.4.3"] = verdict(False, bool(weak),
+                             ["no " + " or ".join(expect["hashes"]) + " on the pam_unix password line of "
+                              + ", ".join(sorted(set(weak)))] if weak else [], False, bool(off))
     noauth = [n for n, l in password_lines(stacks, "pam_unix")
               if l is None or not any(split_arg(a)[0] == "use_authtok" for a in l["args"])]
     v["5.3.3.4.4"] = verdict(False, bool(noauth), ["no use_authtok on the pam_unix password line of " + ", ".join(sorted(set(noauth)))] if noauth else [])
@@ -416,12 +504,12 @@ def guard(profile_id, features):
 
 def main(argv):
     if len(argv) >= 3 and argv[1] == "state":
-        print(json.dumps(state(argv[2])))
+        print(json.dumps(state(argv[2], json.loads(argv[3]) if len(argv) > 3 and argv[3] else None)))
         return 0
     if len(argv) >= 3 and argv[1] == "guard":
         print(json.dumps(guard(argv[2], argv[3:])))
         return 0
-    sys.stderr.write("usage: pam_scan.py state PROFILE | guard PROFILE_ID [FEATURE ...]\n")
+    sys.stderr.write("usage: pam_scan.py state PROFILE [CONFIG_JSON] | guard PROFILE_ID [FEATURE ...]\n")
     return 2
 
 

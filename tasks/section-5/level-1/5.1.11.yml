@@ -8,9 +8,9 @@
   vars:
     cis_sd_id: "5.1.11"
     cis_sd_options:
-      - spec: "disableforwarding|eq|yes"
+      - spec: "disableforwarding|eq|{{ cis_expect_sshd_disable_forwarding }}|{{ 'yes' if cis_sshd_disable_forwarding | bool else 'no' }}"
         directive: "DisableForwarding"
-        value: "yes"
+        value: "{{ 'yes' if cis_sshd_disable_forwarding | bool else 'no' }}"
   tags:
     - "5.1.11"
     - section-5

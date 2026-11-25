@@ -1,6 +1,8 @@
 ---
-# 5.1.7 - sshd must not offer a weak MAC. Fixed through the crypto policy with the role's own
-# CIS-NO-WEAKMAC module, the same one 1.6.3 adds (keep the two module texts identical).
+# 5.1.7 - sshd must not offer a weak MAC (the constant cis_expect_sshd_weak_macs). Fixed through the
+# crypto policy with the role's own module, the same one 1.6.3 adds (the module name and the
+# excluded patterns are the variables of 1.6.3; keep the two module texts identical). The policy
+# holds the module exactly as configured, as 1.6.3 does.
 # hmac-sha1 itself is not weak under this control; 1.6.6 (manual) covers EtM.
 
 - name: "5.1.7 - Ensure sshd MACs are configured"
@@ -8,15 +10,13 @@
   vars:
     cis_sc_id: "5.1.7"
     cis_sc_key: "macs"
-    cis_sc_weak: >-
-      hmac-md5 hmac-md5-96 hmac-ripemd160 hmac-sha1-96 umac-64@openssh.com
-      hmac-md5-etm@openssh.com hmac-md5-96-etm@openssh.com hmac-ripemd160-etm@openssh.com
-      hmac-sha1-96-etm@openssh.com umac-64-etm@openssh.com
+    cis_sc_weak: "{{ cis_expect_sshd_weak_macs }}"
     cis_sc_kind: "mac"
-    cis_sc_module: "CIS-NO-WEAKMAC"
+    cis_sc_enforce: true
+    cis_sc_module: "{{ cis_crypto_policy_module_mac }}"
     cis_sc_body: |
       # Added by the CIS RHEL 9 role: drop 64-bit tag and MD5 MACs.
-      mac = -*-64 -*-MD5
+      mac = {{ cis_crypto_policy_mac_excluded | map('regex_replace', '^', '-') | join(' ') }}
   tags:
     - "5.1.7"
     - section-5

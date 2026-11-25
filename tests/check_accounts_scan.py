@@ -142,7 +142,8 @@ HASHED = SHADOW + "".join([
 PW = PASSWD + "".join("%s:x:%d:%d::/home/%s:/bin/bash\n" % (n, 1100 + i, 1100 + i, n)
                       for i, n in enumerate(["alice", "bob", "carl", "dina", "eve", "fred", "gus", "hank"]))
 s = run({"/etc/shadow": HASHED, "/etc/passwd": PW})
-check("max fix", [x["user"] for x in s["aging"]["max"]["fix"]], ["alice"])
+# The fix makes the maximum exactly the configured one, a stricter value (bob, hank) included.
+check("max fix", [x["user"] for x in s["aging"]["max"]["fix"]], ["alice", "bob", "hank"])
 check("max skip", sorted(x["user"] for x in s["aging"]["max"]["skip"]), ["carl", "dina", "eve"])
 check("max skip reasons mention the cause",
       all(x["reason"] for x in s["aging"]["max"]["skip"]), True)
@@ -151,8 +152,9 @@ check("warn fix", [x["user"] for x in s["aging"]["warn"]["fix"]], ["bob"])
 check("warn skip", s["aging"]["warn"]["skip"], [])
 # carl and eve keep their unlimited maximum (a 365 maximum would expire them), and an
 # inactivity period after no expiry changes nothing, so it is set; dina must change at login.
-check("inactive fix", sorted(x["user"] for x in s["aging"]["inactive"]["fix"]), ["alice", "carl", "eve"])
-check("inactive skip", sorted(x["user"] for x in s["aging"]["inactive"]["skip"]), ["dina", "hank"])
+check("inactive fix", sorted(x["user"] for x in s["aging"]["inactive"]["fix"]), ["alice", "bob", "carl", "eve", "hank"])
+check("inactive skip", sorted(x["user"] for x in s["aging"]["inactive"]["skip"]), ["dina"])
+check("a skipped account that fails the benchmark is marked bad", s["aging"]["inactive"]["skip"][0]["bad"], True)
 check("locked account untouched", [u for k in ("max", "warn", "inactive") for u in
                                     [x["user"] for x in s["aging"][k]["fix"] + s["aging"][k]["skip"]]
                                     if u == "fred"], [])
@@ -173,10 +175,16 @@ check("state unlimited", scan.password_state(TODAY - 9000, 99999, 45, TODAY), "o
 # ---- login.defs and useradd defaults
 s = run({"/etc/login.defs": LOGIN_DEFS.replace("99999\nPASS_MIN", "90\nPASS_MIN").replace("UMASK 022", "UMASK 0027")
          .replace("SHA512", "MD5"), "/etc/default/useradd": "INACTIVE=30\n"})
-check("stricter max ok", s["defaults"]["max"], {"value": "90", "ok": True})
+check("stricter max ok, still to be written", s["defaults"]["max"], {"value": "90", "ok": True, "fix": True})
 check("umask 0027 ok", s["defaults"]["umask"]["ok"], True)
 check("md5 not ok", s["defaults"]["encrypt"]["ok"], False)
-check("inactive 30 ok", s["defaults"]["inactive"], {"value": 30, "ok": True})
+check("inactive 30 ok, still to be written", s["defaults"]["inactive"], {"value": 30, "ok": True, "fix": True})
+s = run({"/etc/login.defs": LOGIN_DEFS.replace("99999\nPASS_MIN", "365\nPASS_MIN"), "/etc/default/useradd": "INACTIVE=45\n"})
+check("value equal to the configured one is not written", [s["defaults"]["max"]["fix"], s["defaults"]["inactive"]["fix"]], [False, False])
+s = run({}, params={"umask": "0077", "encrypt_method": "YESCRYPT", "max_days": 90})
+check("configured umask differs", s["defaults"]["umask"]["fix"], True)
+check("configured hash is wanted", s["defaults"]["encrypt"]["want"], "YESCRYPT")
+check("configured maximum differs", s["defaults"]["max"]["fix"], True)
 s = run({"/etc/pam.d/system-auth": "password sufficient pam_unix.so yescrypt shadow use_authtok\n",
          "/etc/login.defs": LOGIN_DEFS.replace("SHA512", "DES")})
 check("hash follows pam yescrypt", s["defaults"]["encrypt"]["want"], "YESCRYPT")
@@ -253,6 +261,32 @@ check("root unknown effective, one file missing: append to both", s["root_umask"
 s = run({"/root/.bash_profile": "if true; then umask 002; fi # c\n"}, params={"effective_umask": "0002"})
 check("root replace keeps the rest of the line", [x["new"] for x in s["root_umask"]["replace"]],
       ["if true; then umask 027; fi # c"])
+
+# ---- the configured values (what the fix writes exactly, a stricter value included)
+s = run({OWN: "if [ -n \"$PS1\" ]; then\n  typeset -xr TMOUT=600\nfi\n"})
+check("tmout own block with another compliant value is rewritten", (s["tmout"]["state"], s["tmout"]["need_block"]),
+      ("ok", True))
+s = run({OWN: "if [ -n \"$PS1\" ]; then\n  typeset -xr TMOUT=600\nfi\n"}, params={"tmout": 600})
+check("tmout own block equal to the configured value stays", s["tmout"]["need_block"], False)
+s = run({OWN: "umask 027\n"}, params={"umask": "0077"})
+check("own umask differing from the configured one is rewritten", (s["umask"]["state"], s["umask"]["need_block"]),
+      ("ok", True))
+s = run({"/root/.bash_profile": "umask 077\n", "/root/.bashrc": "umask 027\n"}, params={"umask": "0077"})
+check("root statement that is not the configured umask is rewritten",
+      [(x["path"], x["new"]) for x in s["root_umask"]["replace"]], [("/root/.bashrc", "umask 0077")])
+check("root umask fix flag", s["root_umask"]["fix"], True)
+s = run({"/root/.bash_profile": "umask 027\n", "/root/.bashrc": "umask 027\n"}, params={"effective_umask": "0027"})
+check("root umask nothing to fix", s["root_umask"]["fix"], False)
+s = run({}, params={"expect": {"max_days_max": 90}})
+check("benchmark limits come from the expect parameter", s["defaults"]["max"]["ok"], False)
+scan.configure({})
+scan.MAX_DAYS_LIMIT = 365
+
+# ---- a configured value that is itself weaker than the benchmark: written once, then left alone
+s = run({"/etc/login.defs": LOGIN_DEFS.replace("99999\nPASS_MIN", "730\nPASS_MIN")}, params={"max_days": 730})
+check("weak configured value already held: nothing to write", s["defaults"]["max"], {"value": "730", "ok": False, "fix": False})
+check("weak configured value is reported", s["target_ok"]["max"], False)
+check("compliant configured value is not", s["target_ok"]["warn"], True)
 
 # ---- root's PATH
 d = tempfile.mkdtemp()

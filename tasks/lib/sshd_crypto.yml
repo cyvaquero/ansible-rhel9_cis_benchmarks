@@ -7,7 +7,12 @@
 #   cis_sc_kind    the crypto policy check that fixes it (see tasks/lib/crypto_policy.yml)
 #   cis_sc_module  the policy module that fixes it
 #   cis_sc_body    the text of the role's own module, or empty for a shipped one
-# and puts the tags, which every task here inherits, on the import.
+#   cis_sc_enforce optional, default false (change the policy only when a weak algorithm is
+#                  offered). true: the policy holds the module whether or not a weak algorithm
+#                  is offered, as 1.6 does (cis_cp_enforce of tasks/lib/crypto_policy.yml)
+# and puts the tags, which every task here inherits, on the import. cis_sc_weak is the list the
+# benchmark forbids (a role constant, cis_expect_sshd_weak_*); the module and its text are the
+# variables of 1.6 (cis_crypto_policy_*), so 5.1.5 to 5.1.7 and 1.6.2 to 1.6.4 hold one policy.
 #
 # On RHEL 9 sshd takes its algorithm lists from the system crypto policy, through the
 # back-end file that /etc/ssh/sshd_config.d/50-redhat.conf includes, so the fix is the
@@ -62,9 +67,10 @@
     cis_cp_kind: "{{ cis_sc_kind }}"
     cis_cp_module: "{{ cis_sc_module }}"
     cis_cp_pmod_body: "{{ cis_sc_body | default('') }}"
+    cis_cp_enforce: "{{ cis_sc_enforce | default(false) | bool }}"
   when:
     - not (cis_audit_only | bool)
-    - "'state=bad' in cis_sc_check.stdout_lines"
+    - "'state=bad' in cis_sc_check.stdout_lines or (cis_sc_enforce | default(false) | bool)"
 
 - name: "{{ cis_sc_id ~ ' - Check the algorithms sshd offers again after the fix' }}"
   ansible.builtin.command:
@@ -76,7 +82,7 @@
   when:
     - not (cis_audit_only | bool)
     - not ansible_check_mode
-    - "'state=bad' in cis_sc_check.stdout_lines"
+    - "'state=bad' in cis_sc_check.stdout_lines or (cis_sc_enforce | default(false) | bool)"
 
 - name: "{{ cis_sc_id ~ ' - Report an algorithm that the crypto policy does not remove' }}"
   ansible.builtin.debug:

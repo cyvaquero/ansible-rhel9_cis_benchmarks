@@ -8,10 +8,10 @@
   vars:
     cis_sd_id: "5.1.10"
     cis_sd_options:
-      - spec: "clientaliveinterval|pos|"
+      - spec: "clientaliveinterval|pos||{{ cis_sshd_client_alive_interval }}"
         directive: "ClientAliveInterval"
         value: "{{ cis_sshd_client_alive_interval }}"
-      - spec: "clientalivecountmax|pos|"
+      - spec: "clientalivecountmax|pos||{{ cis_sshd_client_alive_count_max }}"
         directive: "ClientAliveCountMax"
         value: "{{ cis_sshd_client_alive_count_max }}"
   tags:

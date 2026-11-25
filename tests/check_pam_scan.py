@@ -256,6 +256,31 @@ fake_authselect(root, renders={})
 res = scan.guard("custom/none", [])
 check("guard cannot render", (res["ok"], any("cannot render" in p for p in res["problems"])), (False, True))
 
+# 5. The site's configured values ("want"): a compliant value that differs has to be written, a
+# value that equals the configured one (a weaker one included) needs no write, limits come from
+# "expect", and the flags can be switched off.
+CFG = {"expect": {"deny_min": "1", "deny_max": "5", "unlock_min": "900", "minlen_min": "14"},
+       "want": {"deny": 4, "unlock_time": 900, "even_deny_root": "False", "minlen": 16, "dictcheck": 1,
+                "pwquality_enforce_for_root": True, "pwhistory_enforce_for_root": False, "remember": 24, "hash": "yescrypt"}}
+root = tree(GOOD, faillock="deny = 3\nunlock_time = 900\neven_deny_root\n", pwhistory="remember = 24\nenforce_for_root\n",
+            pwq_d={"zz-cis-rhel9.conf": PWQ_GOOD})
+fake_authselect(root, current="custom/cis-rhel9 with-faillock with-pwhistory without-nullok")
+res = scan.state("cis-rhel9", CFG)
+v = res["verdict"]
+check("deny 3 is compliant, not the configured 4", (v["5.3.3.1.1"]["state"], v["5.3.3.1.1"]["conf_fix"]), ("ok", True))
+check("unlock_time equals the configured value", (v["5.3.3.1.2"]["state"], v["5.3.3.1.2"]["conf_fix"]), ("ok", False))
+check("even_deny_root wanted off", (v["5.3.3.1.3"]["state"], v["5.3.3.1.3"]["conf_fix"]), ("ok", True))
+check("minlen from the pwquality file is not the configured 16", v["5.3.3.2.2"]["conf_fix"], True)
+check("no dictcheck counts as 1", (v["5.3.3.2.6"]["state"], v["5.3.3.2.6"]["conf_fix"]), ("ok", False))
+check("enforce_for_root wanted and set", v["5.3.3.2.7"]["conf_fix"], False)
+check("pwhistory enforce_for_root wanted off", (v["5.3.3.3.2"]["state"], v["5.3.3.3.2"]["conf_fix"]), ("ok", True))
+check("remember equals the configured value", v["5.3.3.3.1"]["conf_fix"], False)
+check("sha512 on the line is not the configured yescrypt", (v["5.3.3.4.3"]["state"], v["5.3.3.4.3"]["pam_fix"]), ("ok", True))
+check("the verdicts without a config have the fix flags of the benchmark", scan.state("cis-rhel9")["verdict"]["5.3.3.1.1"]["conf_fix"], False)
+# Limits from "expect": a minlen of 14 fails a benchmark of 20.
+res = scan.state("cis-rhel9", {"expect": {"minlen_min": 20}})
+check("expect overrides the built-in limit", res["verdict"]["5.3.3.2.2"]["state"], "bad")
+
 if failures:
     print("\n".join(failures))
     sys.exit(1)

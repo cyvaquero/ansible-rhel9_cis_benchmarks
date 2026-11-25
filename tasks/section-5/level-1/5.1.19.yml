@@ -7,7 +7,7 @@
   vars:
     cis_sd_id: "5.1.19"
     cis_sd_options:
-      - spec: "maxsessions|num|10"
+      - spec: "maxsessions|num|{{ cis_expect_sshd_max_sessions_max }}|{{ cis_sshd_max_sessions }}"
         directive: "MaxSessions"
         value: "{{ cis_sshd_max_sessions }}"
   tags:

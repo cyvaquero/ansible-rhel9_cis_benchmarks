@@ -7,7 +7,7 @@
   vars:
     cis_sd_id: "5.1.17"
     cis_sd_options:
-      - spec: "maxauthtries|num|4"
+      - spec: "maxauthtries|num|{{ cis_expect_sshd_max_auth_tries_max }}|{{ cis_sshd_max_auth_tries }}"
         directive: "MaxAuthTries"
         value: "{{ cis_sshd_max_auth_tries }}"
   tags:

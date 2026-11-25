@@ -1,20 +1,22 @@
 ---
-# 5.1.5 - sshd must not offer a weak cipher (the CBC family and the arcfour family). Fixed
-# through the crypto policy with the role's own CIS-NO-SSHCBC module, the same one 1.6.4 adds
-# (keep the two module texts identical). chacha20-poly1305 is the manual 1.6.5.
+# 5.1.5 - sshd must not offer a weak cipher (the CBC family and the arcfour family, the constant
+# cis_expect_sshd_weak_ciphers). Fixed through the crypto policy with the role's own module, the same
+# one 1.6.4 adds (the module name and the excluded patterns are the variables of 1.6.4; keep the
+# two module texts identical). The policy holds the module exactly as configured, as 1.6.4 does.
+# chacha20-poly1305 is the manual 1.6.5.
 
 - name: "5.1.5 - Ensure sshd Ciphers are configured"
   ansible.builtin.import_tasks: ../../lib/sshd_crypto.yml
   vars:
     cis_sc_id: "5.1.5"
     cis_sc_key: "ciphers"
-    cis_sc_weak: >-
-      3des-cbc blowfish-cbc cast128-cbc aes128-cbc aes192-cbc aes256-cbc arcfour arcfour128 arcfour256 rijndael-cbc@lysator.liu.se
+    cis_sc_weak: "{{ cis_expect_sshd_weak_ciphers }}"
     cis_sc_kind: "sshcbc"
-    cis_sc_module: "CIS-NO-SSHCBC"
+    cis_sc_enforce: true
+    cis_sc_module: "{{ cis_crypto_policy_module_sshcbc }}"
     cis_sc_body: |
       # Added by the CIS RHEL 9 role: drop CBC ciphers for SSH.
-      cipher@SSH = -*-CBC
+      cipher@SSH = {{ cis_crypto_policy_ssh_ciphers_excluded | map('regex_replace', '^', '-') | join(' ') }}
   tags:
     - "5.1.5"
     - section-5

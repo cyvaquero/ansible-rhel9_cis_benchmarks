@@ -1,9 +1,11 @@
 ---
-# 5.3.3.1.3 - Level 2. The root account is locked out like the others: even_deny_root is set in
-# /etc/security/faillock.conf (or root_unlock_time, which implies it), and a root_unlock_time that
-# is set is 0 or at least 60. A root_unlock_time below 60 is replaced by cis_faillock_root_unlock_time
-# (60 by default); one is never added when none is set. A root_unlock_time= argument on a pam_faillock
-# line with a value below 60 is removed from the templates of the role's own authselect profile.
+# 5.3.3.1.3 - Level 2. The root account is locked out like the others (the benchmark): even_deny_root is
+# set in /etc/security/faillock.conf (or root_unlock_time, which implies it), and a root_unlock_time that
+# is set is 0 or at least 60. The fix keeps even_deny_root in the file as cis_faillock_even_deny_root
+# says (false removes the line, and the control is a finding unless root_unlock_time is set) and
+# rewrites a root_unlock_time that is set to cis_faillock_root_unlock_time, also when it is
+# compliant; one is never added when none is set. A root_unlock_time= argument on a pam_faillock
+# line that differs is removed from the templates of the role's own authselect profile.
 # Lockout risk: root can be locked out of password logins, so keep a console or sudo account.
 # The logic is in tasks/lib/pam_setting.yml.
 
@@ -15,10 +17,11 @@
       - path: /etc/security/faillock.conf
         regexp: '^\s*even_deny_root\b'
         line: 'even_deny_root'
+        state: "{{ 'present' if cis_faillock_even_deny_root | bool else 'absent' }}"
       - path: /etc/security/faillock.conf
         regexp: '^\s*root_unlock_time\s*='
         line: 'root_unlock_time = {{ cis_faillock_root_unlock_time }}'
-        skip: '{{ cis_pam.verdict[''5.3.3.1.3''].detail | default([]) | select(''match'', ''^root_unlock_time '') | list | length == 0 }}'
+        skip: "{{ not (cis_pam.verdict['5.3.3.1.3'].root_unlock_set | default(false) | bool) }}"
     cis_ps_header: ''
     cis_ps_tmpl:
       - re: '(^[ \t]*[a-z]+[ \t]+[^\n#]*?\bpam_faillock\.so\b[^\n#]*?)[ \t]+root_unlock_time=\S*'

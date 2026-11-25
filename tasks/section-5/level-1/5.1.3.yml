@@ -1,7 +1,7 @@
 ---
 # 5.1.3 - SSH private host keys are owned by root, and are either group root with no group or
-# other access, or group ssh_keys with group read at most. The logic is shared in
-# tasks/lib/sshd_files.yml.
+# other access, or group ssh_keys with group read at most (the benchmark). The fix gives them exactly
+# cis_sshd_private_key_owner, _group and _mode. The logic is shared in tasks/lib/sshd_files.yml.
 
 - name: "5.1.3 - Ensure access to SSH private host key files is configured"
   ansible.builtin.import_tasks: ../../lib/sshd_files.yml
