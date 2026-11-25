@@ -13,6 +13,37 @@
       - "{{ lookup('ansible.builtin.file', role_path ~ '/files/pam_scan.py') }}"
       - state
       - "{{ cis_authselect_profile }}"
+      - "{{ cis_pam_cfg | to_json }}"
+  vars:
+    # The benchmark limits the verdicts judge against (role constants) and what the site
+    # configured (the cis_* variables), which the fix flags (conf_fix, pam_fix) are judged against.
+    cis_pam_cfg:
+      expect:
+        deny_min: "{{ cis_expect_faillock_deny_min | int }}"
+        deny_max: "{{ cis_expect_faillock_deny_max | int }}"
+        unlock_min: "{{ cis_expect_faillock_unlock_time_min | int }}"
+        root_unlock_min: "{{ cis_expect_faillock_root_unlock_time_min | int }}"
+        difok_min: "{{ cis_expect_pwquality_difok_min | int }}"
+        minlen_min: "{{ cis_expect_pwquality_minlen_min | int }}"
+        maxrepeat_max: "{{ cis_expect_pwquality_maxrepeat_max | int }}"
+        maxsequence_max: "{{ cis_expect_pwquality_maxsequence_max | int }}"
+        remember_min: "{{ cis_expect_pwhistory_remember_min | int }}"
+        hashes: "{{ cis_expect_pam_hash_algorithms }}"
+      want:
+        deny: "{{ cis_faillock_deny | int }}"
+        unlock_time: "{{ cis_faillock_unlock_time | int }}"
+        root_unlock_time: "{{ cis_faillock_root_unlock_time | int }}"
+        even_deny_root: "{{ cis_faillock_even_deny_root | bool }}"
+        difok: "{{ cis_pwquality_difok | int }}"
+        minlen: "{{ cis_pwquality_minlen | int }}"
+        maxrepeat: "{{ cis_pwquality_maxrepeat | int }}"
+        maxsequence: "{{ cis_pwquality_maxsequence | int }}"
+        dictcheck: "{{ cis_pwquality_dictcheck | int }}"
+        pwquality_enforce_for_root: "{{ cis_pwquality_enforce_for_root | bool }}"
+        remember: "{{ cis_pwhistory_remember | int }}"
+        pwhistory_enforce_for_root: "{{ cis_pwhistory_enforce_for_root | bool }}"
+        hash: "{{ cis_password_hash | lower }}"
+      owned_pwquality: "{{ cis_pwquality_dropin }}"
   register: cis_pam_read
   changed_when: false
   check_mode: false

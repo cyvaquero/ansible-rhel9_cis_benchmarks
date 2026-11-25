@@ -8,6 +8,88 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.36]
+
+### Changed
+
+- Section 5: every value a control writes or expects now comes from an overridable role variable
+  whose default is the benchmark value (`defaults/main.yml`, grouped by control ID), the same way
+  as in sections 1 to 4. This completes #58 for sections 1 to 5. New variables cover the owner,
+  group and mode of the SSH config files, keys and folder (`cis_sshd_config_*`,
+  `cis_sshd_private_key_*`, `cis_sshd_public_key_*`, 5.1.1 to 5.1.4), the `Banner` file
+  (`cis_sshd_banner`, 5.1.9), the yes/no sshd settings (`cis_sshd_disable_forwarding`,
+  `_gssapi_authentication`, `_hostbased_authentication`, `_ignore_rhosts`,
+  `_permit_empty_passwords`, `_permit_user_environment`, `_use_pam`, 5.1.11 to 5.1.23) and
+  `PermitRootLogin` (`cis_sshd_permit_root_login`, 5.1.21), whether `sudo`, `pam`, `authselect` and
+  `libpwquality` are installed (`cis_sudo_installed`, `cis_pam_installed`,
+  `cis_authselect_installed`, `cis_libpwquality_installed`, 5.2.1 and 5.3.1.1 to 5.3.1.3), the
+  sudoers owner, group and modes (`cis_sudoers_*`, 5.2.2, 5.2.3 and the role's own file), the
+  sudo `Defaults` (`cis_sudo_use_pty`, `_pwfeedback`, `_visiblepw`, `_timestamp_type`, 5.2.4,
+  5.2.8, 5.2.9, 5.2.11), `cis_pwquality_dictcheck`, `cis_faillock_even_deny_root`,
+  `cis_pwquality_enforce_for_root` and `cis_pwhistory_enforce_for_root` (5.3.3.1.3, 5.3.3.2.6,
+  5.3.3.2.7, 5.3.3.3.2) and the password hashing algorithm (`cis_password_hash`, with
+  `cis_encrypt_method`, 5.3.3.4.3 and 5.4.1.4). The existing section 5 variables keep their names
+  and meaning. Overriding a value changes what the role writes; the checks still judge the
+  benchmark value, kept as `cis_expect_*` constants in `vars/main.yml` (the weak ciphers, MACs and
+  key exchanges of 5.1.5 to 5.1.7 included), so a weaker value is written and reported as a
+  finding on every run. The fix now enforces the configured value exactly: it changes the host
+  whenever the host differs from the variable, also when the host is stricter than the benchmark.
+  A package variable set to `true` only installs (or upgrades to the benchmark minimum) and `false`
+  removes the package when no other installed package needs it (`sudo` is also kept while the role
+  becomes root with it and is not connected as root). The lockout guards are unchanged and no
+  variable bypasses them: `sshd -t` before any reload, the sshd access list guard (5.1.8), the
+  `PermitRootLogin` guard (5.1.21), the authselect and PAM guards (5.3), the su and sudo guards
+  (5.2) and the accounts the role never locks or gives a nologin shell (5.4). Behavior changes
+  with the default values (a host that already holds the benchmark values everywhere changes
+  nothing else):
+  - 5.1.1 to 5.1.4 set the exact mode: `sshd_config` and its `.conf` files 0600 (0400 becomes
+    0600), the folder 0700, public host keys 0644 and private host keys `root:root` 0600, so the
+    RHEL 9 stock `root:ssh_keys` 0640 private keys become `root:root` 0600.
+  - 5.1.5 to 5.1.7 hold the crypto policy modules of 1.6.2 to 1.6.4 whether or not sshd offers a
+    weak algorithm (the same as 1.6).
+  - 5.1.9 sets `Banner` to `/etc/issue.net` also when another compliant file is set.
+  - 5.1.10 sets `ClientAliveInterval 15` over the RHEL 9 default of 180, and the other sshd
+    values (`LoginGraceTime` 60, `LogLevel INFO`, `MaxAuthTries` 4, `MaxStartups` 10:30:60,
+    `MaxSessions` 10) are written over any other compliant value, a stricter one included
+    (`MaxAuthTries` 2 becomes 4); `DisableForwarding`, `GSSAPIAuthentication`,
+    `HostbasedAuthentication`, `IgnoreRhosts`, `PermitEmptyPasswords`, `PermitUserEnvironment` and
+    `UsePAM` are written when they differ from the variable.
+  - 5.2.2 and 5.2.3 set sudoers files to 0440 and `/etc/sudoers.d` to 0750 (0400 and 0700 are
+    replaced); the role's own sudoers file takes the same mode.
+  - 5.2.5 replaces a sudo log file path the site set with `/var/log/sudo.log`; 5.2.10 writes
+    `timestamp_timeout=15` over no line (sudo's default of 5) and over a value from 0 to 14, and
+    5.2.11 replaces `ppid` and `kernel` with `tty`.
+  - 5.2.12 rewrites a `pam_wheel` line that names another group to `sugroup` and creates it.
+  - 5.3.3.1.1 and 5.3.3.1.2 write `deny = 5` and `unlock_time = 900` over other compliant values
+    (a `deny` of 3, an `unlock_time` of 0 or 1800); 5.3.3.1.3 rewrites a `root_unlock_time` that
+    is set to 60; 5.3.3.2.x write `difok = 2`, `minlen = 14`, `maxrepeat = 3` and `maxsequence = 3`;
+    5.3.3.3.1 writes `remember = 24`; a PAM argument that differs from these is removed from the
+    templates of the role's own authselect profile.
+  - 5.3.3.4.3 makes `sha512` the only hashing algorithm on the `pam_unix` password line of the
+    role's own authselect profile (`yescrypt` becomes `sha512`) and 5.4.1.4 sets `ENCRYPT_METHOD`
+    to `SHA512`, no longer following a `yescrypt` line.
+  - 5.4.1.1, 5.4.1.3 and 5.4.1.5 set `PASS_MAX_DAYS` 365, `PASS_WARN_AGE` 7 and the inactive
+    period 45 in `login.defs`, in the useradd default and on every account with a password hash
+    whose value differs, a stricter value included (a maximum of 90 becomes 365, an inactive period
+    of 30 becomes 45); an account whose password would expire is still skipped and reported.
+  - 5.4.2.6 and 5.4.3.3 write `027` over a stricter umask (`077`), and 5.4.3.2 and 5.4.3.4
+    rewrite their block in the role's own profile file when its value is not the variable.
+  Preflight now validates only the type and format of the section 5 variables, never the
+  benchmark's bounds: a `LoginGraceTime` of 0 or above 60, `MaxAuthTries` above 4, `MaxSessions`
+  above 10, any `MaxStartups` of the form `start:rate:full`, any `LogLevel` sshd knows, a
+  `cis_sudo_timestamp_timeout` of any whole number, a sudo `timestamp_type` of `global`, PAM values
+  outside the benchmark's ranges, `PASS_MAX_DAYS`, `PASS_WARN_AGE`, `INACTIVE` and `TMOUT`
+  outside the benchmark's limits and an umask looser than 027 used to stop the run and are now
+  accepted (written and reported as findings). It still stops the run on a value sshd or the tools
+  would not take or that would lock the role out (`MaxSessions` or a ClientAlive value of 0), and on
+  a `cis_encrypt_method` that does not agree with `cis_password_hash`, which the role would
+  otherwise rewrite against the `pam_unix` line on every run. The README has tables for
+  section 5. The shared `tasks/lib/` helpers `sshd_option.yml`, `sshd_files.yml`,
+  `sshd_crypto.yml`, `sudo_default.yml`, `package_min_version.yml` and `pam_setting.yml`, and the
+  scanners `files/sudoers_scan.py`, `files/pam_scan.py` and `files/accounts_scan.py`, take the
+  configured value through new optional parameters; without them they behave as before. #58 is
+  complete for sections 1 to 5.
+
 ## [3.0.0_0.0.35]
 
 ### Changed

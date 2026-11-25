@@ -223,4 +223,92 @@ cis_expect_firewalld_log_denied_forbidden: "off"
 # 4.1.11: the zone target the control applies to, and whether the ICMP types are blocked.
 cis_expect_firewalld_icmp_zone_target: default
 cis_expect_firewalld_icmp_blocked: true
+
+# Section 5: the benchmark values the checks judge against (constants, as in sections 1 to 4).
+# What the role writes comes from the cis_* variables in defaults/main.yml.
+
+# 5.1.1 to 5.1.4: the owner and group the SSH files must have, and the permission bits they must
+# not have (octal). A private host key may instead be in cis_expect_sshd_key_alt_group with
+# the bits of cis_expect_sshd_private_key_alt_forbidden_bits forbidden.
+cis_expect_sshd_file_owner: root
+cis_expect_sshd_file_group: root
+cis_expect_sshd_key_alt_group: ssh_keys
+cis_expect_sshd_config_forbidden_bits: "0177"
+cis_expect_sshd_dir_forbidden_bits: "0077"
+cis_expect_sshd_private_key_forbidden_bits: "0177"
+cis_expect_sshd_private_key_alt_forbidden_bits: "0137"
+cis_expect_sshd_public_key_forbidden_bits: "0133"
+
+# 5.1.5 to 5.1.7: the algorithms sshd must not offer (separated by spaces).
+cis_expect_sshd_weak_ciphers: >-
+  3des-cbc blowfish-cbc cast128-cbc aes128-cbc aes192-cbc aes256-cbc arcfour arcfour128
+  arcfour256 rijndael-cbc@lysator.liu.se
+cis_expect_sshd_weak_macs: >-
+  hmac-md5 hmac-md5-96 hmac-ripemd160 hmac-sha1-96 umac-64@openssh.com
+  hmac-md5-etm@openssh.com hmac-md5-96-etm@openssh.com hmac-ripemd160-etm@openssh.com
+  hmac-sha1-96-etm@openssh.com umac-64-etm@openssh.com
+cis_expect_sshd_weak_kex: >-
+  diffie-hellman-group1-sha1 diffie-hellman-group14-sha1 diffie-hellman-group-exchange-sha1
+
+# 5.1.10 to 5.1.23: the effective sshd values the benchmark wants (compared without regard to
+# case), and the most a limit may be. ClientAliveInterval and ClientAliveCountMax only have to
+# be above zero.
+cis_expect_sshd_disable_forwarding: "yes"
+cis_expect_sshd_gssapi_authentication: "no"
+cis_expect_sshd_hostbased_authentication: "no"
+cis_expect_sshd_ignore_rhosts: "yes"
+cis_expect_sshd_login_grace_time_max: 60
+cis_expect_sshd_log_levels: "verbose,info"
+cis_expect_sshd_max_auth_tries_max: 4
+cis_expect_sshd_max_startups: "10:30:60"
+cis_expect_sshd_max_sessions_max: 10
+cis_expect_sshd_permit_empty_passwords: "no"
+cis_expect_sshd_permit_root_login: "no"
+cis_expect_sshd_permit_user_environment: "no"
+cis_expect_sshd_use_pam: "yes"
+
+# 5.2: the sudo settings the benchmark wants (sudo itself must be installed). The Defaults flags and values are judged on the
+# effective sudoers configuration; timestamp_timeout may be at most the given minutes (0 and no
+# line pass), timestamp_type may be anything but the forbidden one.
+cis_expect_sudo_use_pty: true
+cis_expect_sudo_pwfeedback: false
+cis_expect_sudo_visiblepw: false
+cis_expect_sudo_timestamp_timeout_max: 15
+cis_expect_sudo_timestamp_type_forbidden: global
+cis_expect_sudoers_owner: root
+cis_expect_sudoers_group: root
+cis_expect_sudoers_forbidden_bits: "0337"
+cis_expect_sudoers_dir_forbidden_bits: "0027"
+
+# 5.3.1: the least version-release of each package (each must be installed).
+cis_expect_pam_min_version: "1.5.1-14"
+cis_expect_authselect_min_version: "1.2.6-1"
+cis_expect_libpwquality_min_version: "1.4.4-8"
+
+# 5.3.3: the limits of the PAM settings (the range each value may have), and the hashing
+# algorithms pam_unix may name.
+cis_expect_faillock_deny_min: 1
+cis_expect_faillock_deny_max: 5
+cis_expect_faillock_unlock_time_min: 900
+cis_expect_faillock_root_unlock_time_min: 60
+cis_expect_pwquality_difok_min: 2
+cis_expect_pwquality_minlen_min: 14
+cis_expect_pwquality_maxrepeat_max: 3
+cis_expect_pwquality_maxsequence_max: 3
+cis_expect_pwhistory_remember_min: 24
+cis_expect_pam_hash_algorithms: [sha512, yescrypt]
+
+# 5.3.3.4.3: the hashing algorithms pam_unix accepts as an argument, so the fix can leave only the
+# configured one (cis_password_hash) on the password line. Not benchmark values.
+cis_pam_unix_hash_names: [md5, bigcrypt, sha256, sha512, blowfish, yescrypt, gost_yescrypt]
+
+# 5.4: the limits of the account settings. cis_expect_umask is the loosest umask that passes
+# (027: no more than it allows); the TMOUT limit is in seconds.
+cis_expect_pass_max_days_max: 365
+cis_expect_pass_warn_age_min: 7
+cis_expect_pass_min_days_min: 1
+cis_expect_inactive_days_max: 45
+cis_expect_umask: "027"
+cis_expect_tmout_max: 900
+cis_expect_encrypt_methods: [SHA512, YESCRYPT]
 ...

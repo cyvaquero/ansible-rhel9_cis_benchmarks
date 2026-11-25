@@ -1,8 +1,11 @@
 ---
-# 5.3.3.4.3 - The pam_unix password line of system-auth and password-auth names sha512 or yescrypt. In
-# the templates of the role's own authselect profile the weak algorithms (md5, bigcrypt, sha256,
-# blowfish) are removed and sha512 is added when no strong one is named (sha512, which FIPS mode
-# allows, is the RHEL 9 default); on any other profile it is a finding.
+# 5.3.3.4.3 - The pam_unix password line of system-auth and password-auth names sha512 or yescrypt
+# (the benchmark, cis_expect_pam_hash_algorithms). The fix makes it name exactly cis_password_hash:
+# in the templates of the role's own authselect profile every other hashing algorithm is removed
+# from the line and the configured one is added when it is missing (a line with yescrypt, or with a
+# weaker one, becomes sha512 with the default); on any other profile a line that differs is not
+# changed and, when it fails the benchmark, is a finding. 5.4.1.4 writes the same algorithm to
+# login.defs.
 # The logic is in tasks/lib/pam_setting.yml.
 
 - name: "5.3.3.4.3 - Ensure pam_unix includes a strong password hashing algorithm"
@@ -11,17 +14,16 @@
     cis_ps_id: "5.3.3.4.3"
     cis_ps_conf: []
     cis_ps_header: ''
-    cis_ps_tmpl:
-      - re: '(^[ \t]*password[ \t]+[^\n#]*?\bpam_unix\.so\b[^\n#]*?)[ \t]+md5\b'
-        to: '\1'
-      - re: '(^[ \t]*password[ \t]+[^\n#]*?\bpam_unix\.so\b[^\n#]*?)[ \t]+bigcrypt\b'
-        to: '\1'
-      - re: '(^[ \t]*password[ \t]+[^\n#]*?\bpam_unix\.so\b[^\n#]*?)[ \t]+sha256\b'
-        to: '\1'
-      - re: '(^[ \t]*password[ \t]+[^\n#]*?\bpam_unix\.so\b[^\n#]*?)[ \t]+blowfish\b'
-        to: '\1'
-      - re: '^([ \t]*password[ \t]+\S+[ \t]+\S*pam_unix\.so)\b(?![^\n#]*[ \t](?:sha512|yescrypt)\b)'
-        to: '\1 sha512'
+    cis_ps_tmpl: >-
+      {%- set ns = namespace(items=[]) -%}
+      {%- set line = '(^[ \\t]*password[ \\t]+[^\\n#]*?\\bpam_unix\\.so\\b[^\\n#]*?)[ \\t]+' -%}
+      {%- for algo in cis_pam_unix_hash_names | difference([cis_password_hash | lower]) -%}
+      {%- set ns.items = ns.items + [{'re': line ~ algo ~ '\\b', 'to': '\\1'}] -%}
+      {%- endfor -%}
+      {%- set keep = (cis_password_hash | lower) -%}
+      {%- set head = '^([ \\t]*password[ \\t]+\\S+[ \\t]+\\S*pam_unix\\.so)\\b' -%}
+      {%- set ns.items = ns.items + [{'re': head ~ '(?![^\\n#]*[ \\t]' ~ keep ~ '\\b)', 'to': '\\1 ' ~ keep}] -%}
+      {{ ns.items }}
     cis_ps_feature: ''
   tags:
     - "5.3.3.4.3"

@@ -1,10 +1,10 @@
 ---
 # 5.4.1.5 - The inactive period. The useradd default (`useradd -D -f`, INACTIVE in
-# /etc/default/useradd) is from 0 to 45 days (the value the role writes is cis_inactive_days; a
-# shorter period already set is kept) and so is the inactive period of every account that has
-# a password hash, set with `chage --inactive`. Accounts without a hash are left alone. An
-# account whose password would be expired or inactive today with the new period is skipped and
-# reported, as for 5.4.1.1.
+# /etc/default/useradd) is from 0 to 45 days (the benchmark) and so is the inactive period of every
+# account that has a password hash. The fix makes both exactly cis_inactive_days (one variable
+# drives useradd and `chage --inactive`), a shorter period included. Accounts without a hash are
+# left alone. An account whose password would be expired or inactive today with the new period is
+# skipped and reported, as for 5.4.1.1.
 
 - name: "5.4.1.5 - Handle inactive password lock"
   tags:
@@ -24,7 +24,7 @@
       changed_when: true
       when:
         - not (cis_audit_only | bool)
-        - not cis_acct.defaults.inactive.ok
+        - cis_acct.defaults.inactive.fix | bool
 
     - name: "5.4.1.5 - Set the inactive days of accounts with a password"
       ansible.builtin.command:
@@ -54,6 +54,8 @@
         cis_finding_id: "5.4.1.5"
       when:
         - >-
-          cis_acct.aging.inactive.skip | length > 0
-          or (cis_audit_only | bool and (not cis_acct.defaults.inactive.ok or cis_acct.aging.inactive.fix | length > 0))
+          cis_acct.aging.inactive.skip | selectattr('bad') | list | length > 0
+          or not cis_acct.target_ok.inactive
+          or (cis_audit_only | bool and (not cis_acct.defaults.inactive.ok
+                                         or cis_acct.aging.inactive.fix | selectattr('bad') | list | length > 0))
 ...

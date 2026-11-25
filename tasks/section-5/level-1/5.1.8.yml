@@ -17,6 +17,9 @@
 #   and the control is a finding when nothing was in effect. A connection that is not SSH
 #   (for example local) passes the guard.
 # - Under --check nothing is fixed and, in remediate mode, nothing is recorded for a fix.
+# - The lists are the site's own setting and have no benchmark value to judge: the check is only
+#   whether some list is in effect. A list the role wrote earlier and the site has since
+#   emptied stays in the drop-in (an empty list leaves the directive alone).
 #
 # The check prints state=ok|bad|nosshd|unreadable, eff=yes|no (a list is in effect) and
 # allowed=yes|no|unknown (the guard).
@@ -151,9 +154,9 @@
         line: "# Managed by the CIS RHEL 9 role. Most sshd keywords take the first value read, so this file sorts first; MaxStartups takes the last."
         insertbefore: BOF
         create: true
-        owner: root
-        group: root
-        mode: "0600"
+        owner: "{{ cis_sshd_config_owner }}"
+        group: "{{ cis_sshd_config_group }}"
+        mode: "{{ cis_sshd_config_mode }}"
       when:
         - not (cis_audit_only | bool)
         - not cis_sshd_acc_nosshd | bool
@@ -167,9 +170,9 @@
         regexp: '(?i)^\s*{{ item.directive }}\s'
         line: "{{ item.directive }} {{ item.list | join(' ') }}"
         create: true
-        owner: root
-        group: root
-        mode: "0600"
+        owner: "{{ cis_sshd_config_owner }}"
+        group: "{{ cis_sshd_config_group }}"
+        mode: "{{ cis_sshd_config_mode }}"
         validate: /usr/sbin/sshd -t -f %s
       loop:
         - {directive: AllowUsers, list: "{{ cis_sshd_allow_users }}"}

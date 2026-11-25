@@ -1,7 +1,8 @@
 ---
 # 5.2.9 - sudo refuses to prompt where the password would show: visiblepw is not enabled by
-# an effective global line (no line is the default and passes), and no scoped line enables it.
-# A non-compliant line is overridden with `Defaults !visiblepw` in the role file. The logic is
+# an effective global line (no line is the default and passes), and no scoped line enables it
+# (the benchmark). The fix makes the effective value exactly cis_sudo_visiblepw, with
+# `Defaults visiblepw` or `Defaults !visiblepw` in the role file. The logic is
 # shared in tasks/lib/sudo_default.yml.
 
 - name: "5.2.9 - Ensure sudo visiblepw is configured"
@@ -9,7 +10,10 @@
   vars:
     cis_sdo_id: "5.2.9"
     cis_sdo_option: "visiblepw"
-    cis_sdo_line: '!visiblepw'
+    cis_sdo_line: "{{ 'visiblepw' if cis_sudo_visiblepw | bool else '!visiblepw' }}"
+    cis_sdo_cfg:
+      want: "{{ cis_sudo_visiblepw | bool }}"
+      expect: {visiblepw: "{{ cis_expect_sudo_visiblepw | bool }}"}
   tags:
     - "5.2.9"
     - section-5

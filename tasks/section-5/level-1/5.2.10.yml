@@ -1,7 +1,8 @@
 ---
-# 5.2.10 - the sudo credential cache lasts at most 15 minutes and is not disabled (a negative
-# value never expires). No line is the default of 5 minutes and passes; a value from 0 to 15,
-# however strict, is kept. Otherwise cis_sudo_timestamp_timeout is written. The logic is shared
+# 5.2.10 - the sudo credential cache lasts at most 15 minutes (cis_expect_sudo_timestamp_timeout_max)
+# and is not disabled (a negative value never expires). No line is the default of 5 minutes and
+# passes the benchmark; a value from 0 to 15 passes. The fix makes the effective value exactly
+# cis_sudo_timestamp_timeout (no line counts as 5), a stricter value included. The logic is shared
 # in tasks/lib/sudo_default.yml.
 
 - name: "5.2.10 - Ensure sudo timestamp_timeout is configured"
@@ -10,7 +11,9 @@
     cis_sdo_id: "5.2.10"
     cis_sdo_option: "timestamp_timeout"
     cis_sdo_line: 'timestamp_timeout={{ cis_sudo_timestamp_timeout }}'
-    cis_sdo_max: 15
+    cis_sdo_max: "{{ cis_expect_sudo_timestamp_timeout_max }}"
+    cis_sdo_cfg:
+      want: "{{ cis_sudo_timestamp_timeout | string }}"
   tags:
     - "5.2.10"
     - section-5

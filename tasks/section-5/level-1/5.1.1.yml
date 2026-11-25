@@ -1,6 +1,7 @@
 ---
 # 5.1.1 - /etc/ssh/sshd_config and the .conf files in /etc/ssh/sshd_config.d are owned by root:root
-# with no group or other access and no execute bit. The logic is shared in tasks/lib/sshd_files.yml.
+# with no group or other access and no execute bit (the benchmark; cis_expect_sshd_*). The fix gives
+# them exactly cis_sshd_config_owner, _group and _mode. The logic is shared in tasks/lib/sshd_files.yml.
 
 - name: "5.1.1 - Ensure access to /etc/ssh/sshd_config is configured"
   ansible.builtin.import_tasks: ../../lib/sshd_files.yml

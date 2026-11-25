@@ -7,9 +7,9 @@
   vars:
     cis_sd_id: "5.1.14"
     cis_sd_options:
-      - spec: "ignorerhosts|eq|yes"
+      - spec: "ignorerhosts|eq|{{ cis_expect_sshd_ignore_rhosts }}|{{ 'yes' if cis_sshd_ignore_rhosts | bool else 'no' }}"
         directive: "IgnoreRhosts"
-        value: "yes"
+        value: "{{ 'yes' if cis_sshd_ignore_rhosts | bool else 'no' }}"
   tags:
     - "5.1.14"
     - section-5

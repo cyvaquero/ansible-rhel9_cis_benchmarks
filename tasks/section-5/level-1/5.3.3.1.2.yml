@@ -1,9 +1,8 @@
 ---
-# 5.3.3.1.2 - unlock_time is set in /etc/security/faillock.conf to 0 or at least 900 seconds
-# (the role writes cis_faillock_unlock_time, 900 by
-# default, when it is not); an unlock_time= argument on a
-# pam_faillock line with another value overrides the file and is removed from the templates of
-# the role's own authselect profile.
+# 5.3.3.1.2 - unlock_time is set in /etc/security/faillock.conf (the benchmark: 0 or at least 900 seconds).
+# The fix makes it exactly cis_faillock_unlock_time, also when the file holds another compliant value;
+# an unlock_time= argument on a pam_faillock line that differs from it overrides the file and is
+# removed from the templates of the role's own authselect profile.
 # The logic is in tasks/lib/pam_setting.yml.
 
 - name: "5.3.3.1.2 - Ensure password unlock time is configured"

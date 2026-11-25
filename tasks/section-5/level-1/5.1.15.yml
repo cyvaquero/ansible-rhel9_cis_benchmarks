@@ -8,7 +8,7 @@
   vars:
     cis_sd_id: "5.1.15"
     cis_sd_options:
-      - spec: "logingracetime|num|60"
+      - spec: "logingracetime|num|{{ cis_expect_sshd_login_grace_time_max }}|{{ cis_sshd_login_grace_time }}"
         directive: "LoginGraceTime"
         value: "{{ cis_sshd_login_grace_time }}"
   tags:

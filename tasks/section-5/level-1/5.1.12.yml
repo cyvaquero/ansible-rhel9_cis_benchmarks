@@ -8,9 +8,9 @@
   vars:
     cis_sd_id: "5.1.12"
     cis_sd_options:
-      - spec: "gssapiauthentication|eq|no"
+      - spec: "gssapiauthentication|eq|{{ cis_expect_sshd_gssapi_authentication }}|{{ 'yes' if cis_sshd_gssapi_authentication | bool else 'no' }}"
         directive: "GSSAPIAuthentication"
-        value: "no"
+        value: "{{ 'yes' if cis_sshd_gssapi_authentication | bool else 'no' }}"
   tags:
     - "5.1.12"
     - section-5

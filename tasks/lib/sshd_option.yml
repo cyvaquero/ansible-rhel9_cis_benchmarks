@@ -2,13 +2,18 @@
 # Shared logic for the sshd setting controls (5.1.9 to 5.1.23). A control file imports this
 # with:
 #   cis_sd_id       the CIS ID
-#   cis_sd_options  a list of {spec, directive, value}: spec is "name|kind|arg" (name: the
+#   cis_sd_options  a list of {spec, directive, value}: spec is "name|kind|arg|want" (name: the
 #                   keyword as sshd -T prints it, in lower case), directive and value are
 #                   what the fix writes. Kinds: eq (value equals arg, any case), num (a whole
 #                   number from 1 to arg), pos (a whole number above 0), oneof (one of the
 #                   comma separated words in arg), startups (MaxStartups, each of the three
 #                   numbers at most the matching one in arg), banner (a path to a file with no
-#                   login escapes and no OS name).
+#                   login escapes and no OS name). arg is the benchmark value (a role constant,
+#                   cis_expect_*) and judges the check. want is optional: the value the site
+#                   configured (the same as value, as sshd -T prints it, compared without regard
+#                   to case). When it is given the fix makes the effective value exactly want,
+#                   also when the benchmark check passes; without it the fix writes only when
+#                   the benchmark check fails (the older behavior).
 #   cis_sd_fix_ok   optional, default true: false stops the fix (a message says why)
 #   cis_sd_fix_msg  the message for that case
 # and puts the tags, which every task here inherits, on the import.
@@ -17,7 +22,7 @@
 # file, and also on `sshd -T -C` for the role's own connection (cis_sshd_ctx, set in
 # tasks/section-5/level-1.yml) so a Match block for that account is seen. A host without
 # sshd passes. A setting that is already compliant, wherever it comes from, is never
-# touched. The fix writes the one directive into the role's own drop-in cis_sshd_dropin
+# touched unless a want is given and the value differs from it. The fix writes the one directive into the role's own drop-in cis_sshd_dropin
 # (name sorts before 50-redhat.conf), validated with `sshd -t -f` before it is written, and
 # notifies the handler that checks the whole configuration with `sshd -t` and reloads sshd
 # only when it runs. A value set by another file still wins (for most keywords one read
@@ -48,6 +53,7 @@
         fi
         val() { printf '%s\n' "$1" | awk -v n="$2" '$1 == n { sub(/^[^ ]+ +/, ""); print; exit }'; }
         isnum() { case $1 in ''|*[!0-9]*) return 1 ;; esac; }
+        same() { [ "$(printf '%s' "$1" | tr 'A-Z' 'a-z')" = "$(printf '%s' "$2" | tr 'A-Z' 'a-z')" ]; }
         ok() {
           v=$(val "$1" "$2")
           case $3 in
@@ -73,15 +79,29 @@
             *) return 1 ;;
           esac
         }
-        res=$(printf '%s\n' "$specs" | while IFS='|' read -r name kind arg; do
+        # bad=<name>: the benchmark check fails; fix=<name>: the fix has to write it (the value
+        # differs from what the site wants; without a want, the check fails).
+        res=$(printf '%s\n' "$specs" | while IFS='|' read -r name kind arg want; do
           [ -n "$name" ] || continue
-          if ! ok "$base" "$name" "$kind" "$arg"; then echo "bad=$name"; continue; fi
-          if [ -n "$conn" ] && ! ok "$conn" "$name" "$kind" "$arg"; then echo "bad=$name"; fi
+          b=0
+          d=0
+          for src in "$base" "$conn"; do
+            [ -n "$src" ] || continue
+            if ! ok "$src" "$name" "$kind" "$arg"; then b=1; fi
+            if [ -n "$want" ] && ! same "$(val "$src" "$name")" "$want"; then d=1; fi
+          done
+          [ "$b" -eq 1 ] && echo "bad=$name"
+          if [ -n "$want" ]; then f=$d; else f=$b; fi
+          [ "$f" -eq 1 ] && echo "fix=$name"
         done)
         if [ -n "$res" ]; then
           printf '%s\n' "$res"
-          echo "state=bad"
-          exit 1
+          if printf '%s\n' "$res" | grep -q '^bad='; then
+            echo "state=bad"
+            exit 1
+          fi
+          echo "state=diff"
+          exit 0
         fi
         echo "state=ok"
       - sh
@@ -95,14 +115,14 @@
 - name: "{{ cis_sd_id ~ ' - Work out which sshd settings need a change' }}"
   ansible.builtin.set_fact:
     cis_sd_state: "{{ cis_sd_check.stdout_lines | select('match', '^state=') | first | default('state=unreadable') | regex_replace('^state=', '') }}"
-    cis_sd_bad: "{{ cis_sd_check.stdout_lines | select('match', '^bad=') | map('regex_replace', '^bad=', '') | list }}"
+    cis_sd_bad: "{{ cis_sd_check.stdout_lines | select('match', '^fix=') | map('regex_replace', '^fix=', '') | list }}"
 
 - name: "{{ cis_sd_id ~ ' - Report why the sshd settings are not changed' }}"
   ansible.builtin.debug:
     msg: "{{ cis_sd_fix_msg | default('The change is not made.') }}"
   when:
     - not (cis_audit_only | bool)
-    - cis_sd_state == 'bad'
+    - cis_sd_bad | length > 0
     - not (cis_sd_fix_ok | default(true) | bool)
 
 - name: "{{ cis_sd_id ~ ' - Write the managed header of the sshd drop-in' }}"
@@ -112,12 +132,12 @@
     line: "# Managed by the CIS RHEL 9 role. Most sshd keywords take the first value read, so this file sorts first; MaxStartups takes the last."
     insertbefore: BOF
     create: true
-    owner: root
-    group: root
-    mode: "0600"
+    owner: "{{ cis_sshd_config_owner }}"
+    group: "{{ cis_sshd_config_group }}"
+    mode: "{{ cis_sshd_config_mode }}"
   when:
     - not (cis_audit_only | bool)
-    - cis_sd_state == 'bad'
+    - cis_sd_bad | length > 0
     - cis_sd_fix_ok | default(true) | bool
 
 - name: "{{ cis_sd_id ~ ' - Set the sshd directives in the role drop-in' }}"
@@ -126,9 +146,9 @@
     regexp: '(?i)^\s*{{ item.directive }}\s'
     line: "{{ item.directive }} {{ item.value }}"
     create: true
-    owner: root
-    group: root
-    mode: "0600"
+    owner: "{{ cis_sshd_config_owner }}"
+    group: "{{ cis_sshd_config_group }}"
+    mode: "{{ cis_sshd_config_mode }}"
     validate: /usr/sbin/sshd -t -f %s
   loop: "{{ cis_sd_options }}"
   loop_control:
@@ -136,7 +156,7 @@
   notify: Reload sshd when running
   when:
     - not (cis_audit_only | bool)
-    - cis_sd_state == 'bad'
+    - cis_sd_bad | length > 0
     - cis_sd_fix_ok | default(true) | bool
     - item.spec.split('|')[0] in cis_sd_bad
 
@@ -150,7 +170,7 @@
   when:
     - not (cis_audit_only | bool)
     - not ansible_check_mode
-    - cis_sd_state == 'bad'
+    - cis_sd_state in ['bad', 'diff']
     - cis_sd_fix_ok | default(true) | bool
 
 - name: "{{ cis_sd_id ~ ' - Report a setting that another file overrides' }}"
@@ -163,19 +183,19 @@
       The role edits no file it does not own; change that file by hand.
   when:
     - cis_sd_recheck is not skipped
-    - "'state=ok' not in cis_sd_recheck.stdout_lines"
+    - cis_sd_recheck.stdout_lines | select('match', '^fix=') | list | length > 0
 
 # Audit mode, an unreadable configuration and a fix that is not allowed are real findings.
-# After a fix, a setting that is still not compliant is one too. Under --check the fix does
+# After a fix, a setting that does not meet the benchmark is one too (a site value that is weaker
+# than the benchmark, or one that another file overrides). Under --check the fix does
 # not happen, so remediate mode records nothing then.
 - name: "{{ cis_sd_id ~ ' - Record the finding' }}"
   ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
   vars:
     cis_finding_id: "{{ cis_sd_id }}"
   when:
-    - cis_sd_state in ['bad', 'unreadable']
     - >-
-      (cis_audit_only | bool) or cis_sd_state == 'unreadable'
-      or not (cis_sd_fix_ok | default(true) | bool)
-      or (cis_sd_recheck is not skipped and 'state=ok' not in cis_sd_recheck.stdout_lines)
+      cis_sd_state == 'unreadable'
+      or (cis_sd_state == 'bad' and ((cis_audit_only | bool) or not (cis_sd_fix_ok | default(true) | bool)))
+      or (cis_sd_recheck is not skipped and 'state=bad' in cis_sd_recheck.stdout_lines)
 ...

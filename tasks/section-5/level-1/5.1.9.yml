@@ -1,6 +1,7 @@
 ---
-# 5.1.9 - sshd shows a banner file before login. The path is /etc/issue.net, whose text 1.7.3
-# manages; the check also fails when that file has a login escape or the OS name.
+# 5.1.9 - sshd shows a banner file before login. The fix makes the Banner exactly cis_sshd_banner
+# (default: the 1.7.3 file, /etc/issue.net, whose text 1.7.3 manages); the check judges the
+# benchmark: a file with no login escape and no OS name.
 # The logic is shared in tasks/lib/sshd_option.yml.
 
 - name: "5.1.9 - Ensure sshd Banner is configured"
@@ -8,9 +9,9 @@
   vars:
     cis_sd_id: "5.1.9"
     cis_sd_options:
-      - spec: "banner|banner|"
+      - spec: "banner|banner||{{ cis_sshd_banner }}"
         directive: "Banner"
-        value: "/etc/issue.net"
+        value: "{{ cis_sshd_banner }}"
   tags:
     - "5.1.9"
     - section-5

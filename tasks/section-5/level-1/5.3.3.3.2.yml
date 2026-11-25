@@ -1,5 +1,7 @@
 ---
-# 5.3.3.3.2 - enforce_for_root is set in /etc/security/pwhistory.conf (added when it is not).
+# 5.3.3.3.2 - enforce_for_root is set in /etc/security/pwhistory.conf (the benchmark). The fix keeps it as
+# cis_pwhistory_enforce_for_root says: true adds it when missing, false removes it and the control
+# is a finding.
 # The logic is in tasks/lib/pam_setting.yml.
 
 - name: "5.3.3.3.2 - Ensure password history is enforced for the root user"
@@ -10,6 +12,7 @@
       - path: /etc/security/pwhistory.conf
         regexp: '^\s*enforce_for_root\b'
         line: 'enforce_for_root'
+        state: "{{ 'present' if cis_pwhistory_enforce_for_root | bool else 'absent' }}"
     cis_ps_header: ''
     cis_ps_tmpl: []
     cis_ps_feature: ''

@@ -387,44 +387,144 @@
     - always
     - preflight
 
+# Section 5 override variables (defaults/main.yml). Only the type and format are checked, never
+# the benchmark bounds (see README, "Overriding values"): a value is refused only when sshd, sudo
+# or the account tools would not accept it or when it would lock the role out (MaxSessions 0,
+# a ClientAlive value of 0).
 - name: "Preflight - Validate the SSH server limits"
   ansible.builtin.assert:
     that:
-      - item.value | string is match('^[0-9]+$')
-      - item.value | int >= 1
-      - item.max == 0 or item.value | int <= item.max
+      - lookup('ansible.builtin.vars', item.key) is not boolean
+      - lookup('ansible.builtin.vars', item.key) | string is match('^[0-9]+$')
+      - lookup('ansible.builtin.vars', item.key) | int >= item.min
     fail_msg: >-
-      {{ item.key }} must be a whole number from 1{{ (' to ' ~ item.max) if item.max > 0 else ' up' }}
-      (got {{ item.value | to_json }}).
+      {{ item.key }} must be a whole number of {{ item.min }} or more
+      (got {{ lookup('ansible.builtin.vars', item.key) | to_json }}).
     quiet: true
   loop:
-    - {key: cis_sshd_client_alive_interval, value: "{{ cis_sshd_client_alive_interval }}", max: 0}
-    - {key: cis_sshd_client_alive_count_max, value: "{{ cis_sshd_client_alive_count_max }}", max: 0}
-    - {key: cis_sshd_login_grace_time, value: "{{ cis_sshd_login_grace_time }}", max: 60}
-    - {key: cis_sshd_max_auth_tries, value: "{{ cis_sshd_max_auth_tries }}", max: 4}
-    - {key: cis_sshd_max_sessions, value: "{{ cis_sshd_max_sessions }}", max: 10}
+    - {key: cis_sshd_client_alive_interval, min: 1}
+    - {key: cis_sshd_client_alive_count_max, min: 1}
+    - {key: cis_sshd_login_grace_time, min: 0}
+    - {key: cis_sshd_max_auth_tries, min: 1}
+    - {key: cis_sshd_max_sessions, min: 1}
   loop_control:
     label: "{{ item.key }}"
   tags:
     - always
     - preflight
 
-- name: "Preflight - Validate the SSH server log level and MaxStartups"
+- name: "Preflight - Validate the SSH server log level, MaxStartups and PermitRootLogin"
   ansible.builtin.assert:
     that:
-      - cis_sshd_log_level in ['INFO', 'VERBOSE']
+      - cis_sshd_log_level is string
+      - cis_sshd_log_level in ['QUIET', 'FATAL', 'ERROR', 'INFO', 'VERBOSE', 'DEBUG', 'DEBUG1', 'DEBUG2', 'DEBUG3']
       - cis_sshd_max_startups | string is match('^[0-9]+:[0-9]+:[0-9]+$')
-      - cis_sshd_startups_parts | map('int') | min >= 1
-      - cis_sshd_startups_parts[0] | int <= 10
-      - cis_sshd_startups_parts[1] | int <= 30
-      - cis_sshd_startups_parts[2] | int <= 60
+      - cis_sshd_startups_parts[0] | int >= 1
+      - cis_sshd_startups_parts[1] | int >= 1
+      - cis_sshd_startups_parts[1] | int <= 100
+      - cis_sshd_startups_parts[2] | int >= cis_sshd_startups_parts[0] | int
+      - cis_sshd_permit_root_login is string
+      - cis_sshd_permit_root_login in ['no', 'yes', 'prohibit-password', 'forced-commands-only']
     fail_msg: >-
-      cis_sshd_log_level must be INFO or VERBOSE (got {{ cis_sshd_log_level | to_json }}) and
-      cis_sshd_max_startups three whole numbers start:rate:full of at least 1 and at most
-      10:30:60 (got {{ cis_sshd_max_startups | to_json }}).
+      cis_sshd_log_level must be one of QUIET, FATAL, ERROR, INFO, VERBOSE, DEBUG, DEBUG1,
+      DEBUG2 or DEBUG3 (got {{ cis_sshd_log_level | to_json }}), cis_sshd_max_startups three
+      whole numbers start:rate:full with start of 1 or more, rate from 1 to 100 and full at
+      least start (got {{ cis_sshd_max_startups | to_json }}), and cis_sshd_permit_root_login one
+      of the quoted strings no, yes, prohibit-password or forced-commands-only
+      (got {{ cis_sshd_permit_root_login | to_json }}).
     quiet: true
   vars:
     cis_sshd_startups_parts: "{{ (cis_sshd_max_startups | string).split(':') }}"
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Validate the section 5 yes/no values"
+  ansible.builtin.assert:
+    that:
+      - lookup('ansible.builtin.vars', item) is boolean or (lookup('ansible.builtin.vars', item) | string | lower) in ['true', 'false']
+    fail_msg: "{{ item }} must be true or false (got {{ lookup('ansible.builtin.vars', item) | to_json }})."
+    quiet: true
+  loop:
+    - cis_sshd_disable_forwarding
+    - cis_sshd_gssapi_authentication
+    - cis_sshd_hostbased_authentication
+    - cis_sshd_ignore_rhosts
+    - cis_sshd_permit_empty_passwords
+    - cis_sshd_permit_user_environment
+    - cis_sshd_use_pam
+    - cis_sudo_installed
+    - cis_pam_installed
+    - cis_authselect_installed
+    - cis_libpwquality_installed
+    - cis_sudo_use_pty
+    - cis_sudo_pwfeedback
+    - cis_sudo_visiblepw
+    - cis_faillock_even_deny_root
+    - cis_pwquality_enforce_for_root
+    - cis_pwhistory_enforce_for_root
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Validate the section 5 file modes"
+  ansible.builtin.assert:
+    that:
+      - lookup('ansible.builtin.vars', item) is string
+      - lookup('ansible.builtin.vars', item) is match('^0?[0-7]{3,4}$')
+    fail_msg: >-
+      {{ item }} must be a quoted string of three or four octal digits, for example "0600"
+      (got {{ lookup('ansible.builtin.vars', item) | to_json }}).
+    quiet: true
+  loop:
+    - cis_sshd_config_mode
+    - cis_sshd_config_dir_mode
+    - cis_sshd_private_key_mode
+    - cis_sshd_public_key_mode
+    - cis_sudoers_file_mode
+    - cis_sudoers_dir_mode
+  tags:
+    - always
+    - preflight
+
+- name: "Preflight - Validate the section 5 owners, groups, paths and choices"
+  ansible.builtin.assert:
+    that:
+      - lookup('ansible.builtin.vars', item.key) is string
+      - lookup('ansible.builtin.vars', item.key) is match(item.pattern)
+      - item.extra | default(true)
+    fail_msg: "{{ item.key }} must be {{ item.what }} (got {{ lookup('ansible.builtin.vars', item.key) | to_json }})."
+    quiet: true
+  loop:
+    - {key: cis_sshd_config_owner, pattern: '^[a-z_][a-z0-9_.-]*[$]?$', what: a plain account name}
+    - {key: cis_sshd_config_group, pattern: '^[a-z_][a-z0-9_.-]*[$]?$', what: a plain group name}
+    - {key: cis_sshd_private_key_owner, pattern: '^[a-z_][a-z0-9_.-]*[$]?$', what: a plain account name}
+    - {key: cis_sshd_private_key_group, pattern: '^[a-z_][a-z0-9_.-]*[$]?$', what: a plain group name}
+    - {key: cis_sshd_public_key_owner, pattern: '^[a-z_][a-z0-9_.-]*[$]?$', what: a plain account name}
+    - {key: cis_sshd_public_key_group, pattern: '^[a-z_][a-z0-9_.-]*[$]?$', what: a plain group name}
+    - {key: cis_sudoers_owner, pattern: '^[a-z_][a-z0-9_.-]*[$]?$', what: a plain account name}
+    - {key: cis_sudoers_group, pattern: '^[a-z_][a-z0-9_.-]*[$]?$', what: a plain group name}
+    - {key: cis_sshd_banner, pattern: '^/[A-Za-z0-9_./-]+$', what: an absolute path of letters, digits, underscore, dot, hyphen and slash}
+    - {key: cis_sudo_timestamp_type, pattern: '^(tty|ppid|global|kernel)$', what: tty, ppid, global or kernel}
+    - {key: cis_password_hash, pattern: '^(sha512|yescrypt|sha256|md5|blowfish)$', what: sha512, yescrypt, sha256, md5 or blowfish}
+    - {key: cis_encrypt_method, pattern: '^(?i:sha512|yescrypt|sha256|md5|blowfish)$', what: the upper case spelling of cis_password_hash}
+  loop_control:
+    label: "{{ item.key }}"
+  tags:
+    - always
+    - preflight
+
+# cis_password_hash (the pam_unix line, 5.3.3.4.3) and cis_encrypt_method (login.defs, 5.4.1.4) are
+# one setting. Different values would make 5.3.3.4.3 and 5.4.1.4 undo each other on every run.
+- name: "Preflight - Check that the two password hashing settings agree"
+  ansible.builtin.assert:
+    that:
+      - cis_encrypt_method | upper == cis_password_hash | upper
+    fail_msg: >-
+      cis_encrypt_method ({{ cis_encrypt_method | to_json }}) must be cis_password_hash
+      ({{ cis_password_hash | to_json }}) in upper case: the pam_unix line and ENCRYPT_METHOD are one
+      setting, and different values would be rewritten against each other on every run.
+    quiet: true
   tags:
     - always
     - preflight
@@ -436,15 +536,14 @@
       - cis_sudo_logfile is match('^/[A-Za-z0-9_./-]+$')
       - "'..' not in cis_sudo_logfile"
       - not cis_sudo_logfile.endswith('/')
-      - cis_sudo_timestamp_timeout | string is match('^[0-9]+$')
-      - cis_sudo_timestamp_timeout | int >= 1
-      - cis_sudo_timestamp_timeout | int <= 15
+      - cis_sudo_timestamp_timeout is not boolean
+      - cis_sudo_timestamp_timeout | string is match('^-?[0-9]+$')
       - cis_su_group is string
       - cis_su_group is match('^[a-z_][a-z0-9_-]{0,31}$')
     fail_msg: >-
       cis_sudo_logfile must be an absolute file path of letters, digits, underscore, dot,
       hyphen and slash (got {{ cis_sudo_logfile | to_json }}), cis_sudo_timestamp_timeout a
-      whole number from 1 to 15 (got {{ cis_sudo_timestamp_timeout | to_json }}) and
+      whole number (got {{ cis_sudo_timestamp_timeout | to_json }}) and
       cis_su_group a plain group name of lowercase letters, digits, underscore and hyphen
       (got {{ cis_su_group | to_json }}).
     quiet: true
@@ -458,26 +557,26 @@
       - cis_authselect_profile is string
       - cis_authselect_profile is match('^[a-z][a-z0-9_-]{0,31}$')
       - cis_authselect_profile not in ['minimal', 'sssd', 'winbind', 'nis']
-      - item.value | string is match('^[0-9]+$')
-      - item.value | int >= item.min
-      - item.value | int <= item.max
-      - item.key != 'cis_faillock_unlock_time' or (item.value | int == 0 or item.value | int >= 900)
+      - lookup('ansible.builtin.vars', item.key) is not boolean
+      - lookup('ansible.builtin.vars', item.key) | string is match('^[0-9]+$')
+      - lookup('ansible.builtin.vars', item.key) | int >= item.min
+      - lookup('ansible.builtin.vars', item.key) | int <= item.max
     fail_msg: >-
       cis_authselect_profile must be a name of lowercase letters, digits, underscore and hyphen
       that starts with a letter, is at most 32 characters and is not a stock profile name (got
       {{ cis_authselect_profile | to_json }}), and {{ item.key }} must be a whole number from
-      {{ item.min }} to {{ item.max }}{{ ' that is 0 or at least 900' if item.key == 'cis_faillock_unlock_time' else '' }}
-      (got {{ item.value | to_json }}).
+      {{ item.min }} to {{ item.max }} (got {{ lookup('ansible.builtin.vars', item.key) | to_json }}).
     quiet: true
   loop:
-    - {key: cis_faillock_deny, value: "{{ cis_faillock_deny }}", min: 1, max: 5}
-    - {key: cis_faillock_unlock_time, value: "{{ cis_faillock_unlock_time }}", min: 0, max: 604800}
-    - {key: cis_faillock_root_unlock_time, value: "{{ cis_faillock_root_unlock_time }}", min: 60, max: 604800}
-    - {key: cis_pwquality_difok, value: "{{ cis_pwquality_difok }}", min: 2, max: 128}
-    - {key: cis_pwquality_minlen, value: "{{ cis_pwquality_minlen }}", min: 14, max: 256}
-    - {key: cis_pwquality_maxrepeat, value: "{{ cis_pwquality_maxrepeat }}", min: 1, max: 3}
-    - {key: cis_pwquality_maxsequence, value: "{{ cis_pwquality_maxsequence }}", min: 1, max: 3}
-    - {key: cis_pwhistory_remember, value: "{{ cis_pwhistory_remember }}", min: 24, max: 400}
+    - {key: cis_faillock_deny, min: 1, max: 1000}
+    - {key: cis_faillock_unlock_time, min: 0, max: 31536000}
+    - {key: cis_faillock_root_unlock_time, min: 0, max: 31536000}
+    - {key: cis_pwquality_difok, min: 0, max: 1000}
+    - {key: cis_pwquality_minlen, min: 0, max: 1000}
+    - {key: cis_pwquality_maxrepeat, min: 0, max: 1000}
+    - {key: cis_pwquality_maxsequence, min: 0, max: 1000}
+    - {key: cis_pwquality_dictcheck, min: 0, max: 1}
+    - {key: cis_pwhistory_remember, min: 0, max: 400}
   loop_control:
     label: "{{ item.key }}"
   tags:
@@ -487,18 +586,19 @@
 - name: "Preflight - Validate the account and environment settings"
   ansible.builtin.assert:
     that:
-      - item.value | string is match('^[0-9]+$')
-      - item.value | int >= item.min
-      - item.value | int <= item.max
+      - lookup('ansible.builtin.vars', item.key) is not boolean
+      - lookup('ansible.builtin.vars', item.key) | string is match('^[0-9]+$')
+      - lookup('ansible.builtin.vars', item.key) | int >= item.min
+      - lookup('ansible.builtin.vars', item.key) | int <= item.max
     fail_msg: >-
       {{ item.key }} must be a whole number from {{ item.min }} to {{ item.max }}
-      (got {{ item.value | to_json }}).
+      (got {{ lookup('ansible.builtin.vars', item.key) | to_json }}).
     quiet: true
   loop:
-    - {key: cis_pass_max_days, value: "{{ cis_pass_max_days }}", min: 1, max: 365}
-    - {key: cis_pass_warn_age, value: "{{ cis_pass_warn_age }}", min: 7, max: 99999}
-    - {key: cis_inactive_days, value: "{{ cis_inactive_days }}", min: 0, max: 45}
-    - {key: cis_tmout, value: "{{ cis_tmout }}", min: 1, max: 900}
+    - {key: cis_pass_max_days, min: 1, max: 99999}
+    - {key: cis_pass_warn_age, min: 0, max: 99999}
+    - {key: cis_inactive_days, min: 0, max: 99999}
+    - {key: cis_tmout, min: 1, max: 31536000}
   loop_control:
     label: "{{ item.key }}"
   tags:
@@ -509,14 +609,12 @@
   ansible.builtin.assert:
     that:
       - cis_umask is string
-      # Three or four octal digits (the first of four is ignored) that deny at least what 027 does:
-      # write for the group (2, 3, 6 or 7) and everything for others (7).
-      - cis_umask is match('^[0-7]?[0-7][2367]7$')
+      - cis_umask is match('^[0-7]{3,4}$')
       - cis_account_exceptions is sequence and cis_account_exceptions is not string and cis_account_exceptions is not mapping
       - cis_rejected_exceptions | length == 0
     fail_msg: >-
-      cis_umask must be a quoted string of three or four octal digits that is 027 or more
-      restrictive, for example "027" (got {{ cis_umask | to_json }}), and cis_account_exceptions
+      cis_umask must be a quoted string of three or four octal digits, for example "027"
+      (got {{ cis_umask | to_json }}), and cis_account_exceptions
       a list of plain login names (letters, digits, underscore, dot and hyphen, not starting
       with a digit or hyphen){{
       (' - rejected items: ' ~ (cis_rejected_exceptions | map('to_json') | join(', ')))

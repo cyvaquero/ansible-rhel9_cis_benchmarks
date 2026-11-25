@@ -1,19 +1,21 @@
 ---
 # 5.2.12 - su is limited to the members of a group through pam_wheel. Judged on the active
 # auth line of /etc/pam.d/su that names pam_wheel.so as required or requisite with use_uid
-# and a group=; the group must exist. A line the site already set, with any group, is kept
-# (a group that does not exist is created, empty). Otherwise the fix creates cis_su_group
-# empty when missing and puts `auth required pam_wheel.so use_uid group=<group>` in the file:
+# and a group=; the group must exist (the benchmark: a line with any group passes). The fix makes
+# the line name exactly cis_su_group: it creates that group empty when missing and puts `auth required pam_wheel.so use_uid group=<group>` in the file:
 # in place of a commented or non-compliant pam_wheel line when there is one, else right after
-# the pam_rootok line, so root can still use su. /etc/pam.d/su is not managed by authselect,
+# the pam_rootok line, so root can still use su. A pam_wheel line the site set with another group
+# is not kept: the fix makes the group exactly cis_su_group (the line is rewritten and the group
+# created), though the benchmark accepts any group. /etc/pam.d/su is not managed by authselect,
 # so the edit survives a profile change. The role never adds or removes members: a group that
 # already has members (listed, or with it as their primary group) is a finding in both modes,
 # with the names in a message. Under --check nothing changes and, in remediate mode, nothing
 # is recorded for a fix.
 #
-# The check prints line=ok|missing (a compliant pam_wheel line), group=<name> (the one in the
-# line, else cis_su_group), exists=yes|no, members=<comma separated names> and
-# state=ok|bad|nofile.
+# The check prints line=ok|missing (a compliant pam_wheel line), diff=yes|no (the line names
+# another group than cis_su_group), group=<name> (the one in the line, else cis_su_group),
+# exists=yes|no (that group), wexists=yes|no (cis_su_group), members=<comma separated names>
+# (of the group the line names after the fix) and state=ok|bad|nofile (the benchmark).
 
 - name: "5.2.12 - Handle the su restriction"
   tags:
@@ -50,19 +52,23 @@
               g=$1
             fi
             echo "line=$line"
+            diff=no
+            if [ "$line" = ok ] && [ "$g" != "$1" ]; then diff=yes; fi
+            echo "diff=$diff"
             echo "group=$g"
             state=ok
             [ "$line" = ok ] || state=bad
-            entry=$(getent group "$g" 2>/dev/null) || entry=""
+            if getent group "$g" >/dev/null 2>&1; then echo "exists=yes"; else echo "exists=no"; state=bad; fi
+            if getent group "$1" >/dev/null 2>&1; then echo "wexists=yes"; else echo "wexists=no"; fi
+            # The members of the group the line names once the fix is done.
+            mg=$g
+            [ "$diff" = yes ] && mg=$1
+            entry=$(getent group "$mg" 2>/dev/null) || entry=""
             members=""
             if [ -n "$entry" ]; then
-              echo "exists=yes"
               gid=$(printf '%s' "$entry" | cut -d: -f3)
               members=$( { printf '%s' "$entry" | cut -d: -f4 | tr ',' '\n'
                            getent passwd | awk -F: -v g="$gid" '$4 == g { print $1 }'; } | sed '/^$/d' | sort -u | paste -sd, -)
-            else
-              echo "exists=no"
-              state=bad
             fi
             echo "members=$members"
             echo "state=$state"
@@ -80,9 +86,11 @@
              | default('state=unreadable') | regex_replace('^state=', '') }}
         cis_su_line_ok: "{{ 'line=ok' in cis_check_5_2_12.stdout_lines }}"
         cis_su_group_name: >-
-          {{ cis_check_5_2_12.stdout_lines | select('match', '^group=') | first
-             | default('group=' ~ cis_su_group) | regex_replace('^group=', '') }}
-        cis_su_group_exists: "{{ 'exists=yes' in cis_check_5_2_12.stdout_lines }}"
+          {{ cis_su_group if 'diff=yes' in cis_check_5_2_12.stdout_lines
+             else (cis_check_5_2_12.stdout_lines | select('match', '^group=') | first
+                   | default('group=' ~ cis_su_group) | regex_replace('^group=', '')) }}
+        cis_su_differs: "{{ 'diff=yes' in cis_check_5_2_12.stdout_lines }}"
+        cis_su_group_exists: "{{ 'wexists=yes' in cis_check_5_2_12.stdout_lines }}"
         cis_su_members: >-
           {{ (cis_check_5_2_12.stdout_lines | select('match', '^members=') | first | default('members=')
               | regex_replace('^members=', '')).split(',') | select | list }}
@@ -99,11 +107,12 @@
 
     - name: "5.2.12 - Create the su group"
       ansible.builtin.group:
-        name: "{{ cis_su_group_name }}"
+        name: "{{ cis_su_group }}"
         state: present
       when:
         - not (cis_audit_only | bool)
-        - cis_su_state == 'bad'
+        - cis_su_state != 'nofile'
+        - cis_su_state == 'bad' or cis_su_differs | bool
         - not cis_su_group_exists | bool
 
     - name: "5.2.12 - Require membership of the su group in the pam_wheel line"
@@ -115,8 +124,8 @@
         create: false
       when:
         - not (cis_audit_only | bool)
-        - cis_su_state == 'bad'
-        - not cis_su_line_ok | bool
+        - cis_su_state != 'nofile'
+        - not cis_su_line_ok | bool or cis_su_differs | bool
 
     - name: "5.2.12 - Check the pam_wheel line of su and its group again after the fix"
       ansible.builtin.command:
@@ -128,7 +137,7 @@
       when:
         - not (cis_audit_only | bool)
         - not ansible_check_mode
-        - cis_su_state == 'bad'
+        - cis_su_state == 'bad' or cis_su_differs | bool
 
     - name: "5.2.12 - Record the finding"
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"

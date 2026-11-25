@@ -1,9 +1,10 @@
 ---
-# 5.4.1.3 - The warning age. PASS_WARN_AGE in /etc/login.defs is 7 or more (the value the role
-# writes is cis_pass_warn_age; a longer warning already set is kept) and so is the warning of
-# every account that has a password hash, set with `chage --warndays`. Accounts without a hash
-# are left alone. An account whose password is already expired or inactive, or would be with
-# the maximum age 5.4.1.1 sets, is skipped and reported, as for 5.4.1.1.
+# 5.4.1.3 - The warning age. PASS_WARN_AGE in /etc/login.defs is 7 or more (the benchmark) and so is
+# the warning of every account that has a password hash. The fix makes both exactly
+# cis_pass_warn_age (one variable drives login.defs and `chage --warndays`), a longer warning
+# included. Accounts without a hash are left alone. An account whose password is already expired
+# or inactive, or would be with the maximum age 5.4.1.1 sets, is skipped and reported, as for
+# 5.4.1.1.
 
 - name: "5.4.1.3 - Handle password expiration warning days"
   tags:
@@ -20,7 +21,7 @@
         line: "PASS_WARN_AGE {{ cis_pass_warn_age }}"
       when:
         - not (cis_audit_only | bool)
-        - not cis_acct.defaults.warn.ok
+        - cis_acct.defaults.warn.fix | bool
 
     - name: "5.4.1.3 - Set the warning days of accounts with a password"
       ansible.builtin.command:
@@ -50,6 +51,8 @@
         cis_finding_id: "5.4.1.3"
       when:
         - >-
-          cis_acct.aging.warn.skip | length > 0
-          or (cis_audit_only | bool and (not cis_acct.defaults.warn.ok or cis_acct.aging.warn.fix | length > 0))
+          cis_acct.aging.warn.skip | selectattr('bad') | list | length > 0
+          or not cis_acct.target_ok.warn
+          or (cis_audit_only | bool and (not cis_acct.defaults.warn.ok
+                                         or cis_acct.aging.warn.fix | selectattr('bad') | list | length > 0))
 ...

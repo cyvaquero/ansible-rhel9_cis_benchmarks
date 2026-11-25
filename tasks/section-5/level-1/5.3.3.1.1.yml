@@ -1,7 +1,8 @@
 ---
-# 5.3.3.1.1 - deny is set in /etc/security/faillock.conf to a value from 1 to 5 (the role writes cis_faillock_deny, 5 by
-# default, when it is not); a deny= argument on a pam_faillock line with another value overrides the file and
-# is removed from the templates of the role's own authselect profile.
+# 5.3.3.1.1 - deny is set in /etc/security/faillock.conf (the benchmark: from 1 to 5). The fix makes it
+# exactly cis_faillock_deny, also when the file holds another compliant value; a deny= argument on a
+# pam_faillock line that differs from it overrides the file and is removed from the templates of
+# the role's own authselect profile.
 # The logic is in tasks/lib/pam_setting.yml.
 
 - name: "5.3.3.1.1 - Ensure password failed attempts lockout is configured"

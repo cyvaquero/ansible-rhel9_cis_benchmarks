@@ -7,9 +7,9 @@
   vars:
     cis_sd_id: "5.1.22"
     cis_sd_options:
-      - spec: "permituserenvironment|eq|no"
+      - spec: "permituserenvironment|eq|{{ cis_expect_sshd_permit_user_environment }}|{{ 'yes' if cis_sshd_permit_user_environment | bool else 'no' }}"
         directive: "PermitUserEnvironment"
-        value: "no"
+        value: "{{ 'yes' if cis_sshd_permit_user_environment | bool else 'no' }}"
   tags:
     - "5.1.22"
     - section-5

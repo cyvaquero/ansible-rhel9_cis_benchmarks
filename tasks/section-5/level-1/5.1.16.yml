@@ -7,7 +7,7 @@
   vars:
     cis_sd_id: "5.1.16"
     cis_sd_options:
-      - spec: "loglevel|oneof|verbose,info"
+      - spec: "loglevel|oneof|{{ cis_expect_sshd_log_levels }}|{{ cis_sshd_log_level }}"
         directive: "LogLevel"
         value: "{{ cis_sshd_log_level }}"
   tags:

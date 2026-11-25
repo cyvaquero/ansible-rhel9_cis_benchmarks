@@ -1,19 +1,18 @@
 ---
-# 5.4.1.4 - ENCRYPT_METHOD in /etc/login.defs is SHA512 or YESCRYPT. A value that is not is
-# replaced with SHA512, or with YESCRYPT when the pam_unix line of system-auth already hashes with
-# yescrypt (and not sha512), so login.defs and PAM agree; SHA512 is the only one FIPS mode allows.
-# The PAM side (the hash on the pam_unix lines) is 5.3.3.4.3, which runs first and is not repeated
-# here; this control reads the result and never touches authselect. login.defs only governs group
-# passwords, so changing it affects no user.
+# 5.4.1.4 - ENCRYPT_METHOD in /etc/login.defs is SHA512 or YESCRYPT (the benchmark). The fix makes it
+# exactly cis_encrypt_method (cis_password_hash in upper case: the same setting as the algorithm on
+# the pam_unix line, 5.3.3.4.3, which preflight keeps in agreement and which runs first). This
+# control never touches authselect. login.defs only governs group passwords, so changing it
+# affects no user.
 
 - name: "5.4.1.4 - Set the password hashing algorithm in login.defs"
   ansible.builtin.lineinfile:
     path: /etc/login.defs
     regexp: '^\s*ENCRYPT_METHOD\s'
-    line: "ENCRYPT_METHOD {{ cis_acct.defaults.encrypt.want }}"
+    line: "ENCRYPT_METHOD {{ cis_encrypt_method | upper }}"
   when:
     - not (cis_audit_only | bool)
-    - not cis_acct.defaults.encrypt.ok
+    - cis_acct.defaults.encrypt.fix | bool
   tags:
     - "5.4.1.4"
     - section-5
@@ -26,8 +25,9 @@
   vars:
     cis_finding_id: "5.4.1.4"
   when:
-    - cis_audit_only | bool
-    - not cis_acct.defaults.encrypt.ok
+    - >-
+      (cis_audit_only | bool and not cis_acct.defaults.encrypt.ok)
+      or not cis_acct.target_ok.encrypt
   tags:
     - "5.4.1.4"
     - section-5

@@ -1,7 +1,7 @@
 ---
-# 5.2.5 - sudo writes its own log file: an effective global `Defaults logfile=` with a path.
-# A path the site already set is kept; otherwise cis_sudo_logfile is written. The logic is
-# shared in tasks/lib/sudo_default.yml.
+# 5.2.5 - sudo writes its own log file: an effective global `Defaults logfile=` with a path (the
+# benchmark). The fix makes the effective path exactly cis_sudo_logfile, a path the site already set
+# included. The logic is shared in tasks/lib/sudo_default.yml.
 
 - name: "5.2.5 - Ensure sudo log file exists"
   ansible.builtin.import_tasks: ../../lib/sudo_default.yml
@@ -9,6 +9,8 @@
     cis_sdo_id: "5.2.5"
     cis_sdo_option: "logfile"
     cis_sdo_line: 'logfile="{{ cis_sudo_logfile }}"'
+    cis_sdo_cfg:
+      want: "{{ cis_sudo_logfile }}"
   tags:
     - "5.2.5"
     - section-5

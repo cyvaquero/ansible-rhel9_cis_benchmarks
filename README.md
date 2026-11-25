@@ -4,7 +4,7 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.35).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.36).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and these controls are implemented:
 
 - kernel modules, 1.1.1.1 to 1.1.1.11;
@@ -80,7 +80,7 @@ example `cis_rhel_minor_release | int >= 4`.
 It then validates the selection variables below and fails with a clear message on an
 invalid `cis_profile`, a `cis_apply_level_2`, `cis_audit_only` or `cis_fail_on_findings`
 that is not true or false, or a CIS ID in `cis_exclusions` that is not in the benchmark. The
-variables of sections 1 to 4 below are checked for type and format only (a yes/no value, a whole number, a quoted octal mode,
+variables of sections 1 to 5 below are checked for type and format only (a yes/no value, a whole number, a quoted octal mode,
 a name, a path, a list), never against the benchmark's bounds; see "Overriding values".
 
 ## Usage (planned)
@@ -130,7 +130,7 @@ ansible-playbook -i inventory site.yml -e target=webservers
 ### Overriding values
 
 Every value a control writes or expects comes from a role variable whose default is the
-benchmark value; the variables for sections 1 to 4 are listed below, and each has a comment in
+benchmark value; the variables for sections 1 to 5 are listed below, and each has a comment in
 `defaults/main.yml`. Set one at any Ansible precedence level above the role defaults:
 inventory or `group_vars` / `host_vars`, play `vars`, role parameters, `set_fact` and `-e`.
 Do not edit the role's own files.
@@ -147,7 +147,8 @@ roles:
 - The role enforces the configured value exactly: whenever the host differs from it, the role
   changes the host to it, also when the host is stricter than the benchmark (with the defaults, a
   `kernel.kptr_restrict` of 2 becomes 1, a screen lock delay of 0 becomes 5 and a banner file of
-  mode 0600 becomes 0644). A second run with the same values changes nothing. The checks always
+  mode 0600 becomes 0644; in section 5 a `PASS_MAX_DAYS` of 90 becomes 365 and a private SSH host key
+  of mode 0640 becomes 0600). A second run with the same values changes nothing. The checks always
   judge against the benchmark value (constants in `vars/main.yml`, named `cis_expect_*`, which are
   not meant to be overridden): a configured value stricter than the benchmark's passes, a weaker
   one is written and the control reports a finding, in remediate and audit mode; a site that
@@ -156,13 +157,24 @@ roles:
   finding.
 - For a package, the variable is whether it should be installed: the role installs or removes
   the package to match it, and the control reports a finding while the host differs from the
-  benchmark. This holds for every package of sections 2 to 4 (the service and client packages,
-  chrony, bluez, firewalld, iptables-services, ufw), with its own variable
+  benchmark. This holds for every package of sections 2 to 5 (the service and client packages,
+  chrony, bluez, firewalld, iptables-services, ufw, sudo, pam, authselect, libpwquality), with its own variable
   (`cis_<name>_installed`); `cis_services_keep` wins over the service package variables: a control
   listed there is skipped completely, so nothing is installed or removed for it.
 - The SSH guard of the firewalld controls is not a variable and no override bypasses it: the
   role starts `firewalld` or `nftables.service`, or replaces an `ACCEPT` zone target, only when SSH
-  is already allowed (see "SSH guard" below).
+  is already allowed (see "SSH guard" below). The same holds for the lockout guards of section 5: no
+  variable lets the role write an sshd access list that excludes its own account, close root login
+  while it is connected as root over SSH, remove `sudo` while it becomes root with it, lock or change
+  the shell of its own account, or change PAM except through authselect after the lockout checks. Every
+  sshd change is checked with `sshd -t` before any reload.
+- Where two variables drive one setting, preflight refuses values that disagree, because the role would
+  undo its own change on every run: `cis_password_hash` (the `pam_unix` hash, 5.3.3.4.3) and
+  `cis_encrypt_method` (`ENCRYPT_METHOD`, 5.4.1.4). Where one variable drives a setting that lives in
+  two places (password aging in `login.defs` and with `chage`, the umask in `login.defs`, the shell files
+  and root's files, the faillock, pwquality and pwhistory options in their file and on the PAM lines),
+  the role writes the variable to every place and removes a differing PAM argument from the templates
+  of its own authselect profile, so the file value is the one in force.
 - Preflight checks only the type and format of each value (a yes/no value, a whole number, a
   quoted octal mode such as `"0640"`, a name, a path, a list) and stops the run on anything
   else. Quote file modes: an unquoted `0600` is a number in YAML. Values passed with `-e` are
@@ -293,49 +305,82 @@ not applicable: it covers only zones whose target is `default`.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `cis_sshd_allow_users`, `cis_sshd_allow_groups`, `cis_sshd_deny_users`, `cis_sshd_deny_groups` | `[]` | 5.1.8: users and groups written to `AllowUsers`, `AllowGroups`, `DenyUsers` and `DenyGroups` in the role's sshd drop-in. A non-empty list is written; an empty one leaves that directive alone. All empty: nothing is written, and 5.1.8 is a finding unless a list is already in effect. Plain names only (letters, digits, underscore, dot, hyphen); anything else stops the run at preflight. **Lockout risk:** an allow list locks out every account not in it, and a deny list every account in it. The role writes the lists only when the account it is connected as is still allowed by the result; otherwise it changes nothing and says why. List every account that needs SSH, including the one Ansible uses. |
-| `cis_sshd_client_alive_interval`, `cis_sshd_client_alive_count_max` | `15`, `3` | 5.1.10: the values written when the effective ones are not both above zero. Whole numbers of 1 or more. |
-| `cis_sshd_login_grace_time` | `60` | 5.1.15: seconds, from 1 to 60, written when the effective value is 0 or above 60. |
-| `cis_sshd_log_level` | `INFO` | 5.1.16: `INFO` or `VERBOSE`, written when the effective level is neither. |
-| `cis_sshd_max_auth_tries` | `4` | 5.1.17: from 1 to 4, written when the effective value is higher. |
-| `cis_sshd_max_startups` | `10:30:60` | 5.1.18: `start:rate:full`, each at least 1 and at most 10, 30 and 60, written when any effective number is higher. |
-| `cis_sshd_max_sessions` | `10` | 5.1.19: from 1 to 10, written when the effective value is higher. |
+| `cis_sshd_config_owner`, `cis_sshd_config_group`, `cis_sshd_config_mode`, `cis_sshd_config_dir_mode` | `root`, `root`, `"0600"`, `"0700"` | 5.1.1, 5.1.2: the owner, group and mode the role sets on `sshd_config` and every `.conf` file of `sshd_config.d` (the role's own drop-in included), and the mode of the `sshd_config.d` directory. A stricter mode (0400) is replaced too. |
+| `cis_sshd_private_key_owner`, `cis_sshd_private_key_group`, `cis_sshd_private_key_mode` | `root`, `root`, `"0600"` | 5.1.3: the owner, group and mode of the SSH private host keys. RHEL 9 ships them as `root:ssh_keys` with mode 0640, which the benchmark also allows; the role sets exactly these values, so with the defaults those keys become `root:root` with mode 0600. |
+| `cis_sshd_public_key_owner`, `cis_sshd_public_key_group`, `cis_sshd_public_key_mode` | `root`, `root`, `"0644"` | 5.1.4: the same for the public host keys. |
+| `cis_crypto_policy_module_sshcbc`, `cis_crypto_policy_ssh_ciphers_excluded`, `cis_crypto_policy_module_mac`, `cis_crypto_policy_mac_excluded`, `cis_crypto_policy_module_sha1` | see section 1 | 5.1.5, 5.1.6, 5.1.7 are fixed through the crypto policy with the same modules as 1.6.4, 1.6.3 and 1.6.2, so these variables (section 1) also drive them. The role holds the module in the policy whether or not sshd offers a weak algorithm. A weak algorithm that is still offered (a weaker excluded list, a `Ciphers`, `MACs` or `KexAlgorithms` line elsewhere) is a finding. |
+| `cis_sshd_banner` | the value of `cis_issue_net_path` (`/etc/issue.net`) | 5.1.9: the `Banner` file. An absolute path; the text of the default file is managed by 1.7.3. A file with a login escape or the operating system name is a finding. |
+| `cis_sshd_client_alive_interval`, `cis_sshd_client_alive_count_max` | `15`, `3` | 5.1.10: the values the role holds. Whole numbers of 1 or more. |
+| `cis_sshd_disable_forwarding`, `cis_sshd_gssapi_authentication`, `cis_sshd_hostbased_authentication`, `cis_sshd_ignore_rhosts`, `cis_sshd_permit_empty_passwords`, `cis_sshd_permit_user_environment`, `cis_sshd_use_pam` | `true`, `false`, `false`, `true`, `false`, `false`, `true` | 5.1.11 (Level 2 Server), 5.1.12 (Level 2 Server), 5.1.13, 5.1.14, 5.1.20, 5.1.22, 5.1.23: `DisableForwarding`, `GSSAPIAuthentication`, `HostbasedAuthentication`, `IgnoreRhosts`, `PermitEmptyPasswords`, `PermitUserEnvironment` and `UsePAM`, written as `yes` or `no`. |
+| `cis_sshd_login_grace_time` | `60` | 5.1.15: `LoginGraceTime` in seconds; a whole number of 0 or more (0 means no limit). |
+| `cis_sshd_log_level` | `INFO` | 5.1.16: `LogLevel`: `QUIET`, `FATAL`, `ERROR`, `INFO`, `VERBOSE`, `DEBUG`, `DEBUG1`, `DEBUG2` or `DEBUG3`. |
+| `cis_sshd_max_auth_tries` | `4` | 5.1.17: `MaxAuthTries`; a whole number of 1 or more. |
+| `cis_sshd_max_startups` | `10:30:60` | 5.1.18: `start:rate:full`; start of 1 or more, rate from 1 to 100, full at least start. |
+| `cis_sshd_max_sessions` | `10` | 5.1.19: `MaxSessions`; a whole number of 1 or more (0 would refuse every session). |
+| `cis_sshd_permit_root_login` | `"no"` | 5.1.21: `PermitRootLogin`: `no`, `yes`, `prohibit-password` or `forced-commands-only` (quote `"no"`: YAML reads a bare `no` as false). A value that closes root login (`no`, `forced-commands-only`) is written only when the role is not connected as root over SSH. |
+| `cis_sshd_allow_users`, `cis_sshd_allow_groups`, `cis_sshd_deny_users`, `cis_sshd_deny_groups` | `[]` | 5.1.8: users and groups written to `AllowUsers`, `AllowGroups`, `DenyUsers` and `DenyGroups` in the role's sshd drop-in. A non-empty list is written; an empty one leaves that directive alone (a line the role wrote earlier stays). All empty: nothing is written, and 5.1.8 is a finding unless a list is already in effect. Plain names only (letters, digits, underscore, dot, hyphen); anything else stops the run at preflight. **Lockout risk:** an allow list locks out every account not in it, and a deny list every account in it. The role writes the lists only when the account it is connected as is still allowed by the result; otherwise it changes nothing and says why. List every account that needs SSH, including the one Ansible uses. |
 
-Values outside these ranges stop the run at preflight. A setting that is already compliant,
-wherever it comes from, is never changed.
+The role makes each effective `sshd -T` value exactly the configured one, a stricter value
+included (a `MaxAuthTries` of 2 becomes 4, a `LoginGraceTime` of 30 becomes 60). Preflight refuses
+only what sshd would not take or what would lock the role out (`MaxSessions` or a ClientAlive value
+of 0, a malformed `MaxStartups`); a weaker value is written and the control is a finding. Every
+write goes to the role's own drop-in, is checked with `sshd -t -f` first and is applied by a
+handler that runs `sshd -t` on the whole configuration and reloads sshd only when it runs. Nothing
+later in the section 5 run depends on the reloaded daemon: the controls read `sshd -T`, which
+parses the files.
 
 ### sudo and su (5.2)
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `cis_sudo_logfile` | `/var/log/sudo.log` | 5.2.5: the path written as `Defaults logfile=` when no sudo log file is set. An absolute path of letters, digits, underscore, dot, hyphen and slash; anything else stops the run at preflight. A log file the site already set is kept. Rotate the file (logrotate) to keep it from filling the disk. |
-| `cis_sudo_timestamp_timeout` | `15` | 5.2.10: minutes, from 1 to 15, written when the effective timeout is above 15 or disabled (negative). No line (sudo's own default of 5) and any value from 0 to 15 are compliant and never changed. |
-| `cis_su_group` | `sugroup` | 5.2.12: the group `pam_wheel` allows to use `su`. A plain group name (lowercase letters, digits, underscore, hyphen); anything else stops the run at preflight. The role creates it empty when missing and never adds or removes members. A group that has members is a finding. |
+| `cis_sudo_installed` | `true` | 5.2.1: whether `sudo` should be installed. `false` removes it when no other installed package needs it, and never while the role becomes root with `sudo` (the default become method) without being connected as root. `false` is reported as a finding. |
+| `cis_sudoers_owner`, `cis_sudoers_group`, `cis_sudoers_file_mode`, `cis_sudoers_dir_mode` | `root`, `root`, `"0440"`, `"0750"` | 5.2.2, 5.2.3: the owner and group of `/etc/sudoers`, its folder and every file in it, the mode of the files and the mode of `/etc/sudoers.d`; also the owner, group and mode of the role's own sudoers file. A stricter mode (0400, 0700) is replaced. |
+| `cis_sudo_use_pty`, `cis_sudo_pwfeedback`, `cis_sudo_visiblepw` | `true`, `false`, `false` | 5.2.4, 5.2.8, 5.2.9: whether sudo uses a pty, echoes asterisks (`pwfeedback`) and prompts where the password shows (`visiblepw`). The role writes `Defaults use_pty`, `Defaults pwfeedback` or `Defaults !pwfeedback` (and the same for `visiblepw`) to its own sudoers file whenever the effective value differs; no line counts as sudo's default (all three off). `true` for the last two is reported as a finding. |
+| `cis_sudo_logfile` | `/var/log/sudo.log` | 5.2.5: the path written as `Defaults logfile=` whenever the effective path differs, a path the site already set included. An absolute path of letters, digits, underscore, dot, hyphen and slash; anything else stops the run at preflight. Rotate the file (logrotate) to keep it from filling the disk. |
+| `cis_sudo_timestamp_timeout` | `15` | 5.2.10: minutes, written whenever the effective timeout differs; no line counts as sudo's default of 5, so with the default a host with no line gets `timestamp_timeout=15`. A whole number (a negative one means never). A value above 15 or a negative one is reported as a finding. |
+| `cis_sudo_timestamp_type` | `tty` | 5.2.11: `tty`, `ppid`, `global` or `kernel`; no line counts as `tty`. `global` is reported as a finding. |
+| `cis_su_group` | `sugroup` | 5.2.12: the group `pam_wheel` allows to use `su`. A plain group name (lowercase letters, digits, underscore, hyphen); anything else stops the run at preflight. The role creates it empty when missing, rewrites a `pam_wheel` line that names another group, and never adds or removes members. A group that has members is a finding. |
 
 ### PAM and authselect (5.3)
 
 | Variable | Default | Meaning |
 |---|---|---|
+| `cis_pam_installed`, `cis_authselect_installed`, `cis_libpwquality_installed` | `true`, `true`, `true` | 5.3.1.1, 5.3.1.2, 5.3.1.3: whether `pam`, `authselect` and `libpwquality` should be installed. `true` installs or upgrades the package to the version the benchmark names; `false` removes it only when no other installed package needs it. `false` is reported as a finding. |
 | `cis_authselect_profile` | `cis-rhel9` | 5.3.2.1: the name of the custom authselect profile the role creates (based on `sssd`) and selects on a host authselect does not manage. Lowercase letters, digits, underscore and hyphen, starting with a letter, at most 32 characters, and not `minimal`, `sssd`, `winbind` or `nis`; anything else stops the run at preflight. A host already on an authselect profile keeps it. |
-| `cis_faillock_deny` | `5` | 5.3.3.1.1: `deny` in `/etc/security/faillock.conf`, from 1 to 5, written when the value there is not from 1 to 5. A lower value already set is kept. |
-| `cis_faillock_unlock_time` | `900` | 5.3.3.1.2: `unlock_time` in `faillock.conf`, in seconds: 0 (never unlocked automatically) or 900 to 604800. Written when the value there is not 0 or at least 900; a longer time already set is kept. |
-| `cis_faillock_root_unlock_time` | `60` | 5.3.3.1.3 (Level 2): seconds, 60 to 604800, used only to replace a `root_unlock_time` below 60 that is already in `faillock.conf`. The role itself adds `even_deny_root`. |
-| `cis_pwquality_difok`, `cis_pwquality_minlen` | `2`, `14` | 5.3.3.2.1, 5.3.3.2.2: the values written to the role's pwquality drop-in when the value in effect is below 2 and below 14. A higher value already set anywhere is kept. |
-| `cis_pwquality_maxrepeat`, `cis_pwquality_maxsequence` | `3`, `3` | 5.3.3.2.4, 5.3.3.2.5: from 1 to 3, written when the value in effect is unset, 0 or above 3. |
-| `cis_pwhistory_remember` | `24` | 5.3.3.3.1: `remember` in `/etc/security/pwhistory.conf`, from 24 to 400, written when the value there is below 24. |
+| `cis_faillock_deny`, `cis_faillock_unlock_time` | `5`, `900` | 5.3.3.1.1, 5.3.3.1.2: `deny` and `unlock_time` in `/etc/security/faillock.conf`, written whenever the value there differs (`deny` a whole number of 1 or more, `unlock_time` seconds, 0 meaning never unlocked). |
+| `cis_faillock_root_unlock_time`, `cis_faillock_even_deny_root` | `60`, `true` | 5.3.3.1.3 (Level 2): the `root_unlock_time` the role writes over one that is already set (it never adds one), and whether `even_deny_root` is set (`false` removes the line and is reported as a finding unless a `root_unlock_time` is set). |
+| `cis_pwquality_difok`, `cis_pwquality_minlen`, `cis_pwquality_maxrepeat`, `cis_pwquality_maxsequence`, `cis_pwquality_dictcheck` | `2`, `14`, `3`, `3`, `1` | 5.3.3.2.1, 5.3.3.2.2, 5.3.3.2.4, 5.3.3.2.5, 5.3.3.2.6: the values written to the role's own pwquality drop-in whenever the value in effect differs (no `dictcheck` counts as libpwquality's default, 1). Whole numbers of 0 or more; `dictcheck` is 0 or 1. |
+| `cis_pwquality_enforce_for_root`, `cis_pwhistory_enforce_for_root` | `true`, `true` | 5.3.3.2.7, 5.3.3.3.2: whether `enforce_for_root` is set in the pwquality configuration and in `pwhistory.conf`. `false` removes it from the role's own file (a flag in another file stays) and is reported as a finding. |
+| `cis_pwhistory_remember` | `24` | 5.3.3.3.1: `remember` in `/etc/security/pwhistory.conf`, written whenever the value there differs. A whole number of 0 or more. |
+| `cis_password_hash`, `cis_encrypt_method` | `sha512`, the upper case of `cis_password_hash` | 5.3.3.4.3, 5.4.1.4: the password hashing algorithm, one setting in two places: the algorithm named on the `pam_unix` password line (fixed in the templates of the role's own authselect profile, where every other algorithm is removed; on another profile a line that differs is reported) and `ENCRYPT_METHOD` in `login.defs`. One of `sha512`, `yescrypt`, `sha256`, `md5`, `blowfish`. Preflight stops the run when `cis_encrypt_method` does not agree with `cis_password_hash`. `sha512` is the only one FIPS mode allows. |
+
+A `deny`, `unlock_time`, `root_unlock_time`, `difok`, `minlen`, `maxrepeat`, `maxsequence`,
+`dictcheck` or `remember` argument on a PAM module line that differs from its variable overrides the
+file and is removed from the templates of the role's own authselect profile; on any other profile
+it is left alone and, when it fails the benchmark, a finding. The structural PAM requirements (the
+`pam_faillock`, `pam_pwquality`, `pam_pwhistory` and `pam_unix` lines, no `nullok`, no `remember` on
+`pam_unix`, `use_authtok`) have no value to set and are not variables.
 
 ### Accounts and environment (5.4)
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `cis_pass_max_days` | `365` | 5.4.1.1: the maximum password age, from 1 to 365, written to `PASS_MAX_DAYS` in `login.defs` and with `chage --maxdays` to each existing account that has a password hash, when the value there is not from 1 to 365. A lower value already set is kept. |
-| `cis_pass_warn_age` | `7` | 5.4.1.3: the warning days, 7 or more, written to `PASS_WARN_AGE` and with `chage --warndays` to each account with a password hash, when the value there is below 7. A longer warning already set is kept. |
-| `cis_inactive_days` | `45` | 5.4.1.5: the inactive days, from 0 to 45, written with `useradd -D -f` and with `chage --inactive` to each account with a password hash, when the value there is unset, negative or above 45. A shorter period already set is kept. |
-| `cis_umask` | `"027"` | 5.4.2.6, 5.4.3.3, 5.4.3.4: the umask written to `UMASK` in `login.defs`, to the role's `/etc/profile.d` file and to root's `.bash_profile` and `.bashrc`. Three or four octal digits, 027 or more restrictive, in quotes (an unquoted `027` is the number 23). A stricter umask already set is kept. |
-| `cis_tmout` | `900` | 5.4.3.2: the shell idle timeout in seconds, from 1 to 900, written readonly and exported to the role's `/etc/profile.d` file when no file sets `TMOUT`. |
+| `cis_pass_max_days` | `365` | 5.4.1.1: the maximum password age, written to `PASS_MAX_DAYS` in `login.defs` and with `chage --maxdays` to each existing account that has a password hash, whenever the value differs (a stricter one included). A whole number of 1 or more (99999: no limit). |
+| `cis_pass_warn_age` | `7` | 5.4.1.3: the warning days, written to `PASS_WARN_AGE` and with `chage --warndays` to each account with a password hash, whenever the value differs. |
+| `cis_inactive_days` | `45` | 5.4.1.5: the inactive days, written with `useradd -D -f` and with `chage --inactive` to each account with a password hash, whenever the value differs. |
+| `cis_umask` | `"027"` | 5.4.2.6, 5.4.3.3, 5.4.3.4: the umask written to `UMASK` in `login.defs`, to the role's `/etc/profile.d` file and to root's `.bash_profile` and `.bashrc` whenever the value there is another mask (a stricter statement in root's files is rewritten). Three or four octal digits, in quotes (an unquoted `027` is the number 23). |
+| `cis_tmout` | `900` | 5.4.3.2: the shell idle timeout in seconds, written readonly and exported to the role's `/etc/profile.d` file when no other file sets `TMOUT`, and rewritten there whenever it differs. A whole number of 1 or more. A `TMOUT` in another file is judged, never edited. |
 | `cis_account_exceptions` | `[]` | 5.4.2.7, 5.4.2.8: login names of system accounts the role leaves alone (shell and lock state), reported as findings. Plain names; anything else stops the run at preflight. |
 
-Values outside these ranges stop the run at preflight.
+An account whose password would already be expired or inactive with the new aging value (a last
+change of 0, no last change date, a password older than the maximum) is skipped and reported, never
+changed; an account that only differs from the variable is left without a finding, one that fails the
+benchmark is a finding. Accounts without a password hash are left alone. With the default
+`cis_pass_max_days`, an account whose maximum is stricter and whose password is still within
+365 days gets 365: enforcing the value also relaxes a stricter one.
+
+Preflight refuses only what the tools would not take (a non-number, a malformed mode or umask); it
+never judges a value against the benchmark's bounds.
 
 ### Audit vs remediate
 
@@ -588,29 +633,32 @@ Values outside these ranges stop the run at preflight.
   also over a stricter mode, and adds the users listed in `cis_cron_allow_users` or
   `cis_at_allow_users`. It never removes a user or deletes a deny file.
 - SSH server (5.1): the role writes its settings to one drop-in,
-  `/etc/ssh/sshd_config.d/00-cis-rhel9.conf` (mode 0600), whose name sorts before
+  `/etc/ssh/sshd_config.d/00-cis-rhel9.conf` (mode `cis_sshd_config_mode`), whose name sorts before
   `50-redhat.conf` because sshd uses the first value it reads for most keywords (`MaxStartups` takes the last). Every control judges the
   effective configuration with `sshd -T` (and `sshd -T -C` for the account the role is
-  connected as, so a Match block for it is seen), never one file, and writes a line only
-  when the effective value is not compliant. A line is validated with `sshd -t -f` before
+  connected as, so a Match block for it is seen), never one file, and writes a line when
+  the effective value differs from the configured one (also when it is compliant). A line is validated with `sshd -t -f` before
   it is written; after any change a handler checks the whole configuration with `sshd -t`
   and reloads (never restarts) sshd, only when it is running. A value set before the drop-in
   is read (a file that sorts earlier, or the main file above its `Include`; for `MaxStartups`,
   any file read after it) still wins: the
   control is a finding, and the role edits no file it does not own. A host without
-  `openssh-server` passes. 5.1.1 to 5.1.4 set owner and mode on `sshd_config`, the `.conf`
-  drop-ins, the drop-in folder (0700) and the host keys (found from `sshd -T` and a glob; a
-  private key keeps the `ssh_keys` group it has); only the default drop-in folder is read, not
+  `openssh-server` passes. 5.1.1 to 5.1.4 set the exact owner, group and mode of the variables on
+  `sshd_config`, the `.conf` drop-ins, the drop-in folder and the host keys (found from `sshd -T`
+  and a glob; with the defaults a private key that is `root:ssh_keys` 0640 becomes `root:root`
+  0600, which sshd needs no group for); only the default drop-in folder is read, not
   one named by another `Include`. 5.1.5 to 5.1.7 are fixed through the crypto policy, the
   route of 1.6, not through `Ciphers`, `KexAlgorithms` or `MACs` lines: on RHEL 9 sshd takes
   those lists from the policy, so the role removes only the weak algorithms (CBC and arcfour
   ciphers, SHA-1 key exchange, 64-bit and MD5 MACs) and cannot leave a client with none in
-  common; chacha20 and EtM are the manual 1.6.5 and 1.6.6. 5.1.9 sets `Banner /etc/issue.net`
-  (1.7.3 manages the text). 5.1.11 (`DisableForwarding`, Level 1 Workstation and Level 2
+  common; chacha20 and EtM are the manual 1.6.5 and 1.6.6. The role holds the policy modules of
+  1.6.2 to 1.6.4 whether or not a weak algorithm is offered. 5.1.9 sets `Banner` to `cis_sshd_banner`
+  (`/etc/issue.net` by default, whose text 1.7.3 manages). 5.1.11 (`DisableForwarding`, Level 1 Workstation and Level 2
   Server) turns off all forwarding, so a host used as an SSH jump host or tunnel endpoint
   lists it in `cis_exclusions`. 5.1.12 turns off GSSAPI, which Kerberos single sign-on over
-  SSH needs. 5.1.21 sets `PermitRootLogin no`, except when the role is itself connected as
-  root over SSH (a message says so and the control is a finding). 5.1.8 writes the lists
+  SSH needs. 5.1.21 sets `PermitRootLogin` to `cis_sshd_permit_root_login` (`no` by default), except
+  when the value closes root login and the role is itself connected as root over SSH (a message
+  says so and the control is a finding). 5.1.8 writes the lists
   in `cis_sshd_allow_users`, `cis_sshd_allow_groups`, `cis_sshd_deny_users` and
   `cis_sshd_deny_groups` only when the account the role is connected as (read with
   `id -un`, become off) is still allowed by the result, counting the effective lists for any
@@ -624,15 +672,17 @@ Values outside these ranges stop the run at preflight.
   a trailing `~`), so the name sorts after the usual ones and the role's lines win over the
   files that sort before it. Each control judges every sudoers file sudo reads
   (`/etc/sudoers` and its `@include`, `#include`, `@includedir` and `#includedir` targets, in
-  sudo's order), not one file, and writes a line only when the effective value is not
-  compliant, so a stricter value is never loosened. Every write is validated with
+  sudo's order), not one file, and writes a line when the effective value differs from the
+  configured one (a missing line counts as sudo's own default: `use_pty` off, `pwfeedback` and
+  `visiblepw` off, a `timestamp_timeout` of 5, a `timestamp_type` of `tty`), a stricter value
+  included. Every write is validated with
   `visudo -cf` before it lands, and the whole configuration is checked with `visudo -c`
   afterwards. A non-compliant `Defaults` line that still wins (in a file that sorts after the
   role's, after the `#includedir` line of `/etc/sudoers`, or scoped to a user, host, command
   or runas list, which beats the global lines) is not edited: the control is a finding with
-  the file and line. 5.2.1 installs sudo; 5.2.2 and 5.2.3 set owner, group and only the mode
-  bits that are too open on the sudoers files and `/etc/sudoers.d`. 5.2.8, 5.2.9 and 5.2.11
-  pass on a host with no line (the defaults are compliant). 5.2.6 (Level 2, in
+  the file and line. 5.2.1 installs sudo (`cis_sudo_installed`); 5.2.2 and 5.2.3 set exactly the owner, group and
+  modes of `cis_sudoers_*` on the sudoers files and `/etc/sudoers.d`. 5.2.8, 5.2.9 and 5.2.11
+  write nothing on a host with no line while their variables are the sudo defaults. 5.2.6 (Level 2, in
   `cis_default_exclusions`) and 5.2.7 remove the `NOPASSWD:` tag, or the `!authenticate` item
   of a `Defaults` line, from files the role does not own, validating each edit with
   `visudo -cf`. **Lockout guard:** the account the role is connected as (read with become
@@ -644,7 +694,7 @@ Values outside these ranges stop the run at preflight.
   set nothing is guarded. A line that continues over several lines is not edited. 5.2.12 adds
   `auth required pam_wheel.so use_uid group=<cis_su_group>` to `/etc/pam.d/su` (in place of
   the commented line, else right after `pam_rootok`, so root can still use `su`) and creates
-  the group empty when missing; a line the site already set is kept. `/etc/pam.d/su` is not
+  the group empty when missing; a `pam_wheel` line that names another group is rewritten. `/etc/pam.d/su` is not
   managed by authselect. Members of the group are reported (a finding), never removed. The
   scanner is `files/sudoers_scan.py`, run with the managed node's Python. See
   [docs/review-controls.md](docs/review-controls.md).
@@ -677,8 +727,9 @@ Values outside these ranges stop the run at preflight.
   `unlock_time` (and for Level 2 `even_deny_root`) in `/etc/security/faillock.conf`;
   `difok`, `minlen`, `maxrepeat`, `maxsequence`, `dictcheck` and `enforce_for_root` in the
   role's own `/etc/security/pwquality.conf.d/zz-cis-rhel9.conf`; `remember` and
-  `enforce_for_root` in `/etc/security/pwhistory.conf`. A setting that is already compliant,
-  wherever it comes from, is never touched, so a stricter value is kept. libpwquality reads
+  `enforce_for_root` in `/etc/security/pwhistory.conf`. A setting that is compliant and is the
+  configured value, wherever it comes from, is never touched; one that differs is written, a
+  stricter value included. libpwquality reads
   `pwquality.conf` and then `pwquality.conf.d/*.conf` in name order and the last value wins, so
   compliance is judged on the value in effect; a non-compliant value in a file the role does
   not own that still wins (one that sorts after `zz-cis-rhel9.conf`) is a finding with its file
@@ -687,7 +738,8 @@ Values outside these ranges stop the run at preflight.
   judged from the active `system-auth` and `password-auth`. On the role's own profile it is
   removed or added in the templates in `/etc/authselect/custom/<name>/` and applied with
   `authselect apply-changes`; on any other profile only the features can fix it and the rest is
-  a finding. The password hash is `sha512` (also accepted: `yescrypt`). 5.3.3.2.3 only
+  a finding. The password hash is `cis_password_hash` (`sha512` by default; the check accepts
+  `sha512` and `yescrypt`). 5.3.3.2.3 only
   reports the complexity settings in effect. The scanner is `files/pam_scan.py`, run with the
   managed node's Python. See [docs/review-controls.md](docs/review-controls.md).
 - User accounts and environment (5.4): the scan is `files/accounts_scan.py`, run with the managed
@@ -699,9 +751,10 @@ Values outside these ranges stop the run at preflight.
   role works out whether the new value would make its password already expired or inactive today:
   a last change date of 0, no last change date (which `pam_unix` reads as day -1, so any maximum
   expires it at once), or a password older than the new maximum. Such an account is skipped, named
-  in a message, and the control is a finding; the role never changes it. A stricter value already
-  set is never loosened. 5.4.1.4 sets `ENCRYPT_METHOD` in `login.defs` to `SHA512` (or `YESCRYPT`
-  when the `pam_unix` line already uses it); the PAM side is 5.3.3.4.3 and is not repeated.
+  in a message, and the control is a finding when its value fails the benchmark; the role never
+  changes it. A value that differs from the variable is written, a stricter one included.
+  5.4.1.4 sets `ENCRYPT_METHOD` in `login.defs` to `cis_encrypt_method` (`SHA512` by default,
+  the upper case of `cis_password_hash`); the PAM side is 5.3.3.4.3 and is not repeated.
   5.4.1.2 (manual, Level 2), 5.4.1.6 and 5.4.2.1 to 5.4.2.5 (audit-only) only report; the
   [review page](docs/review-controls.md) lists what. **Lockout guard:** 5.4.2.7 (nologin shell)
   and 5.4.2.8 (`usermod -L`) change only system accounts (UID below `UID_MIN`, or 65534), never
@@ -709,8 +762,8 @@ Values outside these ranges stop the run at preflight.
   the account the role is connected as (read with `id -un`, become off), `ansible_user`,
   `ansible_ssh_user` or the account become runs through, an account with a running process, or
   an account in `cis_account_exceptions`; each skipped account is named with the reason and the
-  control is a finding. 5.4.2.6 edits only root's `.bash_profile` and `.bashrc` (a looser umask
-  statement is rewritten, a file with none gets `umask 027` at its end), judged on what
+  control is a finding. 5.4.2.6 edits only root's `.bash_profile` and `.bashrc` (a statement that is not
+  `cis_umask` is rewritten, a file with none gets `umask <cis_umask>` at its end), judged on what
   `su - root` reports and the statements in those files. **Shell environment:** 5.4.3.2 (`TMOUT`,
   readonly and exported) and 5.4.3.4 (`umask`) keep a marked block each in one role-owned file,
   `/etc/profile.d/zz-cis-rhel9.sh`. Every file the shells read (`/etc/profile`,

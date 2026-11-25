@@ -1,7 +1,9 @@
 ---
-# 5.3.3.2.6 - dictcheck is not 0 in the pwquality configuration (unset is compliant; when the value in
-# effect is 0 the role's drop-in sets dictcheck = 1); a dictcheck=0 argument on a pam_pwquality line
-# overrides the files and is removed from the templates of the role's own profile.
+# 5.3.3.2.6 - dictcheck is not 0 in the pwquality configuration (the benchmark; unset is compliant). The
+# fix makes it exactly cis_pwquality_dictcheck in the role's drop-in (no setting counts as 1, the
+# libpwquality default, so a host that sets nothing is left alone while the variable is 1); a
+# dictcheck= argument on a pam_pwquality line that differs from it overrides the files and is
+# removed from the templates of the role's own profile.
 # The logic is in tasks/lib/pam_setting.yml.
 
 - name: "5.3.3.2.6 - Ensure password dictionary check is enabled"
@@ -11,7 +13,7 @@
     cis_ps_conf:
       - path: '{{ cis_pwquality_dropin }}'
         regexp: '^\s*dictcheck\s*='
-        line: 'dictcheck = 1'
+        line: 'dictcheck = {{ cis_pwquality_dictcheck }}'
     cis_ps_header: '{{ cis_pwquality_dropin }}'
     cis_ps_tmpl:
       - re: '(^[ \t]*[a-z]+[ \t]+[^\n#]*?\bpam_pwquality\.so\b[^\n#]*?)[ \t]+dictcheck=\S*'

@@ -1,6 +1,8 @@
 ---
-# 5.3.3.2.7 - enforce_for_root is set in the pwquality configuration (the role's drop-in gets it
-# when it is not); the option is a flag, so one file setting it is enough.
+# 5.3.3.2.7 - enforce_for_root is set in the pwquality configuration (the benchmark); the option is a
+# flag, so one file setting it is enough. The fix keeps it in the role's drop-in as
+# cis_pwquality_enforce_for_root says: true adds it when no file sets it, false removes it from the
+# role's own drop-in (a flag in another file is left alone) and the control is a finding.
 # The logic is in tasks/lib/pam_setting.yml.
 
 - name: "5.3.3.2.7 - Ensure password quality is enforced for the root user"
@@ -11,6 +13,7 @@
       - path: '{{ cis_pwquality_dropin }}'
         regexp: '^\s*enforce_for_root\b'
         line: 'enforce_for_root'
+        state: "{{ 'present' if cis_pwquality_enforce_for_root | bool else 'absent' }}"
     cis_ps_header: '{{ cis_pwquality_dropin }}'
     cis_ps_tmpl: []
     cis_ps_feature: ''

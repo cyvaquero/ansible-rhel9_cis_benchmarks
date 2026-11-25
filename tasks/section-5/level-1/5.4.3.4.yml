@@ -5,7 +5,8 @@
 # looser). A test of the current umask (`[ `umask` -eq 0 ] && umask 022`, as /etc/bashrc has it)
 # is a conditional default, not a setting. The role keeps `umask <cis_umask>` in a marked block of
 # its own /etc/profile.d/zz-cis-rhel9.sh (cis_shell_dropin), which sorts after the usual files,
-# unless that file already has a compliant statement. A looser statement in any file is reported
+# unless that file already has a statement that is cis_umask (a different value in it, a stricter one
+# included, is rewritten). A looser statement in any file is reported
 # with its file and line and left alone, and the control is a finding. The umask also reaches
 # the role's own non-interactive shells (sshd runs ~/.bashrc, which sources /etc/bashrc and
 # /etc/profile.d); 5.4.3.3's UMASK already applies to every SSH session through pam_umask, so this
@@ -36,7 +37,7 @@
 
     - name: "5.4.3.4 - Report the umask statements the role leaves alone"
       ansible.builtin.debug:
-        msg: "5.4.3.4: {{ item.file }}:{{ item.line }}: {{ item.text }} is looser than 027. The role does not edit this file."
+        msg: "5.4.3.4: {{ item.file }}:{{ item.line }}: {{ item.text }} is looser than {{ cis_expect_umask }}. The role does not edit this file."
       loop: "{{ cis_acct.umask.problems }}"
       loop_control:
         label: "{{ item.file }}"
@@ -45,5 +46,6 @@
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/finding.yml"
       vars:
         cis_finding_id: "5.4.3.4"
-      when: cis_acct.umask.problems | length > 0
+      when:
+        - cis_acct.umask.problems | length > 0 or not cis_acct.target_ok.umask
 ...
