@@ -8,6 +8,15 @@ implements, then the role's own version.
 
 ## [Unreleased]
 
+## [3.0.0_0.0.37]
+
+### Fixed
+
+- 4.1.2 now reports a `FirewallBackend` value that firewalld does not recognize (another case such
+  as `NFTABLES`, a misspelling such as `nftable`, or an empty value), not only `iptables`, in both
+  modes. firewalld reads the value case-sensitively and fails to start with an unknown one, which
+  the old check passed. A missing line or file still passes. Remediation is unchanged (#65).
+
 ## [3.0.0_0.0.36]
 
 ### Changed

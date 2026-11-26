@@ -215,7 +215,7 @@ yet. `implemented`: the control has its task file at
 | CIS ID | Title | Profile | Type | Disposition | Status | Notes |
 |---|---|---|---|---|---|---|
 | 4.1.1 | Ensure firewalld is installed | L1 Server, L1 Workstation | Automated | implement | implemented | Adds cis_firewalld_installed |
-| 4.1.2 | Ensure firewalld backend is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Judges only an explicit iptables backend; holds cis_firewalld_backend; restarts firewalld only when it is running |
+| 4.1.2 | Ensure firewalld backend is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Any FirewallBackend value other than exactly nftables is non-compliant (a missing line or file passes); holds cis_firewalld_backend; restarts firewalld only when it is running |
 | 4.1.3 | Ensure firewalld.service is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Adds cis_firewalld_enabled and cis_firewalld_active; starts firewalld only when SSH is already allowed in the zone that applies to the role's connection; shared guard in tasks/lib/firewalld_ssh_guard.yml |
 | 4.1.4 | Ensure firewalld active zone target is configured | L1 Server, L1 Workstation | Automated | implement | implemented | Holds cis_firewalld_zone_target on every active zone; replaces an ACCEPT target only when SSH is already allowed in the zone that applies to the role's connection |
 | 4.1.5 | Ensure firewalld loopback traffic is configured | L1 Server, L1 Workstation | Manual | manual | implemented | Listed for review; the role reports it and changes nothing |

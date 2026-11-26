@@ -4,7 +4,7 @@ Ansible role that applies the
 [CIS Red Hat Enterprise Linux 9 Benchmark](https://www.cisecurity.org/benchmark/red_hat_linux)
 (v3.0.0) to RHEL 9 hosts.
 
-**Status: pre-alpha (3.0.0_0.0.36).** The role skeleton, preflight check, profile
+**Status: pre-alpha (3.0.0_0.0.37).** The role skeleton, preflight check, profile
 selection, audit mode and lint CI exist, and these controls are implemented:
 
 - kernel modules, 1.1.1.1 to 1.1.1.11;
@@ -290,7 +290,7 @@ refuses the two at different values. 3.1.1 (manual) only reports.
 | Variable | Default | Meaning |
 |---|---|---|
 | `cis_firewalld_installed` | `true` | 4.1.1: whether `firewalld` should be installed. `true` installs it when missing (install only: 4.1.3 decides whether it runs). `false` removes it when no other installed package needs it; one that is needed stays installed and `firewalld.service` is stopped and masked instead, and 4.1.3 leaves the service alone. `false` is reported as a finding. |
-| `cis_firewalld_backend` | `nftables` | 4.1.2: the `FirewallBackend` value held in `/etc/firewalld/firewalld.conf`: `nftables` or `iptables`. The last `FirewallBackend` line is rewritten whenever it is another value or spelling; a missing line counts as `nftables` (firewalld's own default) and a missing file is left alone. When the line changes, `firewalld` is restarted right away, only when it runs. `iptables` is reported as a finding. |
+| `cis_firewalld_backend` | `nftables` | 4.1.2: the `FirewallBackend` value held in `/etc/firewalld/firewalld.conf`: `nftables` or `iptables`. The last `FirewallBackend` line is rewritten whenever it is another value or spelling; a missing line counts as `nftables` (firewalld's own default) and a missing file is left alone. When the line changes, `firewalld` is restarted right away, only when it runs. `iptables` is reported as a finding, and so is any `FirewallBackend` value in the file other than exactly `nftables` (another case, a misspelling, an empty value), because firewalld reads the value case-sensitively and does not start with one it does not know. |
 | `cis_firewalld_enabled`, `cis_firewalld_active` | `true`, `true` | 4.1.3: whether `firewalld.service` is enabled and whether it is running. The role unmasks (when either is true), enables or disables, and starts or stops it to match. Starting it needs the SSH guard to allow it; stopping and disabling do not. `false` is reported as a finding. Ignored while `cis_firewalld_installed` is `false`. |
 | `cis_firewalld_zone_target` | `default` | 4.1.4: the permanent target of every active zone bound to an interface other than `lo` or `virbr*`: `default`, `ACCEPT`, `REJECT` or `DROP`. The role sets it on any zone whose target is another one, a stricter target included (a `DROP` zone becomes `default`), then reloads `firewalld`. Replacing an `ACCEPT` target needs the SSH guard to allow it. `ACCEPT` is reported as a finding. |
 | `cis_nftables_service_enabled`, `cis_nftables_service_active` | `false`, `false` | 4.1.9: whether `nftables.service` is enabled and whether it is running. With both `false` the role stops, disables and masks it when it is enabled or active (one already masked, disabled and stopped is left as it is); otherwise it unmasks, enables or disables, and starts or stops it to match. Starting it needs the SSH guard to allow it, because the ruleset it loads is the site's own. A unit that does not exist is left alone. `true` is reported as a finding. The `nftables` package is never installed or removed. |
@@ -558,7 +558,7 @@ never judges a value against the benchmark's bounds.
   (default: installed). 4.1.2 holds `FirewallBackend` in `/etc/firewalld/firewalld.conf` at
   `cis_firewalld_backend` (a missing line already means `nftables`) and, when it changes the
   line, restarts `firewalld` right away if it is running, before any later control reloads it
-  (so no later reload works against a firewalld that has not applied the line); the check fails only on an explicit `iptables`. 4.1.3 unmasks,
+  (so no later reload works against a firewalld that has not applied the line); the check fails on any `FirewallBackend` value other than exactly `nftables` (a missing line passes). 4.1.3 unmasks,
   enables and starts `firewalld.service`, or the other states `cis_firewalld_enabled` and
   `cis_firewalld_active` say. 4.1.4 checks every active zone bound to an interface other than `lo`
   or `virbr*`: its target must not be `ACCEPT` or empty, and the runtime and permanent targets
