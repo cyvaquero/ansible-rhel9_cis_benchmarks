@@ -1,12 +1,14 @@
 ---
-# 4.1.2 - the firewalld backend. The check judges the benchmark: only an explicit
-# FirewallBackend=<cis_expect_firewalld_backend_forbidden> (iptables) in
-# /etc/firewalld/firewalld.conf is non-compliant (the last such line wins, as in firewalld, and
-# the case is ignored); a missing file, a missing line or any other value passes. The fix makes
-# the last FirewallBackend line exactly cis_firewalld_backend (default nftables) whenever it
-# differs, also when the line holds another spelling or value the benchmark accepts. A missing
-# line counts as firewalld's own default (cis_firewalld_backend_unset) and is written only when
-# that differs from the variable; a missing file is left alone. When the line changes, firewalld
+# 4.1.2 - the firewalld backend. The check judges what firewalld will use: non-compliant when the
+# last FirewallBackend line in /etc/firewalld/firewalld.conf (the last line wins, as in firewalld)
+# holds anything other than exactly cis_expect_firewalld_backend (nftables). firewalld reads the
+# value case-sensitively and does not start with one it does not know, so another case
+# (NFTABLES), a misspelling, iptables and an empty value are all findings. A missing file or a
+# missing line passes: firewalld's own default is nftables. The fix makes the last
+# FirewallBackend line exactly cis_firewalld_backend (default nftables) whenever it differs, also
+# when the line holds another spelling or value. A missing line counts as firewalld's own default
+# (cis_firewalld_backend_unset) and is written only when that differs from the variable; a missing
+# file is left alone. When the line changes, firewalld
 # is restarted right away, and only when it is running (try-restart), so the new backend applies
 # before any later control reloads firewalld: a firewalld that could not apply the old line (a
 # reload with a value it does not know fails and leaves its rules half applied) can hang a later
@@ -32,28 +34,28 @@
           - /bin/sh
           - -c
           - |
-            # $1: the backend the site wants, $2: the one the benchmark forbids, $3: the backend
+            # $1: the backend the site wants, $2: the one the benchmark expects, $3: the backend
             # firewalld uses when the line is missing.
             f=/etc/firewalld/firewalld.conf
             raw=$(sed -n 's/^[[:space:]]*FirewallBackend[[:space:]]*=[[:space:]]*//p' "$f" 2>/dev/null | tail -n 1 | tr -d '[:space:]')
-            v=$(printf '%s' "$raw" | tr 'A-Z' 'a-z')
+            found=$(grep -c '^[[:space:]]*FirewallBackend[[:space:]]*=' "$f" 2>/dev/null || true)
             site=ok
             if [ -f "$f" ]; then
-              if [ -n "$raw" ]; then
+              if [ "${found:-0}" -gt 0 ]; then
                 [ "$raw" = "$1" ] || site=bad
               else
                 [ "$3" = "$1" ] || site=bad
               fi
             fi
             echo "site=$site"
-            if [ "$v" = "$2" ]; then
+            if [ "${found:-0}" -gt 0 ] && [ "$raw" != "$2" ]; then
               echo "state=bad"
               exit 1
             fi
             echo "state=ok"
           - sh
           - "{{ cis_firewalld_backend }}"
-          - "{{ cis_expect_firewalld_backend_forbidden }}"
+          - "{{ cis_expect_firewalld_backend }}"
           - "{{ cis_firewalld_backend_unset }}"
       register: cis_check_4_1_2
       changed_when: false

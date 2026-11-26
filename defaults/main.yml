@@ -464,7 +464,8 @@ cis_firewalld_installed: true
 
 # 4.1.2: the FirewallBackend the role holds in /etc/firewalld/firewalld.conf. One of nftables or
 # iptables. A missing line counts as firewalld's own default (nftables); firewalld is restarted
-# only when it runs. iptables is reported as a finding.
+# only when it runs. iptables is reported as a finding, and so is any value other than exactly
+# nftables in the file (another case, a misspelling, an empty value).
 cis_firewalld_backend: nftables
 
 # 4.1.3: whether firewalld.service is enabled and whether it is running. The role unmasks (when
